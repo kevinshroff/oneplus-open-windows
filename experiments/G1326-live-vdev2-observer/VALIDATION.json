@@ -7,7 +7,7 @@
   "Go_race_tests_pass": true,
   "Python_model_test_groups": 7,
   "Python_tests_pass": true,
-  "native_execution_claimed": false,
+  "native_execution_claimed": true,
   "live_phase_result_claimed": false,
   "binary_retained_or_published": false,
   "source_files": {
@@ -15,7 +15,7 @@
     "Cleanup-Timeout.ps1.in": "cd0291147746b44665ee9932b7829bdf34efee8e31db53c9ceffbe5b691d69e7",
     "LOADED-RECEIPT.template.json": "c917c012fa2ec3a97f810fd97cf899c91557822ec4f5f04a122a0b6d09df1834",
     "Observer.ps1.in": "8c162a3812adde783b81ed90cc3f5af5686462cbf19a5f6f498034c436a2f92e",
-    "README.md": "ca8cc5eca52b2d89909e1cd78f4c7b9d80560b85c86db503b4e6a7fa04d12b55",
+    "README.md": "c6e3220663063ac11c991525ddae6e85afc94f0a508170c05815f690a60acd2c",
     "RESOURCE-ORIGIN.md": "ee812726f825ad150371e2dead714fd1a58d14f30fb2e70abc4d4da99e1a979b",
     "Register-Observer.ps1": "a8280f53790790434f9609c2cba1d5e526c4616a5c4b7c6a52f34f4cbf772f5b",
     "analyze.py": "4eaa1346edd28ec56c363c865b26cadd4bdb33ee127fe312697a3aa82c1672b8",
@@ -30,6 +30,47 @@
     "test_workflow.py": "c9b3906180e700e6c64e28da67cf432b19f5e4c1a49ba84b96240b4bd13f1be1"
   },
   "observer_source_version": 2,
-  "changed_PS_native_qualification_claimed": false,
-  "quote_free_generated_commands_regression_pass": true
+  "changed_PS_native_qualification_claimed": true,
+  "quote_free_generated_commands_regression_pass": true,
+  "native_execution_scope": "HOST_ONLY_NATIVE_ARGV_AND_SYNTAX_DEFAULT_INERT",
+  "native_reader_execution_claimed": false,
+  "changed_PS_native_qualification_scope": "AST_PARSE_AND_DEFAULT_INERT_SYNTAX_CARRIERS_ONLY",
+  "host_only_native_qualification": {
+    "scope": "HOST_ONLY_NATIVE_ARGV_AND_SYNTAX_DEFAULT_INERT",
+    "PowerShell_version": "5.1.26100.9711",
+    "command_cases_passed": 10,
+    "all_cases_argc_including_executable": 3,
+    "all_command_SHA256_exact": true,
+    "historical_embedded_quote_loss_reproduced_argc": 6,
+    "wrong_digest_refused": true,
+    "debugger_calls": 0,
+    "device_calls": 0,
+    "command_interpretation_calls": 0,
+    "live_observer_qualified": false,
+    "public_templates_byte_identical_to_tested_private_v2": true,
+    "public_generator_commands_byte_identical_to_tested_private_v2": true,
+    "public_generated_syntax_carriers_match_native_tested_SHA256": true,
+    "syntax_carriers": [
+      {
+        "name": "Observer-SYNTAX-ONLY.ps1",
+        "parse_errors": 0,
+        "default_inert": true,
+        "sha256": "2e17d89acb108927137e0ea725f1960d4add2a7db5bc3ca46daca4e7f1057f13"
+      },
+      {
+        "name": "Cleanup-Timeout-SYNTAX-ONLY.ps1",
+        "parse_errors": 0,
+        "default_inert": true,
+        "sha256": "427e42462bff2c39184173c3a6737518d6a9a2bc1b080194b45bb0a5fdafbc4d"
+      }
+    ],
+    "source_SHA256": {
+      "Observer.ps1.in": "8c162a3812adde783b81ed90cc3f5af5686462cbf19a5f6f498034c436a2f92e",
+      "Cleanup-Timeout.ps1.in": "cd0291147746b44665ee9932b7829bdf34efee8e31db53c9ceffbe5b691d69e7",
+      "generate.py": "7975f1a959501780efe83b6cf56effb77ee0c3f3a5482caa2af033a370863944"
+    },
+    "tested_private_generator_SHA256": "c745499296912d8d2efab391fa05ea6269c7e3e54ef3494b41c4c4af0fc8f6b0",
+    "argv_verifier_source_SHA256": "d58540b94ee778a302427e19eba13921e4f6fd4a7dadfe52ff47030ec6e97423",
+    "host_recipe_source_SHA256": "9eba7af34b5227e3ef2caad8cf7c78715ea10956b45d6b3e0d4a2333092e2127"
+  }
 }
