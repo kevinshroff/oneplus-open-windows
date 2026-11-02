@@ -1,0 +1,217 @@
+{
+  "schema": "g1311-public-owner-sources/1",
+  "source_root": "../G1287-cold-aperture",
+  "historical_reference": "G1287 final timestamp-normalized ARM64 COFF",
+  "objects": [
+    {
+      "source": "source/owner/owner_entry.c",
+      "object": "0_owner_entry.obj",
+      "historical_coff_sha256": "cfb90a519377c8e74c0e5ece6f60c8a32bff7e8a0e26f036da6c0686a4251a41",
+      "historical_source_sha256": "21f7fe8dff4e1d0b3b4df46f42670807c826b33702fd9067ff07ce626e9fce41"
+    },
+    {
+      "source": "source/owner/bootstrap.c",
+      "object": "1_bootstrap.obj",
+      "historical_coff_sha256": "839856805523def89f20535620ff45556b19b4373f49b8b6e1042d6a0452f26f",
+      "historical_source_sha256": "e5a33465a642a58ea4b48e54118a59e6a555ecc035c57ff4572eb788aa4dd164"
+    },
+    {
+      "source": "source/owner/inputs.c",
+      "object": "2_inputs.obj",
+      "historical_coff_sha256": "c2dcac6f4d412fc485e063afc9b6b8a5e213b360558197ef623cddb55285cbb8",
+      "historical_source_sha256": "d29513dcf5a7962f1ad53c7dd3eff9c838a9ab3f6c2f47d4ce2b8a87475926aa"
+    },
+    {
+      "source": "source/owner/log.c",
+      "object": "3_log.obj",
+      "historical_coff_sha256": "6e09aeeea07f72a158de6144bcf129558c8518a1f1ff52558da4998657df3105",
+      "historical_source_sha256": "03d6f30f035944ec0ebab4d87c34bab1a5debf78eb5b51d833cd9830e977ae61"
+    },
+    {
+      "source": "source/native_bootstrap.c",
+      "object": "4_native_bootstrap.obj",
+      "historical_coff_sha256": "38e9a8c8c8a86140cec7ea4b57f84c110c3b040fbc4a280a3b5e40a18ff08f63",
+      "historical_source_sha256": "e63306742b008a2352a401b657e1b13588c87af04deacdc67cf3f52a890d2ee8"
+    },
+    {
+      "source": "source/nc_visibility.c",
+      "object": "5_nc_visibility.obj",
+      "historical_coff_sha256": "f40e81430cd6af7a35b1e82b1d3504f51ecf62e479d2412a043ff4dc394135ec",
+      "historical_source_sha256": "b8713cae8658dd42317b51365e340d8791330ca279dd020b9721c727a75cf0e5"
+    },
+    {
+      "source": "source/open_smmu_activate.c",
+      "object": "6_open_smmu_activate.obj",
+      "historical_coff_sha256": "5f4e5c320972d177f81ac71a6b0bf4d68acbda8ce2ab0dea63b8cea1d75ce721",
+      "historical_source_sha256": "8c2a6e9d56d1e0c5526da5d906e6a21477a0cd08d6295a7182107a6ef8e25742"
+    },
+    {
+      "source": "source/open_smmu_activate_wdm.c",
+      "object": "7_open_smmu_activate_wdm.obj",
+      "historical_coff_sha256": "bd908cca0311a765eb1c4b32f541c62c0edc5069d07ff85f5948cca3d1215acc",
+      "historical_source_sha256": "c5e8245db2b468d379a14037dc52a559e80669efa5fea328c542b5f260136a19"
+    },
+    {
+      "source": "source/local_bank_consumer.c",
+      "object": "8_local_bank_consumer.obj",
+      "historical_coff_sha256": "76f0bad04dcec95e309e9579fb5997052c442561f96f59ff6ca8ef920b92d48f",
+      "historical_source_sha256": "9ea0e69de100813510f3a039700d24176aa3fb1b1025036b7ef52a04ff6fe799"
+    },
+    {
+      "source": "source/broker/open_smmu_handoff.c",
+      "object": "9_open_smmu_handoff.obj",
+      "historical_coff_sha256": "03483241aaf7e1f67a4549d56c94b30386fba9655452fb4bc27ff718ac025f5d",
+      "historical_source_sha256": "8cd90ab8986687959641255e255b34a0886eaac2bba9216d2620940f7a55fde4"
+    },
+    {
+      "source": "reference/inactive/source/g321_inactive.c",
+      "object": "10_g321_inactive.obj",
+      "historical_coff_sha256": "e5409320e00a2f7ff9baa0dbcd179fdcd9af9eedff85206b820775f38001203b",
+      "historical_source_sha256": "516fe5aa86ebc3241492a87fe87420af7186c3cfcabc6d1ca088865d00f58d92"
+    },
+    {
+      "source": "reference/inactive/source/open_smmu_inactive.c",
+      "object": "11_open_smmu_inactive.obj",
+      "historical_coff_sha256": "9e72707f71b431c424f25bc2ee621e7f7228e2b0a3be78bc326734e160e548dc",
+      "historical_source_sha256": "69d47f5e3fb1dbb4e730f3b5c3d946e64849e0268e18144d8962b0bb5a61fdf0"
+    },
+    {
+      "source": "reference/inactive/source/vendor/ArmSmmu4K.c",
+      "object": "12_ArmSmmu4K.obj",
+      "historical_coff_sha256": "acc415747ed18523eca525150596f8df1acc4f7d6d2959892760c57ca4df3cc9",
+      "historical_source_sha256": "0adb19b483e56e723014ed6cfe2c29f9d9735ae2770f62cf0057b22937dbd157"
+    },
+    {
+      "source": "reference/inactive/source/vendor/ArmSmmu4KAuditInactive.c",
+      "object": "13_ArmSmmu4KAuditInactive.obj",
+      "historical_coff_sha256": "1ed8f317c9e7f587a97ed8a1740ec73c15f939eeb603bffd14c9ae89bb448330",
+      "historical_source_sha256": "f9259f0f8e0356e8b9e62fc8707a8b303867e2f266323dbdcfa6b7671c53a607"
+    },
+    {
+      "source": "reference/runtime/g196_preflight.c",
+      "object": "14_g196_preflight.obj",
+      "historical_coff_sha256": "7e0e8db25fe8e56bed7eb3403b84a7b736e0d1ea79f94e567beb61d866eb5b8b",
+      "historical_source_sha256": "3319f0e5aa8912bc7e17778cf054e4e469081452c18705f81835e8d8f5bd4ae5"
+    },
+    {
+      "source": "reference/runtime/g321_plan.c",
+      "object": "15_g321_plan.obj",
+      "historical_coff_sha256": "2847127cd7e5171ad51ae313d671185cafd82629505d762a04123d88e81b1998",
+      "historical_source_sha256": "0dc503808f8c158749e41027128a19bbaba76a2c103252fca43e5afc850992a0"
+    },
+    {
+      "source": "reference/runtime/g190_backend.c",
+      "object": "16_g190_backend.obj",
+      "historical_coff_sha256": "35757bb85189457b1ad3a51588cf248b551118687d7416fe1836cc82ae8a2c5f",
+      "historical_source_sha256": "6aa4279017f2c42ee8f540cd261c6004270fedf6480ff516cc95321e5156a14d"
+    },
+    {
+      "source": "reference/runtime/vendor/AdrenoFirmware.c",
+      "object": "17_AdrenoFirmware.obj",
+      "historical_coff_sha256": "29b80a04fabd90715e4fd2b3ce36331a4a7bcededdf8eaa310df6765c6c3d4fc",
+      "historical_source_sha256": "c3cc714a65ce90216a0fc5c6f0e102ae1769c45e559c08f94a0b5f6fa3e97070"
+    },
+    {
+      "source": "reference/runtime/vendor/AdrenoHfiEncode.c",
+      "object": "18_AdrenoHfiEncode.obj",
+      "historical_coff_sha256": "650be0d08e3582f722eb89ca5d8ae91eb841866702cf713ca63d6ac216b73897",
+      "historical_source_sha256": "8e0019b01597436a22885ad61d719ae0e614161668b4bdbca762cdce6090513e"
+    },
+    {
+      "source": "source/broker/open_parent_consumer.c",
+      "object": "19_open_parent_consumer.obj",
+      "historical_coff_sha256": "37fa91ac1637910144d6b28add380f5d7f9ad505f40452a82b1dbf46b7cb6e5f",
+      "historical_source_sha256": "b4ef03cce59e923ea728a809a223769a4eceb6105850dc6a2e5028d5940b7fc2"
+    },
+    {
+      "source": "source/cold_hold.c",
+      "object": "20_cold_hold.obj",
+      "historical_coff_sha256": "04b24418d2674c996d8b969c95bdd0ff38934a541f9dfeff5ca72f4a376e7eea",
+      "historical_source_sha256": "44452d0a4932756dcedb4b509d3f5ba7fc6cf61bea92333bdb46f015ee78dcd3"
+    },
+    {
+      "source": "source/cold_hold_native.c",
+      "object": "21_cold_hold_native.obj",
+      "historical_coff_sha256": "6d549f722ab9bb4a9d3638104ed25f2a8756aa2688bd738ad9b77a9f9f777e9c",
+      "historical_source_sha256": "c81a4138f2d3aeab38b8d64877cd3705a6233e7de5427385e781c314e8a0eabb"
+    },
+    {
+      "source": "source/gmu_clock_consumer.c",
+      "object": "22_gmu_clock_consumer.obj",
+      "historical_coff_sha256": "e8b9a0980cba26e73a62a1cb1575072bcbdaa6e0a2fa99c46246b7f7bf687171",
+      "historical_source_sha256": "0042acb18e765a54746c58866c5ac9d0078880872d7826c2939ef2423b376f62"
+    },
+    {
+      "source": "reference/runtime/g482_resources.c",
+      "object": "23_g482_resources.obj",
+      "historical_coff_sha256": "b52b7b238f36713f05a578a69dd4c46413e1848f5b6509843a53cb607e59fcb4",
+      "historical_source_sha256": "239a02d6684e45de0da97f89ec26030b8dc0200a522717d19f1f4d01cbdcf3f5"
+    },
+    {
+      "source": "source/owner_life.c",
+      "object": "24_owner_life.obj",
+      "historical_coff_sha256": "cb2b1bbf92bd0b90c298b0c09fbb02005a98055a3f0f89a559111d746ba23458",
+      "historical_source_sha256": "9272179c4402a81a582e278aaada89d0853f82c7bb962eb5c7d584aa8619ba84"
+    },
+    {
+      "source": "source/property_keys.c",
+      "object": "25_property_keys.obj",
+      "historical_coff_sha256": "9ca68c2d8b965614d23ff1eddeb9dbe8e690bfd51a40b831e640312a42c6260b",
+      "historical_source_sha256": "a16db5d56b257e467da9a6b1abf99892a8ec8d47a8090df81304807409848fca"
+    },
+    {
+      "source": "source/owner/gmu_runtime.c",
+      "object": "26_gmu_runtime.obj",
+      "historical_coff_sha256": "b8029aca722760dd4bb3a618e5e3bd4935d74052a6e3c394fdaf40c0683691a9",
+      "historical_source_sha256": "b28ffee95a661414b8a58be0ba4df79e9cfbd0e02a3c22ab242b543179f56747"
+    },
+    {
+      "source": "reference/runtime/g482_board.c",
+      "object": "27_g482_board.obj",
+      "historical_coff_sha256": "678994603215712c3744dc1b597a278d55217336fefdb7b2e4737126fbd58654",
+      "historical_source_sha256": "c2c4ac81360ac301ce5c9a8ad2988a95255cba0cb6e13358fd394ef428c701d4"
+    },
+    {
+      "source": "source/owner/gpu_cp_native.c",
+      "object": "43_gpu_cp_native.obj",
+      "historical_coff_sha256": "3706425f39d77a1c0101d12fa3323eb5cf6659d17dc6fd17121c4c59a0e4cb80",
+      "historical_source_sha256": "8b56bae1132394ca568343a822eb965e93af14a849f699200617b11c6a26052d"
+    },
+    {
+      "source": "source/owner/gpu_cp_translate.c",
+      "object": "44_gpu_cp_translate.obj",
+      "historical_coff_sha256": "b0f8b8951c269f88454a0d43ac093b3d36a97594901134f8be7982648b9f7255",
+      "historical_source_sha256": "49ad19031ccb00e2770fb6d7bdab12871eff09d02f6b97d53adbcda86264784a"
+    },
+    {
+      "source": "reference/runtime/g433_cp.c",
+      "object": "45_g433_cp.obj",
+      "historical_coff_sha256": "cd767f61ab9beb69d8493a3b52702ce5883db0e6f466e80b2f3a0f8fcb276335",
+      "historical_source_sha256": "85fe9ede2138c5e3a0e4c999d20e42e7341a6618da60d45f9b83dacee810f7e0"
+    },
+    {
+      "source": "reference/runtime/g440_gpu_power.c",
+      "object": "46_g440_gpu_power.obj",
+      "historical_coff_sha256": "9bcaf3b1ee32e6cbccd4bbe6dc131ef58b91151292749e3c6c5f03066ecdf69e",
+      "historical_source_sha256": "456bc000752162a3f1c3fe0f3963c551b66a0730f0d5739bb75903251ecf8574"
+    },
+    {
+      "source": "reference/runtime/g456_hwinit.c",
+      "object": "47_g456_hwinit.obj",
+      "historical_coff_sha256": "314b1f7b28c846119e0849c19e0e85e62ae6df5d59da56f6f50a52e262a20b5c",
+      "historical_source_sha256": "c7394c2997f0e774c1a7642633087e83d0d0da3f76d3422804eae34e1b4b6624"
+    },
+    {
+      "source": "reference/runtime/vendor/AdrenoPM4.c",
+      "object": "48_AdrenoPM4.obj",
+      "historical_coff_sha256": "18ad09feeafa3ce5bb1f8b514e1f71267585304b0eb1bc0c9b069b9e6b4c4888",
+      "historical_source_sha256": "c4b0227859a1e771c5f349524b718b08444f518ef960bfa4b50f6fd4ab30ad2f"
+    },
+    {
+      "source": "source/owner/scm_set_cp0.S",
+      "object": "49_scm_set_cp0.obj",
+      "historical_coff_sha256": "32c0cc14c43c55fb4254f44695959154cf4043ef73c85d8f6be7de5534469721",
+      "historical_source_sha256": "77cb6fcbc124823841bab4f0c0e4fbcaece67834d3fbc273ded268ecb0b8d2c3"
+    }
+  ]
+}

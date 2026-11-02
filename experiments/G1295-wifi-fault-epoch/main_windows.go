@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"runtime"
@@ -96,6 +97,7 @@ func main() {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 	require(dec.Decode(&p) == nil, "Proof schema")
+	require(dec.Decode(new(any)) == io.EOF, "Trailing proof JSON")
 	require(p.Schema == "G1295-root-phase-fault-epoch/1" && p.BootID > 161 && p.OwnedBreak && p.CurrentTables && p.PhysicalAccess, "Current root resource/access/hold admission required")
 	require(regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(p.Image) && p.RootNormalBoot && p.Session != "00000000000000000000000000000000", "Actual fresh normal image/session proof; Boot161 cannot be reused")
 	re32 := regexp.MustCompile(`^[0-9a-f]{32}$`)
@@ -116,6 +118,8 @@ func main() {
 		v["observation_phase"] = p.Phase
 		v["phone_session"] = p.Session
 		v["root_nonce"] = p.Nonce
+		v["image_sha256"] = p.Image
+		v["action_ledger_sha256"] = p.Evidence["action_ledger"]
 		v["utc"] = time.Now().UTC().Format(time.RFC3339Nano)
 		b, e := json.Marshal(v)
 		require(e == nil, "JSON")

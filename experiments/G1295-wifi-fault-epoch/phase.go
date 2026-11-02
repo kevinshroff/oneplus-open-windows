@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -65,6 +66,7 @@ func admitPhase(p proof, re64 *regexp.Regexp, proofTime time.Time) actionLedger 
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
 	require(d.Decode(&l) == nil, "Action ledger schema")
+	require(d.Decode(new(any)) == io.EOF, "Trailing action ledger JSON")
 	require(l.Schema == "G1295-actual-boot-action-ledger/1" && l.BootID == p.BootID && l.BootID > 161 && l.Session == p.Session && l.Image == p.Image && l.Phase == p.Phase, "Action ledger is not actual matching fresh phase/boot/image/session")
 	created, e := time.Parse(time.RFC3339Nano, l.Created)
 	require(e == nil && !created.After(proofTime) && proofTime.Sub(created) < 5*time.Minute, "Stale/future action ledger")

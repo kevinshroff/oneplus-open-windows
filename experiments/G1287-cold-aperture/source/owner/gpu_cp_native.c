@@ -1,6 +1,7 @@
 /* Native single-context SID0/CB0 CP init fence1. No HAL, PAS, secure exit or IOCTL. */
 #include "gpu_owner.h"
 #include "gpu_cp_native.h"
+#include "gpu_va_layout.h"
 #include "g433_sqe_pin.h"
 #include <intrin.h>
 #define UINTN SIZE_T
@@ -80,7 +81,7 @@ static NTSTATUS LoadSqe(G982_CP*c){UNICODE_STRING name;OBJECT_ATTRIBUTES oa;IO_S
 static NTSTATUS Prepare(OGO_CONTEXT*p){G982_CP*c=p->Cp;G433_RUNTIME*r=&c->Run;NTSTATUS s=OgoCpCurrent(p);if(s!=STATUS_SUCCESS)return s;
  KeInitializeMutex(&r->Lock,0);r->Initialized=TRUE;r->Gmu=p->Gmu;r->Generation=p->Gmu->Generation;r->StopSerial=p->Hold.Serial;r->Attempted=TRUE;r->Gpu.ReadGpuRegister=GpuRead;r->Gpu.WriteGpuRegister=GpuWrite;r->Gpu.AhbFenceStatus=Ahb;
  r->Gpu.Board=(G456_FACTS){r->Generation,0x70201,p->CpDdrType,1,1};
- const ULONGLONG va[4]={0xf0000000,0xf0008000,0xf0010000,0xf0030000};const SIZE_T bytes[4]={0x8000,0x1000,0x13000,0x1000};OSMI_INPUT in[4];RtlZeroMemory(in,sizeof(in));OsmiInitialize(&c->Tables);
+ const ULONGLONG va[4]=OGO_CP_VA_INITIALIZER;const SIZE_T bytes[4]={0x8000,0x1000,0x13000,0x1000};OSMI_INPUT in[4];RtlZeroMemory(in,sizeof(in));OsmiInitialize(&c->Tables);
  s=LoadSqe(c);if(s!=STATUS_SUCCESS)return s;
  for(unsigned i=0;i<4;i++){if((s=OgoCpCurrent(p))!=STATUS_SUCCESS)return s;G321_BUFFER*b=&r->Buffer[i];PHYSICAL_ADDRESS low={0},high,skip={0};high.QuadPart=(1ull<<36)-1;r->Layout.Iova[i]=va[i];r->Layout.Bytes[i]=bytes[i];
   b->Mdl=MmAllocatePagesForMdlEx(low,high,skip,bytes[i],MmNonCached,MM_ALLOCATE_FULLY_REQUIRED);if(!b->Mdl)return STATUS_INSUFFICIENT_RESOURCES;

@@ -1,0 +1,227 @@
+{
+  "native_evidence": false,
+  "linked": false,
+  "signed": false,
+  "objects_per_layout": 35,
+  "baseline_historical_coff_matches": 35,
+  "variant_historical_coff_matches": 34,
+  "variant_differences": [
+    "source/owner/gpu_cp_native.c"
+  ],
+  "baseline_source_differences": [
+    "source/owner/gpu_cp_native.c"
+  ],
+  "redaction_object_drift": false,
+  "objects": [
+    {
+      "source": "source/owner/owner_entry.c",
+      "object": "0_owner_entry.obj",
+      "baseline_sha256": "cfb90a519377c8e74c0e5ece6f60c8a32bff7e8a0e26f036da6c0686a4251a41",
+      "nonsecure64_sha256": "cfb90a519377c8e74c0e5ece6f60c8a32bff7e8a0e26f036da6c0686a4251a41"
+    },
+    {
+      "source": "source/owner/bootstrap.c",
+      "object": "1_bootstrap.obj",
+      "baseline_sha256": "839856805523def89f20535620ff45556b19b4373f49b8b6e1042d6a0452f26f",
+      "nonsecure64_sha256": "839856805523def89f20535620ff45556b19b4373f49b8b6e1042d6a0452f26f"
+    },
+    {
+      "source": "source/owner/inputs.c",
+      "object": "2_inputs.obj",
+      "baseline_sha256": "c2dcac6f4d412fc485e063afc9b6b8a5e213b360558197ef623cddb55285cbb8",
+      "nonsecure64_sha256": "c2dcac6f4d412fc485e063afc9b6b8a5e213b360558197ef623cddb55285cbb8"
+    },
+    {
+      "source": "source/owner/log.c",
+      "object": "3_log.obj",
+      "baseline_sha256": "6e09aeeea07f72a158de6144bcf129558c8518a1f1ff52558da4998657df3105",
+      "nonsecure64_sha256": "6e09aeeea07f72a158de6144bcf129558c8518a1f1ff52558da4998657df3105"
+    },
+    {
+      "source": "source/native_bootstrap.c",
+      "object": "4_native_bootstrap.obj",
+      "baseline_sha256": "38e9a8c8c8a86140cec7ea4b57f84c110c3b040fbc4a280a3b5e40a18ff08f63",
+      "nonsecure64_sha256": "38e9a8c8c8a86140cec7ea4b57f84c110c3b040fbc4a280a3b5e40a18ff08f63"
+    },
+    {
+      "source": "source/nc_visibility.c",
+      "object": "5_nc_visibility.obj",
+      "baseline_sha256": "f40e81430cd6af7a35b1e82b1d3504f51ecf62e479d2412a043ff4dc394135ec",
+      "nonsecure64_sha256": "f40e81430cd6af7a35b1e82b1d3504f51ecf62e479d2412a043ff4dc394135ec"
+    },
+    {
+      "source": "source/open_smmu_activate.c",
+      "object": "6_open_smmu_activate.obj",
+      "baseline_sha256": "5f4e5c320972d177f81ac71a6b0bf4d68acbda8ce2ab0dea63b8cea1d75ce721",
+      "nonsecure64_sha256": "5f4e5c320972d177f81ac71a6b0bf4d68acbda8ce2ab0dea63b8cea1d75ce721"
+    },
+    {
+      "source": "source/open_smmu_activate_wdm.c",
+      "object": "7_open_smmu_activate_wdm.obj",
+      "baseline_sha256": "bd908cca0311a765eb1c4b32f541c62c0edc5069d07ff85f5948cca3d1215acc",
+      "nonsecure64_sha256": "bd908cca0311a765eb1c4b32f541c62c0edc5069d07ff85f5948cca3d1215acc"
+    },
+    {
+      "source": "source/local_bank_consumer.c",
+      "object": "8_local_bank_consumer.obj",
+      "baseline_sha256": "76f0bad04dcec95e309e9579fb5997052c442561f96f59ff6ca8ef920b92d48f",
+      "nonsecure64_sha256": "76f0bad04dcec95e309e9579fb5997052c442561f96f59ff6ca8ef920b92d48f"
+    },
+    {
+      "source": "source/broker/open_smmu_handoff.c",
+      "object": "9_open_smmu_handoff.obj",
+      "baseline_sha256": "03483241aaf7e1f67a4549d56c94b30386fba9655452fb4bc27ff718ac025f5d",
+      "nonsecure64_sha256": "03483241aaf7e1f67a4549d56c94b30386fba9655452fb4bc27ff718ac025f5d"
+    },
+    {
+      "source": "reference/inactive/source/g321_inactive.c",
+      "object": "10_g321_inactive.obj",
+      "baseline_sha256": "e5409320e00a2f7ff9baa0dbcd179fdcd9af9eedff85206b820775f38001203b",
+      "nonsecure64_sha256": "e5409320e00a2f7ff9baa0dbcd179fdcd9af9eedff85206b820775f38001203b"
+    },
+    {
+      "source": "reference/inactive/source/open_smmu_inactive.c",
+      "object": "11_open_smmu_inactive.obj",
+      "baseline_sha256": "9e72707f71b431c424f25bc2ee621e7f7228e2b0a3be78bc326734e160e548dc",
+      "nonsecure64_sha256": "9e72707f71b431c424f25bc2ee621e7f7228e2b0a3be78bc326734e160e548dc"
+    },
+    {
+      "source": "reference/inactive/source/vendor/ArmSmmu4K.c",
+      "object": "12_ArmSmmu4K.obj",
+      "baseline_sha256": "acc415747ed18523eca525150596f8df1acc4f7d6d2959892760c57ca4df3cc9",
+      "nonsecure64_sha256": "acc415747ed18523eca525150596f8df1acc4f7d6d2959892760c57ca4df3cc9"
+    },
+    {
+      "source": "reference/inactive/source/vendor/ArmSmmu4KAuditInactive.c",
+      "object": "13_ArmSmmu4KAuditInactive.obj",
+      "baseline_sha256": "1ed8f317c9e7f587a97ed8a1740ec73c15f939eeb603bffd14c9ae89bb448330",
+      "nonsecure64_sha256": "1ed8f317c9e7f587a97ed8a1740ec73c15f939eeb603bffd14c9ae89bb448330"
+    },
+    {
+      "source": "reference/runtime/g196_preflight.c",
+      "object": "14_g196_preflight.obj",
+      "baseline_sha256": "7e0e8db25fe8e56bed7eb3403b84a7b736e0d1ea79f94e567beb61d866eb5b8b",
+      "nonsecure64_sha256": "7e0e8db25fe8e56bed7eb3403b84a7b736e0d1ea79f94e567beb61d866eb5b8b"
+    },
+    {
+      "source": "reference/runtime/g321_plan.c",
+      "object": "15_g321_plan.obj",
+      "baseline_sha256": "2847127cd7e5171ad51ae313d671185cafd82629505d762a04123d88e81b1998",
+      "nonsecure64_sha256": "2847127cd7e5171ad51ae313d671185cafd82629505d762a04123d88e81b1998"
+    },
+    {
+      "source": "reference/runtime/g190_backend.c",
+      "object": "16_g190_backend.obj",
+      "baseline_sha256": "35757bb85189457b1ad3a51588cf248b551118687d7416fe1836cc82ae8a2c5f",
+      "nonsecure64_sha256": "35757bb85189457b1ad3a51588cf248b551118687d7416fe1836cc82ae8a2c5f"
+    },
+    {
+      "source": "reference/runtime/vendor/AdrenoFirmware.c",
+      "object": "17_AdrenoFirmware.obj",
+      "baseline_sha256": "29b80a04fabd90715e4fd2b3ce36331a4a7bcededdf8eaa310df6765c6c3d4fc",
+      "nonsecure64_sha256": "29b80a04fabd90715e4fd2b3ce36331a4a7bcededdf8eaa310df6765c6c3d4fc"
+    },
+    {
+      "source": "reference/runtime/vendor/AdrenoHfiEncode.c",
+      "object": "18_AdrenoHfiEncode.obj",
+      "baseline_sha256": "650be0d08e3582f722eb89ca5d8ae91eb841866702cf713ca63d6ac216b73897",
+      "nonsecure64_sha256": "650be0d08e3582f722eb89ca5d8ae91eb841866702cf713ca63d6ac216b73897"
+    },
+    {
+      "source": "source/broker/open_parent_consumer.c",
+      "object": "19_open_parent_consumer.obj",
+      "baseline_sha256": "37fa91ac1637910144d6b28add380f5d7f9ad505f40452a82b1dbf46b7cb6e5f",
+      "nonsecure64_sha256": "37fa91ac1637910144d6b28add380f5d7f9ad505f40452a82b1dbf46b7cb6e5f"
+    },
+    {
+      "source": "source/cold_hold.c",
+      "object": "20_cold_hold.obj",
+      "baseline_sha256": "04b24418d2674c996d8b969c95bdd0ff38934a541f9dfeff5ca72f4a376e7eea",
+      "nonsecure64_sha256": "04b24418d2674c996d8b969c95bdd0ff38934a541f9dfeff5ca72f4a376e7eea"
+    },
+    {
+      "source": "source/cold_hold_native.c",
+      "object": "21_cold_hold_native.obj",
+      "baseline_sha256": "6d549f722ab9bb4a9d3638104ed25f2a8756aa2688bd738ad9b77a9f9f777e9c",
+      "nonsecure64_sha256": "6d549f722ab9bb4a9d3638104ed25f2a8756aa2688bd738ad9b77a9f9f777e9c"
+    },
+    {
+      "source": "source/gmu_clock_consumer.c",
+      "object": "22_gmu_clock_consumer.obj",
+      "baseline_sha256": "e8b9a0980cba26e73a62a1cb1575072bcbdaa6e0a2fa99c46246b7f7bf687171",
+      "nonsecure64_sha256": "e8b9a0980cba26e73a62a1cb1575072bcbdaa6e0a2fa99c46246b7f7bf687171"
+    },
+    {
+      "source": "reference/runtime/g482_resources.c",
+      "object": "23_g482_resources.obj",
+      "baseline_sha256": "b52b7b238f36713f05a578a69dd4c46413e1848f5b6509843a53cb607e59fcb4",
+      "nonsecure64_sha256": "b52b7b238f36713f05a578a69dd4c46413e1848f5b6509843a53cb607e59fcb4"
+    },
+    {
+      "source": "source/owner_life.c",
+      "object": "24_owner_life.obj",
+      "baseline_sha256": "cb2b1bbf92bd0b90c298b0c09fbb02005a98055a3f0f89a559111d746ba23458",
+      "nonsecure64_sha256": "cb2b1bbf92bd0b90c298b0c09fbb02005a98055a3f0f89a559111d746ba23458"
+    },
+    {
+      "source": "source/property_keys.c",
+      "object": "25_property_keys.obj",
+      "baseline_sha256": "9ca68c2d8b965614d23ff1eddeb9dbe8e690bfd51a40b831e640312a42c6260b",
+      "nonsecure64_sha256": "9ca68c2d8b965614d23ff1eddeb9dbe8e690bfd51a40b831e640312a42c6260b"
+    },
+    {
+      "source": "source/owner/gmu_runtime.c",
+      "object": "26_gmu_runtime.obj",
+      "baseline_sha256": "b8029aca722760dd4bb3a618e5e3bd4935d74052a6e3c394fdaf40c0683691a9",
+      "nonsecure64_sha256": "b8029aca722760dd4bb3a618e5e3bd4935d74052a6e3c394fdaf40c0683691a9"
+    },
+    {
+      "source": "reference/runtime/g482_board.c",
+      "object": "27_g482_board.obj",
+      "baseline_sha256": "678994603215712c3744dc1b597a278d55217336fefdb7b2e4737126fbd58654",
+      "nonsecure64_sha256": "678994603215712c3744dc1b597a278d55217336fefdb7b2e4737126fbd58654"
+    },
+    {
+      "source": "source/owner/gpu_cp_native.c",
+      "object": "43_gpu_cp_native.obj",
+      "baseline_sha256": "3706425f39d77a1c0101d12fa3323eb5cf6659d17dc6fd17121c4c59a0e4cb80",
+      "nonsecure64_sha256": "1589629d7d86385137e715bb0443521b7aa1d00efb512a31865d783a4d7a4fae"
+    },
+    {
+      "source": "source/owner/gpu_cp_translate.c",
+      "object": "44_gpu_cp_translate.obj",
+      "baseline_sha256": "b0f8b8951c269f88454a0d43ac093b3d36a97594901134f8be7982648b9f7255",
+      "nonsecure64_sha256": "b0f8b8951c269f88454a0d43ac093b3d36a97594901134f8be7982648b9f7255"
+    },
+    {
+      "source": "reference/runtime/g433_cp.c",
+      "object": "45_g433_cp.obj",
+      "baseline_sha256": "cd767f61ab9beb69d8493a3b52702ce5883db0e6f466e80b2f3a0f8fcb276335",
+      "nonsecure64_sha256": "cd767f61ab9beb69d8493a3b52702ce5883db0e6f466e80b2f3a0f8fcb276335"
+    },
+    {
+      "source": "reference/runtime/g440_gpu_power.c",
+      "object": "46_g440_gpu_power.obj",
+      "baseline_sha256": "9bcaf3b1ee32e6cbccd4bbe6dc131ef58b91151292749e3c6c5f03066ecdf69e",
+      "nonsecure64_sha256": "9bcaf3b1ee32e6cbccd4bbe6dc131ef58b91151292749e3c6c5f03066ecdf69e"
+    },
+    {
+      "source": "reference/runtime/g456_hwinit.c",
+      "object": "47_g456_hwinit.obj",
+      "baseline_sha256": "314b1f7b28c846119e0849c19e0e85e62ae6df5d59da56f6f50a52e262a20b5c",
+      "nonsecure64_sha256": "314b1f7b28c846119e0849c19e0e85e62ae6df5d59da56f6f50a52e262a20b5c"
+    },
+    {
+      "source": "reference/runtime/vendor/AdrenoPM4.c",
+      "object": "48_AdrenoPM4.obj",
+      "baseline_sha256": "18ad09feeafa3ce5bb1f8b514e1f71267585304b0eb1bc0c9b069b9e6b4c4888",
+      "nonsecure64_sha256": "18ad09feeafa3ce5bb1f8b514e1f71267585304b0eb1bc0c9b069b9e6b4c4888"
+    },
+    {
+      "source": "source/owner/scm_set_cp0.S",
+      "object": "49_scm_set_cp0.obj",
+      "baseline_sha256": "32c0cc14c43c55fb4254f44695959154cf4043ef73c85d8f6be7de5534469721",
+      "nonsecure64_sha256": "32c0cc14c43c55fb4254f44695959154cf4043ef73c85d8f6be7de5534469721"
+    }
+  ]
+}

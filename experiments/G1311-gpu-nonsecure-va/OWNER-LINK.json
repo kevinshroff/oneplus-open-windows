@@ -1,0 +1,27 @@
+{
+  "schema": "g1311-owner-link-policy/1",
+  "provenance": "G1287 reviewed native owner response input",
+  "options": [
+    "/machine:arm64",
+    "/driver",
+    "/subsystem:native,10.00",
+    "/osversion:10.0",
+    "/nodefaultlib",
+    "/dynamicbase",
+    "/nxcompat",
+    "/opt:ref",
+    "/opt:icf",
+    "/Brepro",
+    "/incremental:no",
+    "/entry:DriverEntry"
+  ],
+  "output": "OpenGpuStart.sys",
+  "map": "OpenGpuStart.map",
+  "libraries": [
+    "ntoskrnl.lib",
+    "hal.lib",
+    "libcntpr.lib",
+    "bufferoverflowfastfailk.lib",
+    "aux_klib.lib"
+  ]
+}

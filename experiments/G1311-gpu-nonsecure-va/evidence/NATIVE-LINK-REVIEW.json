@@ -1,0 +1,27 @@
+{
+  "scope": "native MSVC-linked unsigned G1311 nonsecure64 owner; no hardware execution claim",
+  "image_sha256": "3ee73237c4311eec9fe083f3d5067407bde1884d84bddb9f8d65c2370dba1d4b",
+  "image_bytes": 134656,
+  "helper_evidence_id": "ev_df71cc8d2fc48d51a77a5c3338ead601e6d7bb17d4a7f3a890a4401ccc64b17c",
+  "G482GpuWrite_RVA": "0x1434c",
+  "start_write_sequence": {
+    "pre_barrier_RVA": "0x143d0",
+    "store_RVA": "0x143dc",
+    "post_barrier_RVA": "0x143e0",
+    "after_post_barrier_RVA": "0x143e4",
+    "unchanged_from_baseline": true
+  },
+  "va_table_RVA": "0x20cf0",
+  "va_table_evidence_id": "ev_01b7a1545629f07c287318a4c5afc5970f1101b61fabe17a87c45ffd2d88ec78",
+  "va_table_bytes_hex": "0000000040000000008000004000000000000100400000000000030040000000",
+  "va_values": [
+    "0x4000000000",
+    "0x4000008000",
+    "0x4000010000",
+    "0x4000030000"
+  ],
+  "native_link_exit": 0,
+  "signed": false,
+  "loaded": false,
+  "hardware_completion": false
+}

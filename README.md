@@ -7,7 +7,7 @@ The project reuses Windows ARM64 CPU/storage/USB stacks and OEM firmware, develo
 <img src="docs/media/oneplus-open-windows-desktop.jpg" alt="Windows 11 desktop running natively on the unfolded OnePlus Open" width="240">
 
 > [!IMPORTANT]
-> **Research source snapshot. GPU acceleration and reliable Wi-Fi networking are unfinished.** Development is paused. Captured firmware, Windows binaries, signing certificates, credentials and private operator infrastructure are excluded; this repository does not provide a ready-to-flash installation bundle.
+> **Research source snapshot. GPU acceleration and reliable Wi-Fi networking are unfinished.** Development is active. Captured firmware, Windows binaries, signing certificates, credentials and private operator infrastructure are excluded; this repository does not provide a ready-to-flash installation bundle.
 
 **Demonstrated:** Windows desktop • inner framebuffer • native touchscreen • internal-storage boot • USB debugging/control • black cover framebuffer.  
 **Still unfinished:** WDDM acceleration • Wi-Fi networking • Bluetooth/audio/cameras • everyday battery/charging • complete buttons, folding and suspend/resume.

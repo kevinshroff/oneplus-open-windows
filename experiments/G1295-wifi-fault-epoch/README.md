@@ -29,13 +29,13 @@ Root owns the preexisting BREAK6 and final cleanup/resume. This executable never
 
 ## Evidence and interpretation
 
-The four templates intentionally contain missing/null actual context and false approval flags. They are not ready proofs and must not be filled with planned future outcomes. PRE's proof contains no failed-scan key; POST requires the actual new-boot one-init/log boundary and PRE artifacts. Root hashes the exact supplied proof and ledger after actual evidence exists.
+The historical four templates are absent from the publication. Generate replacement templates using `../G1312-wifi-resume/templates.py`; they intentionally contain missing/null actual context and false approval flags. They are not ready proofs and must not be filled with planned future outcomes. PRE's proof contains no failed-scan key; POST requires the actual new-boot one-init/log boundary and PRE artifacts. Root hashes the exact supplied proof and ledger after actual evidence exists.
 
 Same valid tuple in PRE and POST weakens interpreting it as newly created by this Windows init/scan operation. Valid PRE different/empty and POST tuple bounds assignment to the interval containing initialization plus scan/stall; it does not identify the SET_IE instant, marker meaning or executed assertion. Invalid/refused PRE permits no A/B epoch inference. Neither normal MHI state nor CAFECACE alone proves firmware health/fault. The existing8-DWORD tuple is not a credit injector or fix.
 
 ## Root review/use
 
-Local cross-compile passed; BUILD-RECEIPT.json binds exact source and binary hashes. Native default-inert behavior has **not** been executed/verified for this new binary. Root independently reviews, stages and default-inert checks it later.
+Historical local cross-compile passed; its BUILD-RECEIPT.json is absent from the publication. Use `../G1312-wifi-resume/build.py` for a fresh source/binary receipt. The G1312 review rejects trailing proof/ledger JSON documents and includes image/action-ledger hashes in result rows; physical guards and read sequence are unchanged. Native default-inert behavior has **not** been executed/verified for this new binary. Root independently reviews, stages and default-inert checks it later.
 
 ```sh
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags=-buildid= -o G1295-FaultEpoch-amd64.exe main_windows.go guard.go phase.go
@@ -48,3 +48,5 @@ G1295-FaultEpoch-amd64.exe --execute-reviewed-reads --proof ACTUAL-PHASE-PROOF.j
 ```
 
 No phase is selected or approved here. Read semantics/side-effect authority remain G1278/CONTRACT.md; source predicate/experiment interpretation remains G1291. No changed offset, magic-value heuristic or speculative firmware patch is introduced.
+
+G1312 supplies the current offline build/template/comparison tools and exact operator sequence in [its README](../G1312-wifi-resume/README.md). The old G1278/G1291 qualification documents are not exported here; retrieve or independently qualify their contract before asserting physical-access approval. Sequential debug-register reads are not atomic Q6 snapshots even when the host CPU is held.

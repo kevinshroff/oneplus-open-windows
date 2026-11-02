@@ -1,6 +1,8 @@
 # Agent handoff — publication pause
 
-Status date: **2026-11-02**. This is a source/research handoff, not a live-device authorization or an installation recipe. Development was paused at the owner's request. Leave the phone powered on; do not shut it down or resume experiments merely because this file describes them. Recover fresh authority and liveness when the operator explicitly resumes the project.
+Status date: **2026-11-02**. Development resumed with owner approval for Wi-Fi and GPU acceleration. This handoff records the publication baseline and subsequent work; it is not a general live-device authorization or an installation recipe. Re-establish actual device/boot identity before each experiment.
+
+Resume work is tracked in [G1311 GPU VA experiment](../experiments/G1311-gpu-nonsecure-va/README.md), [G1312 Wi-Fi epoch comparison](../experiments/G1312-wifi-resume/README.md), and [G1313 independent GPU review](../experiments/G1313-gpu-review/REVIEW.md). These source changes have passed offline checks; the selected GPU owner also linked with native MSVC and passed a focused compiled review. Hardware outcomes are pending. The phone was shut down with permission after publication, then the owner returned it to fastboot. The known recovery firmware was accepted for one temporary boot without partition flashing.
 
 ## Read first
 
@@ -18,6 +20,12 @@ The last normal Windows experiment used the G1287 GPU owner. Its fixed NORMAL se
 The experimental driver's future startup/once flags may still be armed. Before any later normal-Windows boot, the operator must verify recovery control and offline-fence the actual Windows SYSTEM control sets: `OpenGpuStart` Start4, BootstrapOnce0, CpInitFenceOnce0 and ScmApertureOnce0; `OpenSmmuD0` Start4. Do not mount the wrong hive or equate a successful emergency reset with completed fencing. This is pending recovery work, not permission to perform it during the pause.
 
 Preserve the installed Windows system, working native touch, desktop scaling, development test-signing configuration, black cover framebuffer, Never sleep/display settings and WinPE recovery default. Do not enable charging, change clocks or run overlapping hardware owners as incidental preparation.
+
+## Resume checkpoint
+
+Recovery WinPE control was restored after the temporary G991 boot. The actual offline SYSTEM hive was opened and its existing control sets enumerated. The GPU owner is now Start4 with BootstrapOnce, CpInitFenceOnce and ScmApertureOnce all0; the GPU broker and Wi-Fi service are Start4. All values were read back and the hive unloaded successfully. This prevents the prior GPU attempt from automatically running on the next normal boot.
+
+G1311 now builds the complete35-object owner from the public closure with explicit external Microsoft headers. All35 baseline objects match the historical build. The nonsecure64 build differs only in the intended CP address-layout object. It has not yet demonstrated hardware execution. G1312 supplies the fresh Wi-Fi PRE/POST comparison with stricter artifact identity binding.
 
 ## Architecture and achieved foundations
 

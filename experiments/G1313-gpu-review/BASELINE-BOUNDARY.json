@@ -1,0 +1,58 @@
+{
+  "scope": "historical baseline only; rederive variant RVAs and loaded-base identity",
+  "sha256": "08f30c7158e0c740d40c67d99e2c6a7df9ea216413748607ebc83f070da31164",
+  "preferred_image_base": "0x140000000",
+  "image_size": "0x26000",
+  "evidence_id": "ev_711fb39ca5c19a472178f78b7d8d06d872255eba317d7ae39a41c204317c2119",
+  "helper_rva": "0x1434c",
+  "map_symbol": "G482GpuWrite",
+  "map_object": "23_g482_resources.obj",
+  "instructions": [
+    {
+      "rva": "0x143cc",
+      "word_le_decoded_hex": "8b294149",
+      "assembly": "add x9, x10, w9, UXTW "
+    },
+    {
+      "rva": "0x143d0",
+      "word_le_decoded_hex": "d5033f9f",
+      "assembly": "dsb SY"
+    },
+    {
+      "rva": "0x143d4",
+      "word_le_decoded_hex": "f90007e9",
+      "assembly": "str x9, [sp, #0x8]"
+    },
+    {
+      "rva": "0x143d8",
+      "word_le_decoded_hex": "f94007e9",
+      "assembly": "ldr x9, [sp, #0x8]"
+    },
+    {
+      "rva": "0x143dc",
+      "word_le_decoded_hex": "b9000134",
+      "assembly": "str w20, [x9]"
+    },
+    {
+      "rva": "0x143e0",
+      "word_le_decoded_hex": "d503339f",
+      "assembly": "dsb OSH"
+    },
+    {
+      "rva": "0x143e4",
+      "word_le_decoded_hex": "2a1f03e0",
+      "assembly": "mov w0, wzr"
+    },
+    {
+      "rva": "0x143e8",
+      "word_le_decoded_hex": "a9424ff4",
+      "assembly": "ldp x20, x19, [sp, #0x20]"
+    }
+  ],
+  "intended_stops": [
+    "0x143d0",
+    "0x143dc",
+    "0x143e0",
+    "0x143e4"
+  ]
+}

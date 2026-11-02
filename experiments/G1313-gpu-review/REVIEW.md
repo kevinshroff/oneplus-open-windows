@@ -1,0 +1,31 @@
+# Independent GPU boundary review, 2026-11-02
+
+Offline source review only. No device control, secure calls, signing, commits or new binary reverse engineering. Historical compiled-helper observations below are explicitly inherited from the earlier review, not newly measured. No definite additional implementation defect was found in the examined startup path.
+
+The highest-value next action is instruction-boundary localization on the exact loaded owner. The isolated nonsecure64 VA layout is a reasonable second discriminator, with an important limit: membership in KGSL's software secure allocator range does not establish hardware security classification. Successful register readback and CPU table walks do not establish GPU translation or fetch.
+
+## Observations from the public source
+
+* `reference/runtime/g433_cp.c:46` emits separate low/high words for ring, BR RPTR, BV RPTR and SQE addresses. Lines 65–66 do so for the power-up list and completion packet. The proposed base `0x4000000000` therefore does not require a packet-format redesign.
+* `reference/inactive/source/open_smmu_inactive.c:44` admits all unsigned addresses below `1<<39`; line 87 fixes input/output widths to 39/36. The proposed layout has 29 leaves and three table pages, as does the old layout. Its L1 root index is 256 rather than 3. This is a lower39 TTBR0 address, not an upper canonical address requiring TTBR1. Physical output width is independent of the IOVA width.
+* The table builder emits privileged, executable, normal-NC leaves. Native GPU context programming keeps the same lower39 profile. Do not change PTE permissions, ACTLR, cache policy or stream routing together with the VA trial.
+* `reference/runtime/g456_hwinit.c:86` deliberately writes CP_AHB_CNTL=1. It is a configured default-slave error policy, not the AHB fence-status register and not evidence of an unintended CP hold.
+* `reference/runtime/g456_hwinit.c:73` checks all four SECVID/TSB values are zero but does not write them. This is a real sequence-parity gap, not demonstrated necessity for a write strobe.
+* `reference/runtime/g433_cp.c:62` starts SQE before constructing the initial command packets and posting WPTR. The recorded failure precedes recorded submission. Changing ME_INIT flags, fence packet semantics or post-init secure exit cannot currently be justified as fixing an executed command.
+* `reference/runtime/g482_resources.c:50` validates access and then executes WRITE_REGISTER_ULONG followed by DSB OSH. The historical compiled review identified an additional pre-store DSB SY inside the register-write expansion. The outer STORE_CALL_BEGIN is before this whole sequence.
+
+A locally retained mainline comparison was also checked: its A7xx branch skips the legacy per-block ADDR_MODE_CNTL writes. Do not add a guessed 64-bit address-mode enable to the VA trial. The same comparison explicitly writes zero trusted base/size to leave virtual space available; this weakens any claim that the numerical software secure window alone proves hardware rejection here.
+
+## Prioritized discriminators
+
+1. **Instrument only, existing exact image where possible.** Qualify fresh loaded image/base and actual helper instructions. Bound four points: before pre-store DSB; after pre-store DSB/before STR; after STR/before post-store DSB; after post-store DSB. Existing debugger execution breakpoints can supply these without new MMIO or changed policy, if supported by the live controller. Historical RVAs are not authority for a new image. Do not substitute a breakpoint at wrapper entry for the actual STR boundary.
+2. **One isolated VA-layout run.** Verify the four addresses, all emitted high words (`0x40`), all 29 leaf translations, and no mapping at the corresponding truncated low addresses. Keep sizes, contents, permissions, allocation policy and register sequence unchanged. Fresh boot allocations may naturally change PFNs, so describe this as unchanged allocation policy, not identical physical pages unless actually established. A changed outcome supports address-layout dependence; it does not uniquely prove secure-range classification. An identical outer marker alone still does not resolve the instruction boundary.
+3. **Only after store localization, consider four explicit SECVID/TSB zero stores as a separate parity experiment.** This is more source-grounded than arbitrary clock, ACTLR, TBU or PAS changes, but remains lower priority because existing zero reads already qualify the intended values. Do not combine it with VA movement.
+
+Boundary interpretation must remain narrow. Reaching the point after STR demonstrates CPU progress beyond that instruction, not completed GPU fetch or successful CP execution. Failure in the post-store DSB interval could reflect asynchronous target/interconnect consequences. Failure before STR excludes this particular start write as having executed in the observed interval, but does not identify the prior operation responsible. Reaching the helper return finally justifies moving investigation downstream to SQE execution and WPTR submission.
+
+If source instrumentation is needed because exact-image debugger breakpoints are unavailable, preserve both barriers and the STR exactly and review the generated machine code. Avoid general logging calls between them: those change scheduling, locks, memory ordering and the failure window. A small preallocated memory progress record is less intrusive, but is useful only if a defined surviving observer can retrieve it; adding another DSB to flush it defeats the purpose. An exception PC/ESR/FAR captured by an already working exception facility is stronger evidence than missing log output. No new exception facility is proposed as a prerequisite.
+
+## Closed or low-value alternatives
+
+Do not repeat the aperture setter simply because the previous run failed: one ordinary completion already excludes omitted invocation as a sufficient explanation for that attempt. Persistence remains unmeasured, but another identical call does not measure it. Do not treat normal GMU/HFI completion as proof of SID0 GPU translation; GMU uses a distinct path. Do not collect further opaque TZ dumps without a new decoding basis. Preserve uncertain ownership and no-replay behavior throughout.

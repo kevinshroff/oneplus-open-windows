@@ -1,0 +1,26 @@
+{
+  "native_evidence": false,
+  "linked": false,
+  "signed": false,
+  "loaded": false,
+  "objects": [
+    {
+      "layout": "default",
+      "object": "gpu_cp_native-default.obj",
+      "sha256": "3706425f39d77a1c0101d12fa3323eb5cf6659d17dc6fd17121c4c59a0e4cb80"
+    },
+    {
+      "layout": "baseline",
+      "object": "gpu_cp_native-baseline.obj",
+      "sha256": "3706425f39d77a1c0101d12fa3323eb5cf6659d17dc6fd17121c4c59a0e4cb80"
+    },
+    {
+      "layout": "nonsecure64",
+      "object": "gpu_cp_native-nonsecure64.obj",
+      "sha256": "1589629d7d86385137e715bb0443521b7aa1d00efb512a31865d783a4d7a4fae"
+    }
+  ],
+  "source": "experiments/G1287-cold-aperture/source/owner/gpu_cp_native.c",
+  "source_sha256": "9a20f326a4c324a3f7cca584a4e4644982264735c7e85c0cdaf95f0892e0e6a1",
+  "header_sha256": "75372806008ca5c730bfbd472df0c46146d9d4ac05fa5de4e273ec5a64adc1f7"
+}
