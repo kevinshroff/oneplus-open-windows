@@ -1,7 +1,8 @@
 # G1325: pre-release persistence witness and intentional stop
 
-Offline implementation proposal. Complete ARM64 COFF compilation passed; no
-Windows native link, signing, staging or hardware trial has run. This option cannot produce a CP fence. It observes
+Prepared diagnostic; hardware result pending. Complete ARM64 COFF compilation,
+Windows native linking, focused REA review and signature verification passed.
+The signed image is staged with startup disabled; no load or hardware trial has run. This option cannot produce a CP fence. It observes
 CPU-visible state immediately before the original SQE release and refuses that
 release, retaining ownership through the existing failure path.
 
@@ -111,3 +112,37 @@ broker. Primary Linux definitions:
 There is no ATOS write: the admitted ID0's ATOSNS bit prohibits assuming v2
 translation-operation support. No PTE, cache attribute, clock, ACTLR, route,
 aperture call, firmware byte, ZAP order or command packet is changed.
+
+## Native preparation
+
+The complete 35-object closure linked successfully using the existing native
+MSVC toolchain and five external ARM64 libraries. Focused REA review covered
+the actual GpuWrite release branch, witness, current-authority guard, fixed
+read adapter, FirstUseFrame, backing check and two-pass collector. The compiled
+`0x2020` path reaches a refusal or the witness return; it cannot fall into the
+general register-write path. The witness returns only failure statuses.
+
+Assembly also confirmed that dynamic expected root/route values are stored
+after the constant-plan copy; decompiler scalar assignments must not be read
+as execution ordering. The reviewed image was signed with the existing project
+certificate. Independent local PE/CMS hashing and RSA verification confirmed
+the original payload and signer. Host trust and actual Windows load remain
+separate from that content verification. No new trust setting was applied.
+
+`package_native.py` freezes the actual source/COFF closure and admits only the
+explicit nonsecure64, four-zero-store, non-WC, pre-release-witness combination.
+It refuses a package without the intentional-stop definition. External Microsoft
+headers, libraries and signing material are excluded. For a previously qualified
+build directory:
+
+```sh
+python3 experiments/G1325-pre-release-witness/package_native.py \
+  --build-dir /external/g1325-coff --out /external/G1325-OwnerLinkInputs.zip
+```
+
+The image is selected offline alongside preserved older images with all
+startup/once flags disabled. A future trial still requires fresh normal-boot
+resource, ownership and original-WLAN admission. It must retain the intentional
+stop contract and distinguish a complete witness from a partial/refused one.
+No real GPU fence, hardware translation or WDDM acceleration has been achieved
+by these preparation checks.
