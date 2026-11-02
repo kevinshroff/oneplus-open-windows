@@ -1,10 +1,12 @@
 # G1325: pre-release persistence witness and intentional stop
 
-Prepared diagnostic; hardware result pending. Complete ARM64 COFF compilation,
-Windows native linking, focused REA review and signature verification passed.
-The signed image is staged with startup disabled; no load or hardware trial has run. This option cannot produce a CP fence. It observes
-CPU-visible state immediately before the original SQE release and refuses that
-release, retaining ownership through the existing failure path.
+The [hardware witness completed](HARDWARE-RESULT.md): both register passes and
+the full CPU SQE backing check matched, and Windows remained available after
+the intentional stop. ARM64 COFF compilation, native MSVC linking, focused REA
+review and signature verification preceded that activation. This option cannot
+produce a CP fence. It observes CPU-visible state immediately before the original
+SQE release and refuses that release, retaining ownership through the existing
+failure path. GPU command execution and acceleration remain unfinished.
 
 The hypothesis is that GPU translation configuration or SQE backing validated
 before GPU_SET/GX-on no longer matches after power acquisition and setup. GMU
