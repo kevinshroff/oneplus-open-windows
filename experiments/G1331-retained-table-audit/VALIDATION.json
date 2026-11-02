@@ -1,0 +1,17 @@
+{
+  "schema": "G1331-offline-actual-capture-qualification/1",
+  "scope": "Source-only offline auditor, actual private retained CPU capture; no live device access by auditor",
+  "actual_audit_result": "pass",
+  "captured_files": 18,
+  "equal_before_after_pairs": 9,
+  "descriptor_slots_compared": 1536,
+  "MDL_pages_compared": 29,
+  "unused_zero_slots": 1505,
+  "independent_traversal_pass": true,
+  "GPU_execution_or_visibility_claimed": false,
+  "raw_capture_or_context_published": false,
+  "files": {
+    "README.md": "8afae67155509435343204e2d1ddf6c6c3de459c1cd7fc83458818ebf623b1a2",
+    "audit_captured_graph.py": "ee2b8a61bc065d6a3d0637fe73ffbd69ff4f45676122d45234ad40a9e05c09b6"
+  }
+}

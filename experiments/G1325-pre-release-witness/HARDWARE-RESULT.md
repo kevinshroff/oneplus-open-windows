@@ -34,19 +34,33 @@ point. The measured registers were stable across two passes. The CPU-visible
 SQE copy, tail and page/MDL correspondence matched. Setup before the refused
 release completed without the fatal behavior seen in earlier start attempts.
 
-It does **not** establish that the GPU can fetch that SQE, that the SMMU walks
+The witness alone does **not** establish that the GPU can fetch that SQE, that the SMMU walks
 the intended descriptors, that the published page-table graph remained intact,
 or that GPU security attributes/firewall permissions match those required for
 the fetch. It does not establish secure-aperture persistence, firmware
 compatibility, a post-release fault PC or instruction retirement. The CPU
 readbacks cannot resolve those device-side questions.
 
-The next useful discriminator is the actual retained GPU page-table graph
-against the observed root and independently captured locked-MDL PFNs. A bounded
-CPU-memory capture of already retained objects can provide that evidence
-without another SQE release. It must use freshly qualified object locations
-and preserve retained ownership. An intact CPU graph would still leave actual
-SMMU fetch/security/visibility unproved. No new activation is authorized here.
+## Retained CPU graph follow-up
+
+That next check has now completed without another boot or GPU start. A bounded
+CPU-memory snapshot used object locations and retention lifetimes qualified
+against the exact compiled image. All 18 files had the expected lengths, and
+all nine before/after pairs were identical.
+
+The [offline audit](../G1331-retained-table-audit/README.md) compared every one
+of the three pool pages' 1,536 descriptor slots. All 29 mapped pages matched
+their independently captured locked-MDL PFNs and the fixed source attributes;
+all 1,505 unused slots were zero. An independent traversal confirmed the links,
+all 29 distinct PFNs, the MDL CPU mappings and the pool root's agreement with
+both earlier hardware TTBR0 observations.
+
+These files contain metadata, tables and PFNs, not the SQE payload. The earlier
+native witness supplies the separate SQE content check. Together they narrow
+the measured CPU-side hypotheses while leaving device fetch, SMMU visibility,
+security attributes and release-triggered behavior unresolved. The graph was
+observed at the later retained snapshot; this is not proof of GPU translation
+or a post-release transaction. No new activation is authorized here.
 
 ## Build and evidence boundary
 
