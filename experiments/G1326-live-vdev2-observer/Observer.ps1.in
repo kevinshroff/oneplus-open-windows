@@ -1,0 +1,116 @@
+# HOST LOCAL ONLY. Default inert; no connector/phone job or debugger callback.
+param([switch]$ExecuteReviewedObserver,[string]$Review,[string]$ReviewSha256)
+$ErrorActionPreference='Stop';$global:ProgressPreference='SilentlyContinue'
+if(!$ExecuteReviewedObserver){'INERT: no debugger connection, marker, or read';return}
+function Need($ok,[string]$why){if(!$ok){throw $why}}
+function Hash([string]$p){(Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant()}
+function WriteNewJson([string]$path,$value){$raw=[Text.Encoding]::UTF8.GetBytes(($value|ConvertTo-Json -Depth 16 -Compress)+"`n");$f=[IO.FileStream]::new($path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read,4096,[IO.FileOptions]::WriteThrough);try{$f.Write($raw,0,$raw.Length);$f.Flush($true)}finally{$f.Dispose()}}
+Need ((Hash $Review) -ceq $ReviewSha256) 'Exact root review hash required'
+$j=Get-Content -LiteralPath $Review -Raw|ConvertFrom-Json
+Need ($j.schema -ceq 'wifi-live-vdev2-local-observer/1' -and $j.accepted_local_observer_operation -ceq $true) 'Inert/unaccepted local observer'
+Need ($j.BootId -eq __BOOT__ -and $j.module_base -ceq '__BASE__' -and $j.loaded_receipt_sha256 -ceq '__RECEIPT_SHA__') 'Root review differs from actual loaded receipt'
+Need ($j.root_confirms_original_one_init_one_scan_task_only -ceq $true -and $j.root_owns_pending_initial_module_load_hold -ceq $true -and $j.root_confirms_no_competing_debugger_actor -ceq $true) 'Current independent task/ownership selection required'
+Need ($j.max_owned_hits -eq 2 -and $j.poll_interval_ms -ge 20 -and $j.poll_interval_ms -le 100 -and $j.wait_seconds -ge 5 -and $j.wait_seconds -le 30) 'Finite local observer limits'
+Need ($j.max_stop_upper_bound_ms -gt 0 -and $j.max_stop_upper_bound_ms -le 1000) 'Explicit short-pause budget 1..1000ms required; not proof of timing neutrality'
+$d=Join-Path $env:USERPROFILE 'Downloads\Open-G17\payloads'
+$a=Join-Path $d 'G550-control-amd64.exe';$e=Join-Path $d 'G717-regread-amd64.exe';$reader=Join-Path $PSScriptRoot 'LiveVdev2Observer-amd64.exe'
+Need ((Hash $a) -ceq 'e7629684e9d94976f6e27a984fe5d4292c1ef28d68a9477e432069e10407a712' -and (Hash $e) -ceq 'e5728946c4db42147e7c20953b522f587e5f09589a49153bce138ccff8853a41') 'Qualified native helpers changed'
+Need ((Hash $reader) -ceq '__READER_SHA__' -and (Hash $PSCommandPath) -ceq $j.observer_source_sha256) 'Observer source/reader changed'
+$p=Get-CimInstance Win32_Process -Filter ('ProcessId='+[int]$j.kd_pid)
+Need ([string]$j.kd_run_token -cmatch '^[A-Za-z0-9_.-]{8,128}$') 'Actual debugger run token required'
+Need ($null -ne $p -and $p.CommandLine -like ('*'+[string]$j.kd_run_token+'*')) 'Actual debugger changed'
+$m=[regex]::Match($p.CommandLine,'-logo\s+(?:"([^"]+)"|(\S+))');Need $m.Success 'Actual debugger log path unavailable'
+$log=if($m.Groups[1].Success){$m.Groups[1].Value}else{$m.Groups[2].Value}
+Need ([StringComparer]::OrdinalIgnoreCase.Equals([IO.Path]::GetFullPath($log),[IO.Path]::GetFullPath([string]$j.actual_debugger_log))) 'Debugger log identity mismatch'
+function Status { $text=[string](& $a status|Out-String);Need ($LASTEXITCODE -eq 0) 'Native status failed';$hits=[regex]::Matches($text,'(?m)^EXECUTION_STATUS=0x([0-9a-fA-F]{8})\s*$');Need ($hits.Count -eq 1) 'One current status required';return [Convert]::ToUInt32($hits[0].Groups[1].Value,16) }
+function Capture([string]$command,[string]$begin,[string]$end){
+ Need ((Status) -eq 6) 'Preexisting held6 required; observer never interrupts'
+ & $e capture $command|Out-Null;Need ($LASTEXITCODE -eq 0) 'Native held capture failed'
+ $tail=[string](Get-Content -LiteralPath $log -Tail 180|Out-String)
+ $start=[regex]::Matches($tail,'(?m)^'+[regex]::Escape($begin)+'\r?$');$finish=[regex]::Matches($tail,'(?m)^'+[regex]::Escape($end)+'\r?$')
+ Need ($start.Count -eq 1 -and $finish.Count -eq 1 -and $finish[0].Index -gt $start[0].Index) 'Missing/duplicate actual anchored capture block'
+ return $tail.Substring($start[0].Index,$finish[0].Index+$finish[0].Length-$start[0].Index)
+}
+$armMarker=Join-Path $d ('WiFi-LiveVdev2-Boot-__BOOT__-ARM_LIVE_VDEV2.once.json')
+Need ((Hash $armMarker) -ceq $j.arm_marker_sha256) 'Actual consumed ARM marker binding required; consume before manually arming'
+$arm=Get-Content $armMarker -Raw|ConvertFrom-Json
+Need ($arm.schema -ceq 'wifi-live-vdev2-host-once/1' -and $arm.boot_id -eq __BOOT__ -and $arm.phase -ceq 'ARM_LIVE_VDEV2' -and $arm.phone_session -ceq $j.phone_session -and $arm.image_sha256 -ceq $j.image_sha256) 'Wrong actual ARM marker'
+$intent=Join-Path $d 'WiFi-LiveVdev2-Boot-__BOOT__-LOCAL-OBSERVER.once.json'
+WriteNewJson $intent ([ordered]@{schema='wifi-live-vdev2-local-intent/1';BootId=__BOOT__;review_sha256=$ReviewSha256;arm_marker_sha256=$j.arm_marker_sha256;created_utc=[DateTimeOffset]::UtcNow.ToString('o');maximum_owned_hits=2;interrupt_calls=0;phone_API_calls=0})
+$clock=[Diagnostics.Stopwatch]::StartNew();$events=@();$lastGoLower=$null;$result=[ordered]@{schema='wifi-live-vdev2-local-result/1';BootId=__BOOT__;module_base='__BASE__';review_sha256=$ReviewSha256;selected_capture_completed=$false;selected_capture_exit=$null;resumed=$false;owned_slot_removed=$false;pause_qualified=$false;timing_neutrality_proved=$false;events=@();failure=$null;cleanup_failure=$null;interrupt_calls=0;phone_API_calls=0;callbacks=0;rearms=0;steps=0}
+$selected=$false;$knownOwned=$false;$initialDone=$false
+try {
+ # This initial hold is BEFORE DriverEntry/FW initialization; its existing duration is not a live-phase measurement.
+ $initial=Capture '__INITIAL_COMMAND__' '__INITIAL_BEGIN__' '__INITIAL_END__'
+ Need ($initial -match '(?m)^WIFILIVE_INITIAL_ACCEPT\r?$') 'Actual owned pre-DriverEntry module-load hold not qualified'
+ $lastGoLower=$clock.Elapsed.TotalMilliseconds
+ & $a resume|Out-Null;Need ($LASTEXITCODE -eq 0) 'Initial owned resume failed';$initialDone=$true
+ $deadline=$clock.Elapsed.TotalSeconds+[double]$j.wait_seconds
+ for($hit=0;$hit -lt 2;){
+  $sampleStart=$clock.Elapsed.TotalMilliseconds;$state=Status
+  if($state -eq 1){$lastGoLower=$sampleStart;if($clock.Elapsed.TotalSeconds -ge $deadline){throw 'No selected hit before local deadline; owned hardware slot remains armed, root cleanup required'};Start-Sleep -Milliseconds ([int]$j.poll_interval_ms);continue}
+  Need ($state -eq 6) 'Unexpected execution state; no interrupt/resume'
+  $hit++;$observed=$clock.Elapsed.TotalMilliseconds
+  $begin='__PREFIX___HIT_'+$hit+'_BEGIN';$end='__PREFIX___HIT_'+$hit+'_END'
+  $cmd='__CLASSIFY_BODY__'.Replace('HITBEGIN',$begin).Replace('HITEND',$end)
+  $block=Capture $cmd $begin $end
+  $v=[regex]::Matches($block,'(?m)^WIFILIVE_HIT pc=([0-9a-fA-F`]+) request=([0-9a-fA-F]{8}) vdev=([0-9a-fA-F]{2})\r?$')
+  Need ($v.Count -eq 1) 'Actual hit failed source/PC/owned-slot/argument guards; remain held'
+  Need (($v[0].Groups[1].Value.Replace('`','').ToLowerInvariant()) -ceq '__PC__') 'Foreign event PC'
+  $request=[Convert]::ToUInt32($v[0].Groups[2].Value,16);$vdev=[Convert]::ToUInt32($v[0].Groups[3].Value,16)
+  Need ($request -eq 0x109 -and ($vdev -eq 0 -or $vdev -eq 2)) 'Unexpected stats request/vdev; do not resume foreign hit'
+  $knownOwned=$true
+  $event=[ordered]@{hit=$hit;vdev=$vdev;request=$request;first_observed_ms=$observed;previous_go_lower_bound_ms=$lastGoLower;stop_duration_upper_bound_ms=$null;resumed=$false;within_selected_budget=$false;native_block_sha256=$null}
+  $eventPath=Join-Path $PSScriptRoot ('hit-'+$hit+'.json')
+  if($vdev -eq 0){
+   Need ($hit -eq 1) 'Only the first known vdev0 hit may be skipped'
+   $sha256=[Security.Cryptography.SHA256]::Create();try{$event.native_block_sha256=([BitConverter]::ToString($sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($block)))).Replace('-','').ToLowerInvariant()}finally{$sha256.Dispose()}
+   $nextGoLower=$clock.Elapsed.TotalMilliseconds
+   $skip=Capture '__SKIP_COMMAND__' '__SKIP_BEGIN__' '__SKIP_END__'
+   Need ($skip -match '(?m)^WIFILIVE_SKIP0_RESUME\r?$') 'Owned vdev0 resume refused'
+  }else{
+   Need (!$selected) 'Selected hit already consumed';$selected=$true
+   $owned=Join-Path $PSScriptRoot 'actual-owned-vdev2-stop.json'
+   WriteNewJson $owned ([ordered]@{schema='wifi-live-vdev2-owned-stop/1';BootId=__BOOT__;module_base='__BASE__';pc='__PC__';request=$request;vdev=$vdev;actual_block=$block;source_receipt_sha256='__RECEIPT_SHA__';first_observed_ms=$observed})
+   $proofPath=Join-Path $PSScriptRoot 'PRE_LIVE_VDEV2-proof.json';$ledgerPath=Join-Path $PSScriptRoot 'PRE_LIVE_VDEV2-ledger.json'
+   Need ((Hash $proofPath) -ceq $j.pre_proof_template_sha256 -and (Hash $ledgerPath) -ceq $j.pre_ledger_template_sha256) 'Root-reviewed PRE source changed'
+   $proof=Get-Content $proofPath -Raw|ConvertFrom-Json;$ledger=Get-Content $ledgerPath -Raw|ConvertFrom-Json
+   Need ($proof.root_selected_live_phase_observation -ceq $true -and $proof.root_owns_live_vdev2_boundary_stop -ceq $true -and $proof.phase -ceq 'PRE_LIVE_VDEV2') 'Root did not select the specific conditional live baseline'
+   Need ($proof.boot_id -eq __BOOT__ -and $proof.original_driver_base -ceq '__BASE__' -and $proof.held_pc -ceq '__PC__' -and $proof.phone_session -ceq $j.phone_session -and $proof.image_sha256 -ceq $j.image_sha256) 'PRE root identity changed'
+   $created=[DateTimeOffset]::UtcNow.ToString('o');$proof.created_utc=$created;$ledger.created_utc=$created
+   $proof.actual_evidence_sha256.owned_boundary_stop=Hash $owned;$ledger.actual_evidence_sha256.owned_boundary_stop=Hash $owned
+   $proof.actual_evidence_sha256.arm_marker=Hash $armMarker;$ledger.actual_evidence_sha256.arm_marker=Hash $armMarker
+   $actualLedger=Join-Path $PSScriptRoot 'actual-PRE_LIVE_VDEV2-ledger.json';WriteNewJson $actualLedger $ledger
+   $proof.action_ledger_file=$actualLedger;$proof.actual_evidence_sha256.action_ledger=Hash $actualLedger
+   $actualProof=Join-Path $PSScriptRoot 'actual-PRE_LIVE_VDEV2-proof.json';WriteNewJson $actualProof $proof
+   $capturePath=Join-Path $PSScriptRoot 'PRE_LIVE_VDEV2-result.jsonl'
+   & $reader --execute-reviewed-reads --proof $actualProof --proof-sha256 (Hash $actualProof) --result $capturePath|Out-Null
+   $result.selected_capture_exit=$LASTEXITCODE;$result.selected_capture_completed=($LASTEXITCODE -eq 0)
+   $clean=Capture '__CLEAN_COMMAND__' '__CLEAN_BEGIN__' '__CLEAN_END__'
+   Need ($clean -match '(?m)^WIFILIVE_OWNED_SLOT_REMOVED\r?$' -and $clean -match '(?m)^WIFILIVE_SELECTED_RESUME\r?$') 'Owned selected cleanup refused'
+   $result.owned_slot_removed=$true
+  }
+  # An immediate second owned hit may already be stopped. The preceding resume still supplies a lower bound.
+  $resumeEnd=$clock.Elapsed.TotalMilliseconds;$after=Status
+  Need ($after -eq 1 -or (!$selected -and $after -eq 6)) 'Resume not verified as GO or next possible owned hit'
+  $event.stop_duration_upper_bound_ms=$clock.Elapsed.TotalMilliseconds-[double]$lastGoLower
+  $event.resumed=$true;$event.within_selected_budget=($event.stop_duration_upper_bound_ms -le [double]$j.max_stop_upper_bound_ms)
+  WriteNewJson $eventPath $event;$events+=,$event;$knownOwned=$false
+  if($selected){Need ($after -eq 1) 'Selected capture not resumed GO1';$result.resumed=$true;break}
+  $lastGoLower=$nextGoLower
+ }
+ Need $selected 'Two hits exhausted without selected baseline'
+ $result.pause_qualified=(@($events|Where-Object {!$_.within_selected_budget}).Count -eq 0 -and $events.Count -gt 0)
+} catch {
+ $result.failure=$_.Exception.Message
+ # Only a fully classified own stats stop is eligible for automatic local cleanup. Foreign stops remain held.
+ if($knownOwned){try{if((Status) -eq 6){$clean=Capture '__CLEAN_COMMAND__' '__CLEAN_BEGIN__' '__CLEAN_END__';Need ($clean -match '(?m)^WIFILIVE_OWNED_SLOT_REMOVED\r?$') 'Failure cleanup refused';$result.owned_slot_removed=$true;$result.resumed=((Status) -eq 1)}}catch{$result.cleanup_failure=$_.Exception.Message}}
+} finally {
+ if($null -ne $capturePath -and (Test-Path -LiteralPath $capturePath)){$result.pre_result_sha256=Hash $capturePath}
+ $result.phone_session=$j.phone_session;$result.image_sha256=$j.image_sha256;$result.arm_marker_sha256=$j.arm_marker_sha256
+ $result.events=$events;$result.local_elapsed_ms=$clock.Elapsed.TotalMilliseconds;$result.initial_preFW_resume_attempted=$initialDone
+ $result.unperturbed_live_phase_proved=$false;$result.owned_slot_cleanup_required=(!$result.owned_slot_removed);$result.timeout_safe_only_after_separate_qualified_cleanup=$false
+ WriteNewJson (Join-Path $PSScriptRoot 'LOCAL-OBSERVER-result.json') $result
+}
+$result|ConvertTo-Json -Depth 16 -Compress
+if($result.failure -or $result.cleanup_failure -or !$result.resumed -or !$result.selected_capture_completed){exit 1}

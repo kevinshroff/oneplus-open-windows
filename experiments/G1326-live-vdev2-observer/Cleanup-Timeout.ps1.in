@@ -1,0 +1,46 @@
+# Independent ROOT-selected timeout cleanup. Default inert; at most one interrupt.
+param([switch]$ExecuteReviewedCleanup,[string]$Review,[string]$ReviewSha256)
+$ErrorActionPreference='Stop';$global:ProgressPreference='SilentlyContinue'
+if(!$ExecuteReviewedCleanup){'INERT: no interrupt/cleanup';return}
+function Need($ok,[string]$why){if(!$ok){throw $why}}
+function Hash([string]$p){(Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant()}
+Need ((Hash $Review) -ceq $ReviewSha256) 'Exact root cleanup review required'
+$j=Get-Content $Review -Raw|ConvertFrom-Json
+Need ($j.schema -ceq 'wifi-live-vdev2-timeout-cleanup/1' -and $j.accepted_cleanup -ceq $true -and $j.BootId -eq __BOOT__ -and $j.module_base -ceq '__BASE__' -and $j.loaded_receipt_sha256 -ceq '__RECEIPT_SHA__') 'Inert or wrong cleanup identity'
+Need ($j.root_confirms_observer_terminal_timeout -ceq $true -and $j.root_owns_exact_armed_slot0_from_same_arm_marker -ceq $true -and $j.root_confirms_no_competing_debugger_actor -ceq $true) 'Actual terminal timeout and exclusive slot ownership required'
+Need ((Hash $PSCommandPath) -ceq $j.cleanup_source_sha256 -and (Hash (Join-Path $PSScriptRoot 'LOCAL-OBSERVER-result.json')) -ceq $j.observer_result_sha256) 'Actual timeout/source binding changed'
+$o=Get-Content (Join-Path $PSScriptRoot 'LOCAL-OBSERVER-result.json') -Raw|ConvertFrom-Json
+Need ($o.BootId -eq __BOOT__ -and [string]$o.failure -like 'No selected hit before local deadline*' -and $o.owned_slot_removed -cne $true) 'Not the declared uncleaned timeout'
+$d=Join-Path $env:USERPROFILE 'Downloads\Open-G17\payloads';$a=Join-Path $d 'G550-control-amd64.exe';$e=Join-Path $d 'G717-regread-amd64.exe'
+Need ((Hash $a) -ceq 'e7629684e9d94976f6e27a984fe5d4292c1ef28d68a9477e432069e10407a712' -and (Hash $e) -ceq 'e5728946c4db42147e7c20953b522f587e5f09589a49153bce138ccff8853a41') 'Qualified cleanup helpers changed'
+$arm=Join-Path $d 'WiFi-LiveVdev2-Boot-__BOOT__-ARM_LIVE_VDEV2.once.json';Need ((Hash $arm) -ceq $j.arm_marker_sha256 -and $o.arm_marker_sha256 -ceq $j.arm_marker_sha256) 'Same actual ARM marker required'
+Need ([string]$j.kd_run_token -cmatch '^[A-Za-z0-9_.-]{8,128}$') 'Actual debugger run token required'
+$p=Get-CimInstance Win32_Process -Filter ('ProcessId='+[int]$j.kd_pid);Need ($null -ne $p -and $p.CommandLine -like ('*'+[string]$j.kd_run_token+'*')) 'Actual debugger changed'
+$m=[regex]::Match($p.CommandLine,'-logo\s+(?:"([^"]+)"|(\S+))');Need $m.Success 'Actual debugger log required';$log=if($m.Groups[1].Success){$m.Groups[1].Value}else{$m.Groups[2].Value}
+Need ([StringComparer]::OrdinalIgnoreCase.Equals([IO.Path]::GetFullPath($log),[IO.Path]::GetFullPath([string]$j.actual_debugger_log))) 'Current log changed'
+$intent=Join-Path $d 'WiFi-LiveVdev2-Boot-__BOOT__-TIMEOUT-CLEANUP.once.json'
+$f=[IO.FileStream]::new($intent,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read,4096,[IO.FileOptions]::WriteThrough)
+try{$raw=[Text.Encoding]::UTF8.GetBytes(('{"schema":"wifi-live-timeout-cleanup-intent/1","BootId":__BOOT__,"review_sha256":"'+$ReviewSha256+'","interrupt_attempts_max":1}'));$f.Write($raw,0,$raw.Length);$f.Flush($true)}finally{$f.Dispose()}
+function Status {$text=[string](& $a status|Out-String);Need ($LASTEXITCODE -eq 0) 'Status failed';$x=[regex]::Matches($text,'(?m)^EXECUTION_STATUS=0x([0-9a-fA-F]{8})\s*$');Need ($x.Count -eq 1) 'One current status';[Convert]::ToUInt32($x[0].Groups[1].Value,16)}
+function Block([string]$command,[string]$begin,[string]$end){Need ((Status) -eq 6) 'Existing held6 required';& $e capture $command|Out-Null;Need ($LASTEXITCODE -eq 0) 'Native command failed';$s=[string](Get-Content $log -Tail 100|Out-String);$b=[regex]::Matches($s,'(?m)^'+[regex]::Escape($begin)+'\r?$');$e=[regex]::Matches($s,'(?m)^'+[regex]::Escape($end)+'\r?$');Need ($b.Count -eq 1 -and $e.Count -eq 1 -and $e[0].Index -gt $b[0].Index) 'Actual anchored cleanup block';$s.Substring($b[0].Index,$e[0].Index+$e[0].Length-$b[0].Index)}
+$result=[ordered]@{schema='wifi-live-vdev2-timeout-cleanup-result/1';BootId=__BOOT__;module_base='__BASE__';review_sha256=$ReviewSha256;arm_marker_sha256=$j.arm_marker_sha256;interrupt_attempts=0;interrupt_issued=$false;owned_slot_removed=$false;resumed=$false;failure=$null;foreign_or_unknown_stop_preserved=$true}
+try{
+ $state=Status
+ if($state -eq 1){$result.interrupt_attempts=1;$raw=[string](& $a interrupt|Out-String);$interruptExit=$LASTEXITCODE;$result.interrupt_issued=($interruptExit -eq 0 -and $raw -match '(?m)^Interrupt HRESULT=0x00000000\s*$')
+  # One attempt only. A race into a hardware stop is classified below; no interrupt replay.
+  $until=[DateTimeOffset]::UtcNow.AddSeconds(5);do{$state=Status;if($state -eq 6){break};Start-Sleep -Milliseconds 50}while([DateTimeOffset]::UtcNow -lt $until)
+ }
+ Need ($state -eq 6) 'No current held stop; root must retain cleanup ownership'
+ $b=Block '__TIMEOUT_CLASSIFY__' '__TIMEOUT_CLASSIFY_BEGIN__' '__TIMEOUT_CLASSIFY_END__'
+ $ownHardware=$b -match '(?m)^WIFILIVE_TIMEOUT_OWN_HARDWARE\r?$'
+ $ownInterrupt=$result.interrupt_issued -and $b -match '(?m)^WIFILIVE_TIMEOUT_INTERRUPT_PC\r?$' -and $b -match 'Break instruction exception - code 80000003'
+ Need ($ownHardware -or $ownInterrupt) 'Foreign/unknown stop preserved; no clear or resume'
+ $cmd=if($ownHardware){'__TIMEOUT_CLEAR_HARDWARE__'}else{'__TIMEOUT_CLEAR_INTERRUPT__'}
+ $c=Block $cmd '__TIMEOUT_CLEAR_BEGIN__' '__TIMEOUT_CLEAR_END__'
+ Need ($c -match '(?m)^WIFILIVE_TIMEOUT_OWNED_SLOT_REMOVED\r?$') 'Owned exact-slot cleanup refused'
+ $result.owned_slot_removed=$true;$result.resumed=((Status) -eq 1);Need $result.resumed 'Resume GO1 not observed'
+ $result.foreign_or_unknown_stop_preserved=$false
+}catch{$result.failure=$_.Exception.Message}
+$out=Join-Path $PSScriptRoot 'TIMEOUT-CLEANUP-result.json';$raw=[Text.Encoding]::UTF8.GetBytes(($result|ConvertTo-Json -Compress)+"`n");$f=[IO.FileStream]::new($out,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read,4096,[IO.FileOptions]::WriteThrough);try{$f.Write($raw,0,$raw.Length);$f.Flush($true)}finally{$f.Dispose()}
+$result|ConvertTo-Json -Compress
+if($result.failure -or !$result.owned_slot_removed -or !$result.resumed){exit 1}

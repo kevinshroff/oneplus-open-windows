@@ -1,0 +1,15 @@
+{
+  "schema": "wifi-live-vdev2-actual-loaded-original/1",
+  "BootId": null,
+  "module_base": null,
+  "nt_base": null,
+  "load_stop_pc": null,
+  "root_nonce": null,
+  "original_driver_sha256": "802b1f7c5325c312b710312ced0864f813beaf30ff0fceceeefd9f48b2f25d56",
+  "loaded_boundary_16bytes": null,
+  "root_qualifies_exact_loaded_PE": false,
+  "root_owns_module_load_hold_before_DriverEntry": false,
+  "root_qualifies_no_other_breakpoints": false,
+  "root_qualifies_MASM_and_native_ARM64_ba_e4": false,
+  "root_qualifies_G550_G717_local_route": false
+}
