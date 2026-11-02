@@ -30,6 +30,7 @@ func call(obj uintptr,slot int,args ...uintptr)uint32{
  case 6:
   *(*uint32)(unsafe.Pointer(args[0]))=0
   if scenario=="unexpected-enabled"{*(*uint32)(unsafe.Pointer(args[0]))=4}
+  if scenario=="enabled-after-set"&&selected!=0{*(*uint32)(unsafe.Pointer(args[0]))=4}
  case 13:
   selected=uint32(args[0]);if args[1]!=4{panic("Not EXECUTE")}
   if scenario=="parameter-rejected"{return 0x80070057}
@@ -39,12 +40,13 @@ func call(obj uintptr,slot int,args ...uintptr)uint32{
  case 12:
   *(*uint32)(unsafe.Pointer(args[0]))=selected;*(*uint32)(unsafe.Pointer(args[1]))=4
   if scenario=="bad-readback"{*(*uint32)(unsafe.Pointer(args[1]))=2}
+  if scenario=="size-canonicalization"{*(*uint32)(unsafe.Pointer(args[0]))=4}
  default:panic("Unexpected/enabling/releasing method")
  }
  return 0
 }
 func run(name string,wantPanic bool){
- scenario=name;objects=0;removed=0;queriesAfterRemoval=0
+ scenario=name;objects=0;removed=0;queriesAfterRemoval=0;selected=0
  var result attempt;panicked:=false
  func(){defer func(){if recover()!=nil{panicked=true}}();result=probe(1,4)}()
  if panicked!=wantPanic{panic("Wrong panic result: "+name)}
@@ -52,11 +54,17 @@ func run(name string,wantPanic bool){
  if removed!=wantRemoved||queriesAfterRemoval!=0{panic("Wrong lifetime: "+name)}
  if name!="remove-fails"&&objects!=0{panic("Leaked object: "+name)}
  if !wantPanic&&(!result.Removed||result.Accepted!=(name=="success")){panic("Named return/defer incorrect: "+name)}
+ if name=="bad-readback"&&(result.Access!=2||result.ReadSize!=4||result.Matched||result.Reason!="parameter_readback_mismatch_observed"){panic("Lost mismatch evidence")}
  fmt.Println("PASS",name)
 }
 func main(){
- run("success",false);run("parameter-rejected",false)
- for _,name:=range []string{"create-fails","unexpected-enabled","wrong-type","bad-readback","remove-fails"}{run(name,true)}
+ run("success",false);run("parameter-rejected",false);run("bad-readback",false)
+ for _,name:=range []string{"create-fails","unexpected-enabled","enabled-after-set","wrong-type","remove-fails"}{run(name,true)}
+ scenario="size-canonicalization";objects=0;removed=0;queriesAfterRemoval=0;selected=0
+ a,b:=probe(1,1),probe(1,4)
+ if a.Size!=1||a.ReadSize!=4||a.Access!=4||a.Flags!=0||a.Accepted||a.Matched||!a.Removed||a.Reason!="parameter_readback_mismatch_observed"{panic("First mismatch observation lost")}
+ if b.Size!=4||b.ReadSize!=4||!b.Accepted||!b.Matched||!b.Removed||objects!=0||removed!=2||queriesAfterRemoval!=0{panic("Independent size4 not completed")}
+ fmt.Println("PASS size1 mismatch retained; independent size4 exact match (synthetic scenario only)")
 }
 '''
 with tempfile.TemporaryDirectory(prefix='g1313-lifecycle-') as td:

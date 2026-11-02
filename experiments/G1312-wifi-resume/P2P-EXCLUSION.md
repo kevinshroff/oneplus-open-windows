@@ -1,4 +1,4 @@
-# P2P capability exclusion candidate
+# P2P capability exclusion: negative result
 
 A future fresh initialization can isolate the Wi-Fi Direct lifecycle using the original driver's recognized `p2pDisable` **REG_DWORD1** option. This is a proposed experiment, not a demonstrated fix. It must not replay initialization in an already-consumed boot.
 
@@ -20,4 +20,4 @@ If selected, resolve the actual device **Driver software key afresh** before cha
 
 The experiment must first prove the configuration reached the compiled gate and that the Wi-Fi Direct device lifecycle is absent; virtual-device numbering alone is insufficient. Then require real STA scan/channel/BSS progress and sustained returned RX credits beyond the old boundary. Association, DHCP and traffic remain separate success criteria. If the same stop recurs with the gate proved active, the simple P2P-lifecycle explanation is weakened; it does not justify an unrelated barrier or credit patch.
 
-No configuration change, new initialization or hardware action was performed for this source review.
+Root subsequently ran one fresh initialization and scan with this single option selected. The retained CPU log proves both configuration value1 and the compiled `cannot support P2P` gate; the Wi-Fi Direct lifecycle is absent. Early STA firmware scans and BSS indications still occurred, but the later HT capability SET_IE again consumed the final EP2 credit; its host sender completion succeeded, while no subsequent RX credit returned and the requested scan stayed queued. Cached networks remained empty. This excludes the simple claim that the Wi-Fi Direct lifecycle is necessary for this recurrence; it does not prove the final HT command caused it. Do not repeat this exclusion as an untested candidate.

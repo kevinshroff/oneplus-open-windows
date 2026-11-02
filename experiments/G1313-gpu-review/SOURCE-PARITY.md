@@ -1,8 +1,9 @@
 # A740 start sequence and MMIO parity
 
 Source review, 2026-11-02. This establishes comparison behavior, not a missing
-write's causal role. The nonsecure64 trial still failed at the outer SQE-start
-call boundary; it did not localize the helper's barriers or STR.
+write's causal role. The initial nonsecure64 trial failed at the outer SQE-start
+call boundary. Subsequent Boot163 manual hardware stops established completion
+of the pre-store DSB and arrival at the original STR; see [current review](REVIEW.md).
 
 ## Start and security sequence
 
@@ -31,7 +32,9 @@ The clear remaining store-parity gap is four SECVID/TSB zero stores: Linux/Sheng
 write TSB control, trusted base low/high and size; current G456 qualifies zeros
 without those stores. Zero readback does not prove a write occurred, but no
 source or observed result demonstrates that a write strobe is required. Any
-such trial must remain separate from instruction-boundary localization. A
+such trial should now be a separate fresh one-shot change, preserving the existing
+nonsecure64 layout and all other policy. The newly localized pre-STR boundary
+makes this the next concrete source-parity experiment, not an established fix. A
 pre-start PAS/ZAP change, repeated SQE start, guessed clock value or separate
 ME write is not justified by these sequences.
 

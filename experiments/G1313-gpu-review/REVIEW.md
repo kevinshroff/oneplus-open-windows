@@ -1,8 +1,26 @@
 # Independent GPU boundary review, 2026-11-02
 
-Offline source review only. No device control, secure calls, signing, commits or new binary reverse engineering. Historical compiled-helper observations below are explicitly inherited from the earlier review, not newly measured. No definite additional implementation defect was found in the examined startup path.
+Offline review incorporating root-recorded native evidence. This review itself performed no device control, secure calls, signing or commits. Exact compiled-image pins are in [SQE-SPECIAL-CALLSITE.md](SQE-SPECIAL-CALLSITE.md). No definite additional implementation defect has been established.
 
-The highest-value next action is instruction-boundary localization on the exact loaded owner. The isolated nonsecure64 VA layout is a reasonable second discriminator, with an important limit: membership in KGSL's software secure allocator range does not establish hardware security classification. Successful register readback and CPU table walks do not establish GPU translation or fetch.
+## Current result: manual hardware boundary, Boot163
+
+The G1311 nonsecure64 owner was qualified at its load event against the selected image and code words. A callback-based automatic chain reached the unique SQE-start callsite but crashed the host debugger engine. WER identified dbgeng.dll 10.0.22621.755, access violation at module offset 0x256b8d. That chain is deprecated; the faulting command/lifetime mechanism is not established. Root recovered the same boot and same attempt at the callsite without replaying initialization.
+
+Independent external debugger commands then used two thread-qualified hardware execution slots, without breakpoint callbacks. The same thread stopped first at helper RVA `0x143d0` (`DSB SY`), then at `0x143dc` (original word `0xb9000134`, `STR W20,[X9]`). W20 was1, W21 was register offset0x2020, and X9 held the mapped register address. This positively establishes that the helper's access-validation path and pre-store DSB SY completed in this attempt. The register store had not yet executed at the recorded STR stop.
+
+At that stop, root removed the STR breakpoint and verified enabled size4 execution breakpoints at `0x143e0` (post-store `DSB OSH`) and `0x143e4` (following instruction), both matching the same thread and carrying no callbacks. After explicit resume, neither successor hit was observed. The host debugger remained alive and physical USB diagnostics900E was observed. This is a target-side failure after release from the pre-STR stop, distinct from the earlier host access violation.
+
+The strongest supported boundary is **pre-store barrier completed; failure after release at the SQE start store, before any observed successor stop**. Missing hits do not mathematically prove STR retirement, delivery of the write to hardware, a GPU fetch, or a precise fault PC. ARM64 breakpoint restart/suppression or internal single-step behavior, adjacent +4 delivery, and transport loss constrain negative evidence. Earlier benign entry→entry+4 success supports the channel but does not prove every resume case. The substantial manual holds also perturb watchdog/power timing. The record therefore does not exclude execution of the post-store barrier merely because its breakpoint was not reported.
+
+Evidence reviewed offline: root receipts `gpu-manual-arm-result.json`, `gpu-manual-predsb-result.json`, `gpu-manual-str-result.json`, and `gpu-after-STR-runtime.json`. Runtime addresses, physical addresses and private transport configuration are intentionally omitted here. These RVAs apply only to the exact G1311 image pinned in the linked compiled review.
+
+## Next bounded change
+
+The highest-value remaining source-grounded code trial is **four explicit zero stores to TSB control, trusted base low/high, and trusted size**, in their compared setup order before SQE start. Linux and the actual Sheng board path perform these writes; current G456 checks the corresponding zero prestate and omits the stores. Readback zero does not establish a necessary write strobe, so this is a parity experiment, not a diagnosed fix.
+
+Keep the existing G1311 nonsecure64 layout, mapping/permissions, secure-call policy, barriers, SQE value1, and initialization packets unchanged. Preserve existing zero-prestate admission and normal checked-write/readback/error handling; do not copy Android trusted-address ranges or add SECVID_TRUST_CNTL. Use a fresh one-shot initialization, never replay the consumed attempt. An uninterrupted ordinary-log run avoids adding the long manual holds to this changed-sequence trial. Record completion of the four stores separately from SQE-start return: failure at a new store is a different boundary; continued failure at the old boundary weakens the parity hypothesis; success supports dependence on the additional setup sequence but does not alone identify a hidden latch mechanism.
+
+No stronger observed lead currently supports changing CPU mapping attributes, removing either barrier, preloading ZAP, adding a second ME-enable write, changing a clock constant or repeating the aperture call. Exact CPU PTE/MAIR observation remains a useful read-only mapping question if cheaply available during a separately qualified stop, but mapping flags alone are not evidence of a defect. The VA-only trial's unchanged outer failure already shows that moving out of the old software secure allocator window was insufficient; it does not establish correct GPU translation.
 
 ## Observations from the public source
 
@@ -16,7 +34,7 @@ The highest-value next action is instruction-boundary localization on the exact 
 
 A locally retained mainline comparison was also checked: its A7xx branch skips the legacy per-block ADDR_MODE_CNTL writes. Do not add a guessed 64-bit address-mode enable to the VA trial. The same comparison explicitly writes zero trusted base/size to leave virtual space available; this weakens any claim that the numerical software secure window alone proves hardware rejection here.
 
-## Prioritized discriminators
+## Historical discriminator plan (superseded by the result above)
 
 1. **Instrument only, existing exact image where possible.** Qualify fresh loaded image/base and actual helper instructions. Bound four points: before pre-store DSB; after pre-store DSB/before STR; after STR/before post-store DSB; after post-store DSB. Existing debugger execution breakpoints can supply these without new MMIO or changed policy, if supported by the live controller. Historical RVAs are not authority for a new image. Do not substitute a breakpoint at wrapper entry for the actual STR boundary.
 2. **One isolated VA-layout run.** Verify the four addresses, all emitted high words (`0x40`), all 29 leaf translations, and no mapping at the corresponding truncated low addresses. Keep sizes, contents, permissions, allocation policy and register sequence unchanged. Fresh boot allocations may naturally change PFNs, so describe this as unchanged allocation policy, not identical physical pages unless actually established. A changed outcome supports address-layout dependence; it does not uniquely prove secure-range classification. An identical outer marker alone still does not resolve the instruction boundary.

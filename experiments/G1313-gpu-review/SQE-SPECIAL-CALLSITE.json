@@ -1,0 +1,158 @@
+{
+  "schema": "g1313-sqe-special-callsite/1",
+  "unsigned_sha256": "3ee73237c4311eec9fe083f3d5067407bde1884d84bddb9f8d65c2370dba1d4b",
+  "preferred_image_base": "0x140000000",
+  "evidence_id": "ev_7a818142e8e57a7ff3e4ca5fb51680094524eff7c685177dcfd3699ae7cd5b95",
+  "function_rva": "0x18cd8",
+  "map_symbol": "GpuWrite",
+  "map_object": "43_gpu_cp_native.obj",
+  "selected_gate_rva": "0x192c4",
+  "gate_instruction": "bl 0x14001434c",
+  "gate_word": "97ffec22",
+  "helper_rva": "0x1434c",
+  "generic_call_rva": "0x19394",
+  "live_execution_observed": false,
+  "gate_registers": {
+    "x0": "x22 == owner x20 + 0x1e0",
+    "w1": "0x2020",
+    "w2": "w19 == 1",
+    "w21": "0x2020"
+  },
+  "instructions": [
+    {
+      "rva": "0x18d64",
+      "instruction_word": "52840408",
+      "assembly": "mov w8, #0x2020"
+    },
+    {
+      "rva": "0x18d68",
+      "instruction_word": "6b0802bf",
+      "assembly": "cmp w21, w8"
+    },
+    {
+      "rva": "0x18d6c",
+      "instruction_word": "54001701",
+      "assembly": "b.ne 0x14001904c"
+    },
+    {
+      "rva": "0x18d70",
+      "instruction_word": "7100067f",
+      "assembly": "cmp w19, #0x1"
+    },
+    {
+      "rva": "0x18d74",
+      "instruction_word": "54000321",
+      "assembly": "b.ne 0x140018dd8"
+    },
+    {
+      "rva": "0x1920c",
+      "instruction_word": "6b0b02bf",
+      "assembly": "cmp w21, w11"
+    },
+    {
+      "rva": "0x19228",
+      "instruction_word": "54000ae1",
+      "assembly": "b.ne 0x140019384"
+    },
+    {
+      "rva": "0x19290",
+      "instruction_word": "d0000028",
+      "assembly": "adrp x8, 0x14001f000"
+    },
+    {
+      "rva": "0x19294",
+      "instruction_word": "f0000024",
+      "assembly": "adrp x4, 0x140020000"
+    },
+    {
+      "rva": "0x19298",
+      "instruction_word": "91384084",
+      "assembly": "add x4, x4, #0xe10"
+    },
+    {
+      "rva": "0x1929c",
+      "instruction_word": "b9000be9",
+      "assembly": "str w9, [sp, #0x8]"
+    },
+    {
+      "rva": "0x192a0",
+      "instruction_word": "528009c0",
+      "assembly": "mov w0, #0x4e"
+    },
+    {
+      "rva": "0x192a4",
+      "instruction_word": "52800061",
+      "assembly": "mov w1, #0x3"
+    },
+    {
+      "rva": "0x192a8",
+      "instruction_word": "f9408508",
+      "assembly": "ldr x8, [x8, #0x108]"
+    },
+    {
+      "rva": "0x192ac",
+      "instruction_word": "b90003ff",
+      "assembly": "str wzr, [sp]"
+    },
+    {
+      "rva": "0x192b0",
+      "instruction_word": "d63f0100",
+      "assembly": "blr x8"
+    },
+    {
+      "rva": "0x192b4",
+      "instruction_word": "91078296",
+      "assembly": "add x22, x20, #0x1e0"
+    },
+    {
+      "rva": "0x192b8",
+      "instruction_word": "52840401",
+      "assembly": "mov w1, #0x2020"
+    },
+    {
+      "rva": "0x192bc",
+      "instruction_word": "2a1303e2",
+      "assembly": "mov w2, w19"
+    },
+    {
+      "rva": "0x192c0",
+      "instruction_word": "aa1603e0",
+      "assembly": "mov x0, x22"
+    },
+    {
+      "rva": "0x192c4",
+      "instruction_word": "97ffec22",
+      "assembly": "bl 0x14001434c"
+    },
+    {
+      "rva": "0x192c8",
+      "instruction_word": "f942ae88",
+      "assembly": "ldr x8, [x20, #0x558]"
+    },
+    {
+      "rva": "0x19384",
+      "instruction_word": "91078296",
+      "assembly": "add x22, x20, #0x1e0"
+    },
+    {
+      "rva": "0x19388",
+      "instruction_word": "2a1503e1",
+      "assembly": "mov w1, w21"
+    },
+    {
+      "rva": "0x1938c",
+      "instruction_word": "2a1303e2",
+      "assembly": "mov w2, w19"
+    },
+    {
+      "rva": "0x19390",
+      "instruction_word": "aa1603e0",
+      "assembly": "mov x0, x22"
+    },
+    {
+      "rva": "0x19394",
+      "instruction_word": "97ffebee",
+      "assembly": "bl 0x14001434c"
+    }
+  ]
+}

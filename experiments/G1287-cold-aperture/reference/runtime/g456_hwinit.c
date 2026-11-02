@@ -4,6 +4,7 @@
 #include "gpu_owner.h"
 #include "g433_runtime.h"
 #include "g456_tables.h"
+#include "g456_secvid_zero.h"
 #define GMU_DWORD_BASE 0x1a800u
 #define GX_STATUS_BYTE 0x14340u
 /* Mainline A6xx/A7xx hw_init: AHB default slave response ERROR,
@@ -74,6 +75,11 @@ NTSTATUS G456ConfigureGpuStopped(G433_RUNTIME*r){
  for(ULONG i=0;i<RTL_NUMBER_OF(zero_regs);i++){TRY(Read(r,zero_regs[i],&value));if(value){s=STATUS_NOT_SUPPORTED;goto done;}}
  TRY(Read(r,G456_RBBM_STATUS,&value));TRY(Read(r,G456_CP_SQE_CNTL,&value));
  t->Stage=2;
+#if OGO_GPU_SECVID_ZERO_STORES
+ /* Opt-in stores follow complete existing zero-prestate admission. Use the
+  * same VendorPost/Write lease, AHB, retention, barrier and journal path. */
+ for(ULONG i=0;i<G456SecvidZeroStores_COUNT;i++)TRY(VendorPost(r,G456SecvidZeroStores[i][0],G456SecvidZeroStores[i][1]));
+#endif
  for(ULONG i=0;i<G456Gbif_COUNT;i++)TRY(VendorPost(r,G456Gbif[i][0],G456Gbif[i][1]));
  TRY(VendorPost(r,G456_UCHE_GBIF_GX_CONFIG,0x10240e0));TRY(VendorPost(r,G456_RBBM_PERFCTR_GPU_BUSY_MASKED,MAXULONG));
  TRY(VendorPost(r,G456_UCHE_TRAP_BASE_LO,0xfffff000));TRY(VendorPost(r,G456_UCHE_TRAP_BASE_HI,0x1ffff));

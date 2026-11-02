@@ -64,9 +64,35 @@ and scalar WDDM types, and checks worker-absent/allocation failures and successf
 queue acceptance under ASan/UBSan. The stub also verifies that LastSubmittedFence
 is published before queue entry, which can wake/complete work immediately.
 Three cases pass. This is CPU source testing,
-not a scheduler or hardware qualification. Full DDI COFF compilation was
-attempted with the G1311 external WDK profile but stopped at missing Microsoft
-`acpiioct.h` in `dispmprt.h`; a complete display WDK header closure is required.
+not a scheduler or hardware qualification. The complete current `ddi.c` now also
+compiles to ARM64 COFF with `-Wall -Wextra -Werror` using external Microsoft
+WDK/SDK headers. The earlier missing `acpiioct.h` was resolved by supplying the
+existing full display-header root; no header was deleted, replaced with stubs,
+or copied into this repository. The produced object is66322 bytes, SHA256
+`a087d736ff2c605d5d2151b6ef82d029baa4f761b30d78517e3366b458fde107`.
+This establishes translation-unit/API compilation, not native linking,
+Dxgkrnl callback execution or scheduler/hardware correctness.
+
+`compile_ddi.py` accepts an explicit Clang compiler, repeated external include
+roots and a new output directory. It records the exact compiler invocation,
+version, complete85-file dependency hash set for this run, diagnostics and object
+hash. Keep its local-path receipt outside the public tree. Example:
+
+```sh
+python3 experiments/G1315-wddm-integration/compile_ddi.py \
+  --compiler /absolute/path/to/clang \
+  --include-dir /external/WDK/Include/10.0.26100.0/km \
+  --include-dir /external/SDK/Include/10.0.26100.0/shared \
+  --include-dir /external/SDK/Include/10.0.26100.0/ucrt \
+  --include-dir /external/MSVC/include \
+  --include-dir /external/display-shared-headers \
+  --out /external/new-ddi-build
+```
+
+The display shared root must supply the actual Microsoft `acpiioct.h` needed by
+`dispmprt.h`; use the corresponding complete WDK/SDK release. The successful
+local run used WDK/SDK26100 and Clang17.0.0. No external input is needed to
+resolve this particular compile blocker in the current workspace.
 
 ## Concrete integration order after first native completion
 

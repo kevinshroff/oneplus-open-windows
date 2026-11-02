@@ -50,6 +50,8 @@ type attempt struct {
 	Size      uint32 `json:"size"`
 	Result    string `json:"set_hresult"`
 	Accepted  bool   `json:"metadata_accepted"`
+	Matched   bool   `json:"parameters_match"`
+	Reason    string `json:"reason"`
 	Type      uint32 `json:"breakpoint_type"`
 	Processor uint32 `json:"processor_type"`
 	ReadSize  uint32 `json:"read_size"`
@@ -87,10 +89,18 @@ func probe(ctl uintptr, size uint32) (a attempt) {
 	if hr == 0 {
 		need("GetDataParameters", call(bp, 12, uintptr(unsafe.Pointer(&a.ReadSize)), uintptr(unsafe.Pointer(&a.Access))))
 		need("GetFlags after parameters", call(bp, 6, uintptr(unsafe.Pointer(&a.Flags))))
-		if a.ReadSize != size || a.Access != 4 || a.Flags&4 != 0 {
-			panic("Parameter readback mismatch")
+		if a.Flags&4 != 0 {
+			panic("Unexpected enabled breakpoint after parameters")
 		}
-		a.Accepted = true
+		a.Matched = a.ReadSize == size && a.Access == 4
+		a.Accepted = a.Matched
+		if a.Matched {
+			a.Reason = "exact_disabled_parameter_match"
+		} else {
+			a.Reason = "parameter_readback_mismatch_observed"
+		}
+	} else {
+		a.Reason = "set_parameters_rejected"
 	}
 	return a
 }
@@ -140,5 +150,5 @@ func main() {
 	if count(ctl) != before {
 		panic("Unexpected breakpoint inventory after probe")
 	}
-	_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"schema": "g1313-disabled-hwexec-probe/1", "attempts": out, "target_memory_accesses": 0, "breakpoints_enabled": 0, "interrupts": 0, "resumes": 0, "live_execution_support_proven": false})
+	_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"schema": "g1313-disabled-hwexec-probe/2", "attempts": out, "target_memory_accesses": 0, "breakpoints_enabled": 0, "interrupts": 0, "resumes": 0, "live_execution_support_proven": false})
 }

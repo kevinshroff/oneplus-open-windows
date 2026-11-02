@@ -1,5 +1,7 @@
 # Fixed execution-breakpoint plan
 
+**Current G1311 update:** the benign EL1 hardware execution channel has passed, and the exact compiled SQE-only outer callsite is now qualified at RVA192c4. Use [SQE-SPECIAL-CALLSITE.md](SQE-SPECIAL-CALLSITE.md) for the load-event gate and first breakpoint. The baseline discussion below predates that caller classification; do not arm the universal helper during early startup.
+
 Prepared offline. This document performs no live operation and is not a reusable address configuration. The root operator must derive the newly linked variant's addresses and current loaded base before selecting instrumentation.
 
 ## Baseline identity and exact instructions

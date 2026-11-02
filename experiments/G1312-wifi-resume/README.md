@@ -84,3 +84,5 @@ Cursor denotes the last **reserved** record, not next-free. Its row is marked po
 The descriptor-high16 field is a received length only for status-reap events1/0x30. Event0 is a destination RX-buffer repost and uses address descriptor layout; its high16 bits must not be interpreted as a large received length or an error. See [the resumed observation](BOOT162-OBSERVATIONS.md).
 
 [The P2P exclusion candidate](P2P-EXCLUSION.md) records the exact original-driver descriptor/gate and criteria for one future isolated configuration experiment. It is not an approval or a demonstrated fix.
+
+See [legacy mode capability exclusion](LEGACY-MODE.md) for the source-qualified next discriminator and required runtime gate evidence.
