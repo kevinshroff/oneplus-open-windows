@@ -1,0 +1,66 @@
+{
+  "schema": "g1335-offline-validation/2",
+  "memory_current_allocatability": "unknown",
+  "baseline": "G1325 original nonsecure64 IOVAs, lowSQE0/witness0/SECVID1/GPUWC0",
+  "allocator_tests": {
+    "native_evidence": false,
+    "ASan_UBSan": true,
+    "tests": [
+      {
+        "low_physical": false,
+        "boundary_cases": 9,
+        "generic_high_PA_preserved": true,
+        "result": "pass"
+      },
+      {
+        "low_physical": true,
+        "boundary_cases": 9,
+        "generic_high_PA_preserved": true,
+        "result": "pass"
+      }
+    ],
+    "invalid_selectors": 2
+  },
+  "generic_high_PA_preserved_both_modes": true,
+  "coff": {
+    "baseline": "G1325 original nonsecure64 IOVAs, witness0, lowSQE0, SECVID1, GPUWC0",
+    "default_off_matches_G1325": 35,
+    "objects": 35,
+    "changed_objects": [
+      "11_open_smmu_inactive.obj",
+      "43_gpu_cp_native.obj"
+    ],
+    "GMU_original_builder_preserved": true,
+    "linked": false,
+    "native_evidence": false
+  },
+  "source_patch_sha256": "a2854e946eeac69726a9bd95f90a928f30da9e55a3c45579ef1f923f853e153e",
+  "policy_header_sha256": "458fecc63bef992ba2b2de11f29a88fcf427b1e3b2cc3e1fe269b338f92ddc11",
+  "main_closure_modified": false,
+  "linked": false,
+  "signed": false,
+  "staged": false,
+  "hardware_qualified": false,
+  "activation_selected": false,
+  "native_packet": {
+    "zip_sha256": "bb46651ec5a56bb6c4dae294deab072a4791309964ee4de1f8d359aa37665244",
+    "manifest_sha256": "e33dc5f69353d2303ce307e0851e496ced66de9c3a2e851a1528eb9595e96e2e",
+    "members": 275,
+    "owner_objects": 35,
+    "native_link_performed": false,
+    "signing_performed": false,
+    "hardware_qualified": false
+  },
+  "packager_wrong_profile_rejections": [
+    {
+      "wrong_profile": "lowphysical_off",
+      "refused_before_ZIP": true,
+      "error": "RuntimeError: explicit CP-only low physical required"
+    },
+    {
+      "wrong_profile": "G1334_lowSQE",
+      "refused_before_ZIP": true,
+      "error": "RuntimeError: original G1325 SQE IOVA required"
+    }
+  ]
+}

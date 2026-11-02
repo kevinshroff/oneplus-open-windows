@@ -29,7 +29,7 @@ public sealed class Matched4478Selector : IDisposable {
 
  [DllImport("C:\\Windows\\System32\\cfgmgr32.dll")]static extern uint CM_Get_DevNode_Status(out uint status,out uint problem,uint inst,uint flags);
  [DllImport("C:\\Windows\\System32\\newdev.dll",SetLastError=true)]static extern bool DiInstallDevice(IntPtr parent,IntPtr h,ref DEV d,ref DRIVER driver,uint flags,out bool needReboot);
- IntPtr h=new IntPtr(-1); DEV d; DRIVER driver; bool list,attempted; public PARAMS Parameters; public DETAIL SelectedDetail; public uint Status,Problem; public uint DriverCount; public string CandidateError,InfSha256,ResolvedSection; public ulong Version {get{return driver.DriverVersion;}} public string Description {get{return driver.Description;}} public string Provider {get{return driver.Provider;}}
+ IntPtr h=new IntPtr(-1); DEV d; DRIVER driver; bool list,attempted; public PARAMS Parameters; public DETAIL SelectedDetail; public uint Status,Problem; public uint DriverCount; public string CandidateError,InfSha256,ResolvedSection,ActualDetailInfPath,NormalizedDetailInfPath,NormalizedDetailInfSHA256,NormalizedExpectedInfPath; public ulong Version {get{return driver.DriverVersion;}} public string Description {get{return driver.Description;}} public string Provider {get{return driver.Provider;}}
  static void Check(bool ok,string step){if(!ok)throw new Win32Exception(Marshal.GetLastWin32Error(),step);}
  static string Hash(string f){using(var s=SHA256.Create())using(var x=File.OpenRead(f)){return BitConverter.ToString(s.ComputeHash(x)).Replace("-","").ToLowerInvariant();}}
  static bool stageAttempted;
@@ -44,6 +44,12 @@ public sealed class Matched4478Selector : IDisposable {
   if(required<1||required>260)throw new Exception("Bounded actual DriverStore path");string inf=Path.GetFullPath(store.ToString());
   if(!inf.StartsWith(@"C:\Windows\System32\DriverStore\FileRepository\",StringComparison.OrdinalIgnoreCase)||Hash(inf)!="3141acb9146b3dcff0a01f09a5b4abc6cd8c272725f30c6e997d3c6a415d3bbb")throw new Exception("Actual DriverStore new INF hash/path differs");
   return new {publishedInf=oem,driverStoreInf=inf,InfSHA256=Hash(inf),packageImportCalls=1,driverInstallCalls=0,automaticReboot=false};
+ }
+ public static string NormalizeInfToStore(string file){
+  file=Path.GetFullPath(file);StringBuilder store=new StringBuilder(260);uint required;
+  Check(SetupGetInfDriverStoreLocationW(file,IntPtr.Zero,null,store,260,out required),"Resolve actual INF to DriverStore");
+  if(required<1||required>260)throw new Exception("Bounded normalized DriverStore INF required");
+  string result=Path.GetFullPath(store.ToString());if(!result.StartsWith(@"C:\Windows\System32\DriverStore\FileRepository\",StringComparison.OrdinalIgnoreCase))throw new Exception("Normalized INF outside DriverStore");return result;
  }
  public static uint SelectionFlags(uint flags){return (flags & ~(0x01000000U|0x00080000U))|0x00810000U;}
  public static uint SelectionFlagsEx(uint flagsEx){return (flagsEx & ~0x04000000U)|0x00000800U;}
@@ -71,9 +77,13 @@ public sealed class Matched4478Selector : IDisposable {
    if(driver.DriverVersion!=0x00010000117e0898UL)throw new Exception("Exact matched version1.0.4478.2200 required");
    uint need;bool first=SetupDiGetDriverInfoDetailW(h,ref d,ref driver,IntPtr.Zero,0,out need);int err=Marshal.GetLastWin32Error();if(first||err!=122||need<1584||need>65536)throw new Exception("Bounded driver detail size query required");
    IntPtr data=Marshal.AllocHGlobal((int)need);try{Marshal.WriteInt32(data,1584);Check(SetupDiGetDriverInfoDetailW(h,ref d,ref driver,data,need,out need),"Driver detail");SelectedDetail=(DETAIL)Marshal.PtrToStructure(data,typeof(DETAIL));}finally{Marshal.FreeHGlobal(data);}
-   string inf=Path.GetFullPath(SelectedDetail.InfFile);
-   if(!String.Equals(inf,exactInf,StringComparison.OrdinalIgnoreCase))CandidateError="Single-INF detail path differs from exact source";
-   if(CandidateError==null)InfSha256=Hash(inf);
+   string inf=SelectedDetail.InfFile;ActualDetailInfPath=inf;
+   // SetupDiGetDriverInfoDetail can return the system published OEM INF, not
+   // the supplied DriverStore path. Compare both mapped package identity and bytes.
+   try{InfSha256=Hash(inf);NormalizedDetailInfPath=NormalizeInfToStore(inf);NormalizedExpectedInfPath=NormalizeInfToStore(exactInf);NormalizedDetailInfSHA256=Hash(NormalizedDetailInfPath);
+    if(!String.Equals(NormalizedDetailInfPath,NormalizedExpectedInfPath,StringComparison.OrdinalIgnoreCase))CandidateError="Single-INF normalized DriverStore identity differs from exact selection";
+    if(InfSha256!="3141acb9146b3dcff0a01f09a5b4abc6cd8c272725f30c6e997d3c6a415d3bbb"||NormalizedDetailInfSHA256!=InfSha256)CandidateError="Published/detail and DriverStore INF hashes differ";
+   }catch(Exception error){CandidateError="INF normalization failed: "+error.Message;}
    if(CandidateError==null && (InfSha256!="3141acb9146b3dcff0a01f09a5b4abc6cd8c272725f30c6e997d3c6a415d3bbb"||!String.Equals(SelectedDetail.Section,"QcWlan_BERYLLIUM.ndi",StringComparison.OrdinalIgnoreCase)))CandidateError="Exact new signed INF/generic base section not matched: "+SelectedDetail.Section;
    if(CandidateError==null){uint line;IntPtr hinf=SetupOpenInfFileW(inf,IntPtr.Zero,2,out line);Check(hinf!=new IntPtr(-1),"Open exact signed INF for architecture resolution");try{StringBuilder actual=new StringBuilder(256);uint required;Check(SetupDiGetActualSectionToInstallExW(hinf,SelectedDetail.Section,IntPtr.Zero,actual,256,out required,IntPtr.Zero,IntPtr.Zero),"Resolve local native architecture section");if(required<1||required>256)throw new Exception("Bounded resolved section required");ResolvedSection=actual.ToString();if(!String.Equals(ResolvedSection,"QcWlan_BERYLLIUM.ndi.NTarm64",StringComparison.OrdinalIgnoreCase))CandidateError="Unexpected resolved architecture section: "+ResolvedSection;}finally{SetupCloseInfFile(hinf);}}
 

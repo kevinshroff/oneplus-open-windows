@@ -36,8 +36,9 @@ try{
  # is the one selected package copy/install/init; no extra start/restart call.
  $stage=[Matched4478Selector]::StagePackageOnce([string](Join-Path $j.package_directory 'qcwlanhmt8380.inf'));New-Json (Join-Path $PSScriptRoot 'package-stage-return.json') $stage
  $n=[Matched4478Selector]::new([string]$j.instance_id,[string]$stage.driverStoreInf)
- Need ([string]::IsNullOrEmpty($n.CandidateError)) ([string]$n.CandidateError)
  $selection=[pscustomobject]@{version=('{0:x16}' -f $n.Version);Inf=$n.SelectedDetail.InfFile;InfSHA256=$n.InfSha256;section=$n.SelectedDetail.Section;resolvedSection=$n.ResolvedSection;Flags=$n.Parameters.Flags;FlagsEx=$n.Parameters.FlagsEx;DriverPath=$n.Parameters.DriverPath}
+ New-Json (Join-Path $PSScriptRoot 'selection-diagnostics.json') ([pscustomobject]@{actualDetailInf=$n.ActualDetailInfPath;detailInfSHA256=$n.InfSha256;normalizedDetailInf=$n.NormalizedDetailInfPath;normalizedExpectedInf=$n.NormalizedExpectedInfPath;normalizedDetailSHA256=$n.NormalizedDetailInfSHA256;candidateError=$n.CandidateError;version=$selection.version;section=$selection.section;resolvedSection=$selection.resolvedSection})
+ Need ([string]::IsNullOrEmpty($n.CandidateError)) ([string]$n.CandidateError)
  Journal 'invoke-once-callsite-begin' 1 0;$install=$n.InvokeOnce();Journal 'invoke-once-return' 1 0
  New-Json (Join-Path $PSScriptRoot 'driver-return.json') $install
  Need ($install.success -ceq $true -and $install.calls -eq 1 -and $install.NeedReboot -ceq $false) 'Install failed/reboot required; stop further actions, no retry/reboot'

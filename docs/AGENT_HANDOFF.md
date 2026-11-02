@@ -1,5 +1,13 @@
 # Agent handoff — Wi-Fi and GPU development
 
+Latest update (Boot168):
+
+- Wi-Fi4478/firmware341 matched package installs and initializes without reboot; all18 runtime files and platform policies verify. Corrected published-INF→DriverStore selector and exact native source qualification are in G1333.
+- The first requested RF scan received two management frames and firmware completion. A later scan60seconds afterward exhausted the final command credit; no later RX/credit return, association or DHCP. Next Wi-Fi attempt batches immediate connection/DHCP/traffic after the first scan on a clean boot.
+- G1335 low-physical candidate has35-object parity/boundary tests, native MSVC link and bounded compiled review. It changes CP BO/table placement only, retains original IOVAs and GMU policy, and is unsigned/uninstalled/unactivated. No first GPU fence or WDDM acceleration yet.
+- G1334's low-SQE trial is consumed and negative; recovery is complete. Keep GPU disabled during Wi-Fi work and do not reuse old Wi-Fi RVAs on4478.
+
+
 Status date: **2026-11-03**. Development resumed with owner approval for Wi-Fi and GPU acceleration. This handoff records the publication baseline and subsequent work; it is not a general live-device authorization or an installation recipe. Re-establish actual device/boot identity before each experiment.
 
 Resume work is tracked in [G1311 GPU VA experiment](../experiments/G1311-gpu-nonsecure-va/README.md), [G1312 Wi-Fi observations](../experiments/G1312-wifi-resume/BOOT162-OBSERVATIONS.md), and [G1313 independent GPU review](../experiments/G1313-gpu-review/REVIEW.md). The GPU variant built, linked with native MSVC, passed compiled review, and reached the same fatal CP start-call boundary in a hardware trial. Original Wi-Fi initialization succeeded and early firmware scans reported BSS entries, but firmware replies and credits subsequently stopped; usable networking remains unfinished.
@@ -10,7 +18,8 @@ unchanged, and credits still stopped. The [G1334 low-SQE trial](../experiments/G
 then confirmed the reference address but reached the same fatal start boundary;
 software recovery restored WinPE control and disabled future GPU starts.
 A [newer matched Wi-Fi package](../experiments/G1333-wifi-new-package/README.md)
-and native-qualified installer source are prepared; its device trial remains pending.
+initialized on Boot168 and completed the first RF scan, but a later scan again
+stalled credits. See its runtime result and immediate-connection next step.
 
 ## Read first
 

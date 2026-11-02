@@ -1,0 +1,18 @@
+{
+  "profile_id": "G1335-low-physical-cp",
+  "native_link_exit": 0,
+  "unsigned_sha256": "1928cb44cbe617d5ac60e41bccd5c502b09cf51edebd3416748c9c3075bd0c60",
+  "unsigned_bytes": 134656,
+  "source_manifest_sha256": "e33dc5f69353d2303ce307e0851e496ced66de9c3a2e851a1528eb9595e96e2e",
+  "driver_loads": 0,
+  "signing": 0,
+  "hardware_trial_selected": false,
+  "source_profile": {
+    "layout": "nonsecure64",
+    "sqe_low_iova": false,
+    "pre_release_witness": false,
+    "gpu_low_physical": true,
+    "CP_allocation_high": 4294967295,
+    "GMU_policy_unchanged": true
+  }
+}

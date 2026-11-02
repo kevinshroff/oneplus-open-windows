@@ -1,0 +1,132 @@
+--- a/experiments/G1287-cold-aperture/source/owner/gpu_cp_native.c
++++ b/experiments/G1287-cold-aperture/source/owner/gpu_cp_native.c
+@@ -2,6 +2,7 @@
+ #include "gpu_owner.h"
+ #include "gpu_cp_native.h"
+ #include "gpu_va_layout.h"
++#include "ogo_gpu_allocation.h"
+ #include "g433_sqe_pin.h"
+ #include <intrin.h>
+ #define UINTN SIZE_T
+@@ -89,16 +90,16 @@
+  r->Gpu.Board=(G456_FACTS){r->Generation,0x70201,p->CpDdrType,1,1};
+  const ULONGLONG va[4]=OGO_CP_VA_INITIALIZER;const SIZE_T bytes[4]={0x8000,0x1000,0x13000,0x1000};OSMI_INPUT in[4];RtlZeroMemory(in,sizeof(in));OsmiInitialize(&c->Tables);
+  s=LoadSqe(c);if(s!=STATUS_SUCCESS)return s;
+- for(unsigned i=0;i<4;i++){if((s=OgoCpCurrent(p))!=STATUS_SUCCESS)return s;G321_BUFFER*b=&r->Buffer[i];PHYSICAL_ADDRESS low={0},high,skip={0};high.QuadPart=(1ull<<36)-1;r->Layout.Iova[i]=va[i];r->Layout.Bytes[i]=bytes[i];
++ for(unsigned i=0;i<4;i++){if((s=OgoCpCurrent(p))!=STATUS_SUCCESS)return s;G321_BUFFER*b=&r->Buffer[i];PHYSICAL_ADDRESS low={0},high,skip={0};high.QuadPart=OGO_GPU_ALLOC_HIGH;r->Layout.Iova[i]=va[i];r->Layout.Bytes[i]=bytes[i];
+   b->Mdl=MmAllocatePagesForMdlEx(low,high,skip,bytes[i],MmNonCached,MM_ALLOCATE_FULLY_REQUIRED);if(!b->Mdl)return STATUS_INSUFFICIENT_RESOURCES;
+   if(!(b->Mdl->MdlFlags&MDL_PAGES_LOCKED)||MmGetMdlByteOffset(b->Mdl)||MmGetMdlByteCount(b->Mdl)!=bytes[i])return STATUS_DEVICE_CONFIGURATION_ERROR;
+-  PPFN_NUMBER pfns=MmGetMdlPfnArray(b->Mdl);for(SIZE_T j=0;j<bytes[i]/4096;j++)if((ULONGLONG)pfns[j]>=(1ull<<24))return STATUS_CONFLICTING_ADDRESSES;
++  PPFN_NUMBER pfns=MmGetMdlPfnArray(b->Mdl);for(SIZE_T j=0;j<bytes[i]/4096;j++)if((ULONGLONG)pfns[j]>=OGO_GPU_ALLOC_LIMIT/4096)return STATUS_CONFLICTING_ADDRESSES;
+   b->Cpu=MmMapLockedPagesSpecifyCache(b->Mdl,KernelMode,MmNonCached,NULL,FALSE,NormalPagePriority|MdlMappingNoExecute);if(!b->Cpu)return STATUS_INSUFFICIENT_RESOURCES;
+   for(SIZE_T j=0;j<bytes[i]/4096;j++)if((ULONGLONG)MmGetPhysicalAddress((PUCHAR)b->Cpu+j*4096).QuadPart!=(ULONGLONG)pfns[j]*4096)return STATUS_DATA_ERROR;
+   RtlZeroMemory(b->Cpu,bytes[i]);if(i==2){UCHAR digest[32];RtlCopyMemory(b->Cpu,c->SqeInput,G433_SQE_FILE_BYTES);OpenShaAll(b->Cpu,G433_SQE_FILE_BYTES,digest);BOOLEAN match=RtlCompareMemory(digest,G433SqeSha,32)==32;RtlSecureZeroMemory(digest,32);if(!match)return STATUS_INVALID_IMAGE_HASH;RtlMoveMemory(b->Cpu,(PUCHAR)b->Cpu+4,G433_SQE_FILE_BYTES-4);RtlZeroMemory((PUCHAR)b->Cpu+G433_SQE_FILE_BYTES-4,bytes[i]-(G433_SQE_FILE_BYTES-4));}
+   in[i]=(OSMI_INPUT){b->Mdl,va[i],bytes[i]};
+  }
+- s=OsmiBuildInactive(&c->Tables,in,4);if(s!=STATUS_SUCCESS)return s;return OgoCpCurrent(p);
++ s=OsmiBuildInactiveGpu(&c->Tables,in,4);if(s!=STATUS_SUCCESS)return s;return OgoCpCurrent(p);
+ }
+ /* This is a distinct first-use GPU authority, never a resumed CM3 stopped token.
+  * GX was physically off with no CPU CP stores and SID0 fault/default. Exact
+--- a/experiments/G1287-cold-aperture/reference/inactive/source/open_smmu_inactive.h
++++ b/experiments/G1287-cold-aperture/reference/inactive/source/open_smmu_inactive.h
+@@ -1,6 +1,7 @@
+ /* SPDX-License-Identifier: MIT. No active translation or hardware operation. */
+ #pragma once
+ #include <ntddk.h>
++#include "ogo_gpu_allocation.h"
+ #include "vendor/ArmSmmu4K.h"
+ #include "vendor/ArmSmmu4KAudit.h"
+ #define OSMI_MAX_INPUTS 16u
+@@ -29,5 +30,11 @@
+ VOID OsmiInitialize(OSMI_TABLES *);
+ NTSTATUS OsmiBuildInactive(OSMI_TABLES *,const OSMI_INPUT *,ULONG Count);
+ NTSTATUS OsmiAuditInactive(OSMI_TABLES *);
++/* CP-only placement specialization. Original GMU/bootstrap API stays 36-bit. */
++#if OGO_GPU_LOW_PHYSICAL
++NTSTATUS OsmiBuildInactiveGpu(OSMI_TABLES *,const OSMI_INPUT *,ULONG Count);
++#else
++#define OsmiBuildInactiveGpu OsmiBuildInactive
++#endif
+ /* No hardware has ever received this root. Poisoned storage stays retained. */
+ NTSTATUS OsmiDestroyInactive(OSMI_TABLES *);
+--- a/experiments/G1287-cold-aperture/reference/inactive/source/open_smmu_inactive.c
++++ b/experiments/G1287-cold-aperture/reference/inactive/source/open_smmu_inactive.c
+@@ -30,7 +30,12 @@
+  }
+  return t->Status=STATUS_SUCCESS;
+ }
++#if OGO_GPU_LOW_PHYSICAL
++static NTSTATUS BuildWithLimit(OSMI_TABLES*t,const OSMI_INPUT*in,ULONG count,UINT64 allocation_limit){
++#else
+ NTSTATUS OsmiBuildInactive(OSMI_TABLES*t,const OSMI_INPUT*in,ULONG count){
++ const UINT64 allocation_limit=OSMI_PA_LIMIT;
++#endif
+  ULONG order[OSMI_MAX_INPUTS];SIZE_T leaves=0,pages=1,k=0;
+  UINT64 last1=MAXULONGLONG,last2=MAXULONGLONG;NTSTATUS st=STATUS_INVALID_PARAMETER;
+  if(!t||!in||!count||count>OSMI_MAX_INPUTS||KeGetCurrentIrql()!=PASSIVE_LEVEL||
+@@ -50,7 +55,7 @@
+  for(ULONG j=0;j<count;j++){
+   ULONG i=order[j];if(j&&in[order[j-1]].Iova+in[order[j-1]].Bytes>in[i].Iova)return STATUS_CONFLICTING_ADDRESSES;
+   PPFN_NUMBER pfns=MmGetMdlPfnArray(in[i].Mdl);
+-  for(SIZE_T n=0;n<in[i].Bytes/4096;n++)if((UINT64)pfns[n]>=OSMI_PA_LIMIT/4096)return STATUS_CONFLICTING_ADDRESSES;
++  for(SIZE_T n=0;n<in[i].Bytes/4096;n++)if((UINT64)pfns[n]>=allocation_limit/4096)return STATUS_CONFLICTING_ADDRESSES;
+  }
+  t->State=OSMI_BUILDING;
+  t->Ranges=ExAllocatePool2(POOL_FLAG_NON_PAGED,leaves*sizeof(*t->Ranges),TAG);
+@@ -70,14 +75,14 @@
+   }
+  }
+  t->RangeCount=leaves;t->PoolBytes=pages*4096;
+- PHYSICAL_ADDRESS low={0},high,boundary={0};high.QuadPart=(LONGLONG)(OSMI_PA_LIMIT-1);
++ PHYSICAL_ADDRESS low={0},high,boundary={0};high.QuadPart=(LONGLONG)(allocation_limit-1);
+  t->Pool=MmAllocateContiguousMemorySpecifyCache(t->PoolBytes,low,high,boundary,MmNonCached);
+  if(!t->Pool){st=STATUS_INSUFFICIENT_RESOURCES;goto known_failure;}
+  t->PoolCache=MmNonCached;t->PoolOrigin=0x4e435047u;
+  t->PoolPhysical=MmGetPhysicalAddress(t->Pool);
+  if(((ULONG_PTR)t->Pool&4095)||(t->PoolPhysical.QuadPart&4095)||
+-    (UINT64)t->PoolPhysical.QuadPart>=OSMI_PA_LIMIT||
+-    t->PoolBytes>OSMI_PA_LIMIT-(UINT64)t->PoolPhysical.QuadPart){st=STATUS_CONFLICTING_ADDRESSES;goto known_failure;}
++    (UINT64)t->PoolPhysical.QuadPart>=allocation_limit||
++    t->PoolBytes>allocation_limit-(UINT64)t->PoolPhysical.QuadPart){st=STATUS_CONFLICTING_ADDRESSES;goto known_failure;}
+  for(SIZE_T n=0;n<pages;n++){
+   PHYSICAL_ADDRESS actual=MmGetPhysicalAddress((PUCHAR)t->Pool+n*4096);
+   if(actual.QuadPart!=t->PoolPhysical.QuadPart+(LONGLONG)(n*4096)){st=STATUS_CONFLICTING_ADDRESSES;goto known_failure;}
+@@ -93,6 +98,10 @@
+   * pre-activation cleanup, never an inferred DMA/TLB rollback. */
+  FreeKnown(t);t->State=OSMI_CLOSED;return t->Status=st;
+ }
++#if OGO_GPU_LOW_PHYSICAL
++NTSTATUS OsmiBuildInactive(OSMI_TABLES*t,const OSMI_INPUT*in,ULONG count){return BuildWithLimit(t,in,count,OSMI_PA_LIMIT);}
++NTSTATUS OsmiBuildInactiveGpu(OSMI_TABLES*t,const OSMI_INPUT*in,ULONG count){return BuildWithLimit(t,in,count,OGO_GPU_ALLOC_LIMIT);}
++#endif
+ NTSTATUS OsmiDestroyInactive(OSMI_TABLES*t){
+  if(!t||KeGetCurrentIrql()!=PASSIVE_LEVEL)return STATUS_INVALID_DEVICE_STATE;
+  if(t->State==OSMI_POISONED||t->ActivationQualified)return STATUS_DEVICE_BUSY;
+--- a/experiments/G1311-gpu-nonsecure-va/compile_owner.py
++++ b/experiments/G1311-gpu-nonsecure-va/compile_owner.py
+@@ -20,6 +20,7 @@
+ p.add_argument('--gpu-mmio-writecombine',action='store_true',help='G1322 GPU bank CPU mapping request only; default off')
+ p.add_argument('--pre-release-witness',action='store_true',help='G1325 read-only witness then refuse SQE release; default off')
+ p.add_argument('--sqe-low-iova',action='store_true',help='G1334 SQE-only 1 MiB IOVA; default off')
++p.add_argument('--gpu-low-physical',action='store_true',help='G1335 cap CP BO and table allocation PAs below4GiB; default off')
+ a=p.parse_args()
+ out=a.out.resolve()
+ if out==REPO or REPO in out.parents:p.error('output must be outside the public repository')
+@@ -39,6 +40,7 @@
+ if a.gpu_mmio_writecombine:args+=['-DOGO_GPU_MMIO_WRITECOMBINE=1']
+ if a.pre_release_witness:args+=['-DOGO_GPU_PRE_RELEASE_WITNESS=1']
+ if a.sqe_low_iova:args+=['-DOGO_GPU_SQE_LOW_IOVA=1']
++if a.gpu_low_physical:args+=['-DOGO_GPU_LOW_PHYSICAL=1']
+ for x in includes:args+=['-I'+str(x)]
+ for x in a.system_include:args+=['-isystem',str(x.resolve())]
+ compiler_version=subprocess.run([a.cc,'--version'],check=True,text=True,capture_output=True).stdout.splitlines()[0]
+@@ -69,7 +71,7 @@
+ # Every public closure file is pinned: headers can affect more than the changed TU.
+ pins={str(x.relative_to(REPO)):sha(x.read_bytes()) for folder in ('source','reference')
+       for x in sorted((B/folder).rglob('*')) if x.is_file()}
+-report=dict(schema='g1311-public-owner-coff/1',sqe_low_iova=a.sqe_low_iova,layout=a.layout,secvid_zero_stores=a.secvid_zero_stores,gpu_mmio_writecombine=a.gpu_mmio_writecombine,pre_release_witness=a.pre_release_witness,objects=rows,
++report=dict(schema='g1311-public-owner-coff/1',gpu_low_physical=a.gpu_low_physical,sqe_low_iova=a.sqe_low_iova,layout=a.layout,secvid_zero_stores=a.secvid_zero_stores,gpu_mmio_writecombine=a.gpu_mmio_writecombine,pre_release_witness=a.pre_release_witness,objects=rows,
+             source_pins=pins,link_policy_sha256=sha((W/'OWNER-LINK.json').read_bytes()),inventory_sha256=sha((W/'OWNER-SOURCES.json').read_bytes()),
+             c_flags=args[1:args.index('-I'+str(includes[0]))],
+             system_header_roots_count=len(a.system_include),

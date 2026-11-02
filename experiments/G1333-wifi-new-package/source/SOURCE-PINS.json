@@ -4,10 +4,10 @@
   "native_compilation_performed": false,
   "runtime_selected": false,
   "sources": {
-    "SingleInfSelector.cs": "987e42aea3b5f93880411a9c91d278ceb5a368c3ece69f9daa3f77bfa777e643",
+    "SingleInfSelector.cs": "fb33cb3e9d40d10bef44de5d047d1586abd44d888d3b3b626447e7d5368a90d8",
     "ScanAndCache.cs": "29a9b41d4f52c4b8058cfd4311585e2aec93686c7acab0542e1be8e9ae1793aa",
     "Policy.ps1": "7855c1bea7c04ebbd3d1145a7c3bde41cc560bbe14e7fdee56d3c6afc65f81b8",
-    "Initialize-Once.ps1": "4021f80d9fb47e06e00250721b3a5df51db2e7eaa03464b46e3628448ea0d43c",
+    "Initialize-Once.ps1": "eec1d1fe180c164b2c31f7f7ac4f0a8aa673446066b610c5a1799877ad33316b",
     "Launch-FutureTask.ps1": "c5719f26fc4efba9f2360a8a44745829826d2cf9c38c93e759e4d5eb3ae7a66c",
     "Native-Compile-Only.ps1": "c18fc7275b7507467d3de45c21c7230259253d792274d87dcba9d1444d67908a"
   },
