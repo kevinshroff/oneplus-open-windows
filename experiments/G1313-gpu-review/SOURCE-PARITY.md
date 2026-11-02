@@ -28,13 +28,12 @@ acknowledgement. The separate
 [NativeAdreno CP builder](https://github.com/UniXNU/Adreno740/blob/a9a2cbb43b89d672e2921e19721a6438b738b17f/NativeAdrenoCpInit.cpp)
 constructs initialization packets, not a second engine-enable operation.
 
-The clear remaining store-parity gap is four SECVID/TSB zero stores: Linux/Sheng
-write TSB control, trusted base low/high and size; current G456 qualifies zeros
-without those stores. Zero readback does not prove a write occurred, but no
-source or observed result demonstrates that a write strobe is required. Any
-such trial should now be a separate fresh one-shot change, preserving the existing
-nonsecure64 layout and all other policy. The newly localized pre-STR boundary
-makes this the next concrete source-parity experiment, not an established fix. A
+The four SECVID/TSB zero-store parity gap has now been tested in
+[G1318](../G1318-secvid-zero-stores/README.md): Linux/Sheng write TSB control,
+trusted base low/high and size; the variant added those stores after the complete
+existing zero-prestate admission. All four stores returned successfully, but
+the same fatal SQE-start call boundary persisted. Explicit store parity did not
+resolve first CP start. Do not repeat it as an unrun experiment. A
 pre-start PAS/ZAP change, repeated SQE start, guessed clock value or separate
 ME write is not justified by these sequences.
 

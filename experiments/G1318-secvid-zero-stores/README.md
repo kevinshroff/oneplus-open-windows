@@ -81,3 +81,20 @@ manifest and fresh loaded image/base before setting breakpoints. Never reuse
 G1311 runtime addresses. Native link/signing, approval and a fresh one-attempt
 activation remain separate operator work. A fatal or timed-out attempt retains
 uncertain ownership; this option adds no retry, rollback or cleanup authority.
+
+## Hardware trial result
+
+The reviewed owner was signed with the existing project signer, its payload and
+signature independently verified, and one fresh normal-Windows activation ran
+with ordinary logging and no instruction breakpoints. Each of the four new
+zero stores logged a successful return through the existing guarded write path.
+The intended nonsecure64 address high words remained `0x40`.
+
+The phone nevertheless entered Qualcomm900E after the same SQE
+`STORE_CALL_BEGIN` at stage3, without a returned marker or first CP fence.
+Explicit zero-store parity therefore did not resolve the failure. This trial
+does not add an instruction-retirement observation or identify the root cause.
+A fresh Sahara handshake and one RESET7/ACK8 recovery were acknowledged; that
+acknowledgement alone is not completed WinPE recovery or offline fencing.
+Fresh WinPE control subsequently returned, and the actual offline SYSTEM
+control sets were fenced and read back before the hive was unloaded.
