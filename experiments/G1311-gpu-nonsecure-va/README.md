@@ -1,8 +1,11 @@
 # G1311: private lower39 nonsecure64 VA discriminator
 
-This is an opt-in source experiment on the G1287 cold-aperture
-closure. The selected variant has now been linked with native MSVC and its compiled start-write sequence and64-bit VA table reviewed with REA; see [native review](evidence/NATIVE-LINK-REVIEW.json). It has not yet been loaded or exercised on hardware.
-No GPU fence or WDDM acceleration is demonstrated here. The only production
+This is an opt-in source experiment on the G1287 cold-aperture closure.
+After native MSVC linking and REA review of the compiled start-write sequence
+and 64-bit VA tables, a controlled trial using the selected signed image reached
+the changed address readbacks and the same fatal start-call boundary; see the
+[native review](evidence/NATIVE-LINK-REVIEW.json) and trial result below.
+No GPU fence or WDDM acceleration was achieved. The only production
 change is the private CP BO virtual-address initializer. The default remains
 G1287. Physical allocation policy, NC mappings, permissions, firmware bytes, ownership,
 SMC placement, translation registers, SQE-start sequence and retain-on-uncertainty
@@ -23,6 +26,19 @@ VA selector, fallback, runtime retry or additional hardware authority. Existing
 bootstrap/CP/SCM opt-ins and cold resource admission still apply independently.
 The new compile option alone cannot authorize startup.
 
+
+## Native trial result, 2026-11-02
+
+The selected nonsecure64 trial reached ring, BR/BV-shadow and SQE high-word
+readbacks of 0x40, establishing that the changed VA layout was active. It then
+reached the same stage 3 SQE-start `STORE_CALL_BEGIN` marker without a returned
+marker, followed by Qualcomm 900E. No first CP fence completed. This trial did
+not resolve whether the helper's pre-store barrier, STR or post-store barrier
+completed. A fresh loaded-module identity attestation was not captured before
+the failure; selection of the reviewed signed image plus the new address
+readbacks must not be presented as full loaded-image identity proof. The VA
+change alone did not clear this observed failure boundary.
+
 ## Source reasoning and limits
 
 The handoff proposes this discriminator because the four baseline addresses
@@ -33,7 +49,8 @@ retrieved-byte SHA256
 This is a branch URL with pinned retrieved bytes, not a claimed immutable commit.
 This software convention does not prove
 that A740 classified the old addresses as secure or caused the fatal start
-boundary. It is a hypothesis to discriminate with a later controlled attempt.
+boundary. The controlled trial above found that this VA change alone did not clear
+the observed failure boundary; address security classification remains unproven.
 
 The complete variant ends at 0x4000031000, below the existing lower39 limit
 0x8000000000. Its L1 index is 256 rather than the baseline's 3. The same three
@@ -53,7 +70,7 @@ run the real ArmSmmu4K builder and inactive auditor, independently walk every
 page and its last byte, check unmapped gaps/old and truncated addresses, and reject corrupted
 root/permissions and out-of-profile VA/PA. These establish source encoding and
 CPU table construction; hardware address-width acceptance, table fetches,
-firmware execution and completion remain unmeasured.
+GPU firmware execution and completion remain unmeasured.
 
 ## Reproduce the offline checks
 
@@ -142,8 +159,9 @@ The five required ARM64 libraries are `ntoskrnl.lib`, `hal.lib`, `libcntpr.lib`,
 `/machine:arm64 /driver /subsystem:native,10.00 /osversion:10.0 /nodefaultlib
 /dynamicbase /nxcompat /opt:ref /opt:icf /Brepro /incremental:no
 /entry:DriverEntry`. Selecting and qualifying the actual native linker,
-libraries, exact linked PE and signing remain operator work. Native linking
-and signing were not performed in this offline experiment. The unchanged
+libraries, exact linked PE and signing remain operator work. The portable compiler
+does not link or sign. A later operator-controlled native link/sign preceded
+the trial above; those actions do not turn host-model tests into GPU evidence. The unchanged
 broker is not rebuilt by this recipe.
 
 Historical G1287 `compile_all.py`/`freeze.py` still depend on excluded inputs;

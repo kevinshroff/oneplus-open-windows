@@ -35,7 +35,7 @@ Same valid tuple in PRE and POST weakens interpreting it as newly created by thi
 
 ## Root review/use
 
-Historical local cross-compile passed; its BUILD-RECEIPT.json is absent from the publication. Use `../G1312-wifi-resume/build.py` for a fresh source/binary receipt. The G1312 review rejects trailing proof/ledger JSON documents and includes image/action-ledger hashes in result rows; physical guards and read sequence are unchanged. Native default-inert behavior has **not** been executed/verified for this new binary. Root independently reviews, stages and default-inert checks it later.
+Historical local cross-compile passed; its BUILD-RECEIPT.json is absent from the publication. Use `../G1312-wifi-resume/build.py` for a fresh source/binary receipt. The G1312 review rejects trailing proof/ledger JSON documents and includes image/action-ledger hashes in result rows; physical guards and read sequence are unchanged. The rebuilt G1312 binary subsequently passed its native default-inert check with exit0 and no debugger connection or target read. Actual phase admission/reads remain separate.
 
 ```sh
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags=-buildid= -o G1295-FaultEpoch-amd64.exe main_windows.go guard.go phase.go

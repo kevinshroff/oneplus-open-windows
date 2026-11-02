@@ -1,8 +1,8 @@
-# Agent handoff — publication pause
+# Agent handoff — Wi-Fi and GPU development
 
 Status date: **2026-11-02**. Development resumed with owner approval for Wi-Fi and GPU acceleration. This handoff records the publication baseline and subsequent work; it is not a general live-device authorization or an installation recipe. Re-establish actual device/boot identity before each experiment.
 
-Resume work is tracked in [G1311 GPU VA experiment](../experiments/G1311-gpu-nonsecure-va/README.md), [G1312 Wi-Fi epoch comparison](../experiments/G1312-wifi-resume/README.md), and [G1313 independent GPU review](../experiments/G1313-gpu-review/REVIEW.md). These source changes have passed offline checks; the selected GPU owner also linked with native MSVC and passed a focused compiled review. Hardware outcomes are pending. The phone was shut down with permission after publication, then the owner returned it to fastboot. The known recovery firmware was accepted for one temporary boot without partition flashing.
+Resume work is tracked in [G1311 GPU VA experiment](../experiments/G1311-gpu-nonsecure-va/README.md), [G1312 Wi-Fi observations](../experiments/G1312-wifi-resume/BOOT162-OBSERVATIONS.md), and [G1313 independent GPU review](../experiments/G1313-gpu-review/REVIEW.md). The GPU variant built, linked with native MSVC, passed compiled review, and reached the same fatal CP start-call boundary in a hardware trial. Original Wi-Fi initialization succeeded and early firmware scans reported BSS entries, but firmware replies and credits subsequently stopped; usable networking remains unfinished.
 
 ## Read first
 
@@ -13,11 +13,11 @@ Resume work is tracked in [G1311 GPU VA experiment](../experiments/G1311-gpu-non
 
 The former private repository's old leading README described a much earlier sensor/touch checkpoint. Its live-state paragraphs are superseded. This public repository has a new publication history; private transcripts, job databases, snapshots, signed capsules and captured binaries are intentionally absent. A private operator may possess additional evidence. Do not fabricate their contents or treat a source identifier as a currently loaded image.
 
-## Closing physical/control state
+## Historical publication checkpoint
 
 The last normal Windows experiment used the G1287 GPU owner. Its fixed NORMAL secure-aperture call returned successfully once, GMU/HFI and later CP setup proceeded, and the phone then entered Qualcomm 900E at the first SQE-start write-call boundary. A Sahara RESET request received its ACK, and the USB-EEM network interface subsequently reappeared. Fresh WinPE/Windows control had **not** been confirmed when publication work took over. The debugger's old GO status and old log are not proof of a new kernel connection.
 
-The experimental driver's future startup/once flags may still be armed. Before any later normal-Windows boot, the operator must verify recovery control and offline-fence the actual Windows SYSTEM control sets: `OpenGpuStart` Start4, BootstrapOnce0, CpInitFenceOnce0 and ScmApertureOnce0; `OpenSmmuD0` Start4. Do not mount the wrong hive or equate a successful emergency reset with completed fencing. This is pending recovery work, not permission to perform it during the pause.
+The experimental driver's future startup/once flags may still be armed after a fatal trial. Before any later normal-Windows boot, verify recovery control and offline-fence the actual Windows SYSTEM control sets: `OpenGpuStart` Start4, BootstrapOnce0, CpInitFenceOnce0 and ScmApertureOnce0; `OpenSmmuD0` Start4. Do not mount the wrong hive or equate a successful emergency reset with completed fencing.
 
 Preserve the installed Windows system, working native touch, desktop scaling, development test-signing configuration, black cover framebuffer, Never sleep/display settings and WinPE recovery default. Do not enable charging, change clocks or run overlapping hardware owners as incidental preparation.
 
@@ -25,7 +25,15 @@ Preserve the installed Windows system, working native touch, desktop scaling, de
 
 Recovery WinPE control was restored after the temporary G991 boot. The actual offline SYSTEM hive was opened and its existing control sets enumerated. The GPU owner is now Start4 with BootstrapOnce, CpInitFenceOnce and ScmApertureOnce all0; the GPU broker and Wi-Fi service are Start4. All values were read back and the hive unloaded successfully. This prevents the prior GPU attempt from automatically running on the next normal boot.
 
-G1311 now builds the complete35-object owner from the public closure with explicit external Microsoft headers. All35 baseline objects match the historical build. The nonsecure64 build differs only in the intended CP address-layout object. It has not yet demonstrated hardware execution. G1312 supplies the fresh Wi-Fi PRE/POST comparison with stricter artifact identity binding.
+G1311 builds the complete 35-object owner from the public closure with explicit external Microsoft headers. All 35 baseline objects match the historical build. The nonsecure64 build differs only in the intended CP address-layout object. Its hardware trial confirmed the new address high words but did not achieve CP execution or a fence. G1312 supplies stricter Wi-Fi artifact binding and source-qualified history decoding.
+
+Normal Windows subsequently booted successfully with the selected nonsecure64 owner still disabled. The known parent cold-start repair completed, and the exact G991 pre-Wi-Fi post-EBS comparison passed all50 measured words. A fresh debugger transport initially remained in NoDebuggee7; one qualified attach interrupt resolved it, and the owned stop was resumed. Refreshing the debugger module inventory was also necessary before interpreting empty module queries as absence.
+
+The planned G1295 PRE baseline could not be admitted: Windows reported the disabled Wi-Fi endpoint with problem32 and no allocated BAR memory resources. No G1295 phase was invoked or consumed, and there is no baseline tuple. Do not invent one or force the paired POST schema. One original initialization and explicit scan subsequently completed without a reboot request, but cached networks remained empty. Source-qualified CE2 and host-log captures show early receive/interrupt activity and later credit starvation; no retained zero-length-reap event supports the proposed ordering patch. The existing scan trace was retrieved and decoded without another scan. The [WDDM integration review](../experiments/G1315-wddm-integration/README.md) identifies remaining real submission boundaries and removes a latent fabricated-completion error; the adapter remains disabled.
+
+The isolated G1311 VA trial used the existing broker and cached owner bindings. The broker restart returned successfully. Ring/shadow/SQE high-word readbacks were 0x40, then the owner logged `STORE_CALL_BEGIN` at stage3 and the phone entered Qualcomm 900E without a return marker. This does not localize the failure among the helper's pre-store barrier, STR and post-store barrier. A fresh Sahara mode2 handshake and one RESET7/ACK8 recovered the emergency interface; Windows control has not yet returned. Future-start fencing must therefore be re-established before a further normal boot. Do not replay the consumed activation task or treat the old debugger GO status as a live target.
+
+Next prepared discriminators are [P2P capability exclusion](../experiments/G1312-wifi-resume/P2P-EXCLUSION.md) at one future fresh Wi-Fi initialization, and a [benign ARM64 execution-breakpoint channel test](../experiments/G1313-gpu-review/hwexec/README.md) before another CP start. The breakpoint helper passed native default-inert execution; neither its disabled configuration probe nor an actual hardware hit has run. The [fresh GPU source comparison](../experiments/G1313-gpu-review/SOURCE-PARITY.md) does not support moving ZAP before CP initialization, retrying the failed start, or inventing an additional ME-enable write.
 
 ## Architecture and achieved foundations
 

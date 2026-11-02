@@ -1,0 +1,79 @@
+{
+  "schema": "gpu-start-primary-source-pins/1",
+  "retrieval_date": "2026-11-02",
+  "hardware_evidence": false,
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/UniXNU/Adreno740/a9a2cbb43b89d672e2921e19721a6438b738b17f/NativeAdrenoCpInit.cpp",
+      "sha256": "58a7a2d1aa83ffa7eb7131351a694d45272586a0abbb5f24916ea2105538a2d6",
+      "ref": "a9a2cbb43b89d672e2921e19721a6438b738b17f",
+      "ref_kind": "commit"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8550/oneplus/sm8550_v_15.0.0_oneplus11/vendor/qcom/opensource/graphics-kernel/adreno_gen7.c",
+      "sha256": "fe83b9244175ecfcf7cd363ca502b900ade5c7bea69b10bfef9c5d26fbf8a94c",
+      "ref": "oneplus/sm8550_v_15.0.0_oneplus11",
+      "ref_kind": "branch; retrieved bytes pinned"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/torvalds/linux/e2f57c576f14f96449cfee840860cb9707501d23/drivers/gpu/drm/msm/adreno/a6xx_gpu.c",
+      "sha256": "9b725c1c56a9b6b804de0daa899fa03f51ddb6c8253904c77814540d5142f4cd",
+      "ref": "e2f57c576f14f96449cfee840860cb9707501d23",
+      "ref_kind": "commit"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/UniXNU/UniXNU-sheng/5eb3c704f9cbb61481537cc617ed381c6eaa41f1/package/GpuPowerProbe.cpp",
+      "sha256": "34ee6d336c734a3b5d00a8fb810ae63cfa27169a869b94b16fd263dca063098c",
+      "ref": "5eb3c704f9cbb61481537cc617ed381c6eaa41f1",
+      "ref_kind": "commit"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/torvalds/linux/e2f57c576f14f96449cfee840860cb9707501d23/drivers/gpu/drm/msm/adreno/a6xx_catalog.c",
+      "sha256": "e1a2aba9a9ba6f753d8130525542e93d20373fc927d066663d749d2a6cb7a746",
+      "ref": "e2f57c576f14f96449cfee840860cb9707501d23",
+      "ref_kind": "commit"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/torvalds/linux/e2f57c576f14f96449cfee840860cb9707501d23/arch/arm64/include/asm/io.h",
+      "sha256": "00094f2b75733389e6a940201b1231df863fc355f159f0ab0f3d4986c938e4bf",
+      "ref": "e2f57c576f14f96449cfee840860cb9707501d23",
+      "ref_kind": "commit"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/torvalds/linux/e2f57c576f14f96449cfee840860cb9707501d23/arch/arm64/include/asm/pgtable-prot.h",
+      "sha256": "57ce67a0ff04fbfe10f5d18238bf1c29b1246a3f7f5fe9e059771de0b38fb8ce",
+      "ref": "e2f57c576f14f96449cfee840860cb9707501d23",
+      "ref_kind": "commit"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/torvalds/linux/e2f57c576f14f96449cfee840860cb9707501d23/drivers/gpu/drm/msm/msm_gpu.c",
+      "sha256": "d6730df914b208b494cacf36865dba8b030681b99026e7ffe3c379e8b9569d09",
+      "ref": "e2f57c576f14f96449cfee840860cb9707501d23",
+      "ref_kind": "commit"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/torvalds/linux/e2f57c576f14f96449cfee840860cb9707501d23/drivers/gpu/drm/msm/msm_io_utils.c",
+      "sha256": "925f645b7b9dee3a45e85a1c72a8f2df2ee9c8d13d848d929ed05da4c1d2b967",
+      "ref": "e2f57c576f14f96449cfee840860cb9707501d23",
+      "ref_kind": "commit"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/torvalds/linux/e2f57c576f14f96449cfee840860cb9707501d23/drivers/gpu/drm/msm/msm_gpu.h",
+      "sha256": "25f31845895f7bb186eeecb9dada6c83568cca7d14fcef0546de89ea99cc85a1",
+      "ref": "e2f57c576f14f96449cfee840860cb9707501d23",
+      "ref_kind": "commit"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/torvalds/linux/e2f57c576f14f96449cfee840860cb9707501d23/include/asm-generic/io.h",
+      "sha256": "59a7e83c58acc80691f1a30c0ce1cf115d921fdbff848a0be2286654bf82d58d",
+      "ref": "e2f57c576f14f96449cfee840860cb9707501d23",
+      "ref_kind": "commit"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/torvalds/linux/e2f57c576f14f96449cfee840860cb9707501d23/arch/arm64/include/asm/barrier.h",
+      "sha256": "8a999b400d262bb182a2881f105041309ded27fa6dd3971af662f690fbc24135",
+      "ref": "e2f57c576f14f96449cfee840860cb9707501d23",
+      "ref_kind": "commit"
+    }
+  ]
+}
