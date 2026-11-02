@@ -4,6 +4,14 @@ Status date: **2026-11-03**. Development resumed with owner approval for Wi-Fi a
 
 Resume work is tracked in [G1311 GPU VA experiment](../experiments/G1311-gpu-nonsecure-va/README.md), [G1312 Wi-Fi observations](../experiments/G1312-wifi-resume/BOOT162-OBSERVATIONS.md), and [G1313 independent GPU review](../experiments/G1313-gpu-review/REVIEW.md). The GPU variant built, linked with native MSVC, passed compiled review, and reached the same fatal CP start-call boundary in a hardware trial. Original Wi-Fi initialization succeeded and early firmware scans reported BSS entries, but firmware replies and credits subsequently stopped; usable networking remains unfinished.
 
+The [Boot167 Wi-Fi comparison](../experiments/G1326-live-vdev2-observer/BOOT167-RESULT.md)
+completed: the pending PRE receive entry was serviced, the error tuple stayed
+unchanged, and credits still stopped. The [G1334 low-SQE trial](../experiments/G1334-low-sqe-iova/HARDWARE-RESULT.md)
+then confirmed the reference address but reached the same fatal start boundary;
+software recovery restored WinPE control and disabled future GPU starts.
+A [newer matched Wi-Fi package](../experiments/G1333-wifi-new-package/README.md)
+and native-qualified installer source are prepared; its device trial remains pending.
+
 ## Read first
 
 1. README.md and STATUS.md distinguish demonstrated features from prototypes.

@@ -1,0 +1,13 @@
+{
+  "schema": "G1333-actual-fresh-admission/1",
+  "BootId": null,
+  "phone_session": null,
+  "instance_id": null,
+  "package_directory": null,
+  "native_qcwlan_Start4_Stopped": false,
+  "native_GPU_owner_broker_Start4_Stopped": false,
+  "actual_old_and_new_qcwlan_module_absent": false,
+  "actual_no_old_SYS_breakpoints_or_observer": false,
+  "actual_native_admission_sha256": null,
+  "actual_module_evidence_sha256": null
+}

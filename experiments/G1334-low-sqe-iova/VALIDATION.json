@@ -25,7 +25,18 @@
     "hardware_qualified": false
   },
   "hardware_qualified": false,
-  "linked": false,
-  "signed": false,
-  "loaded": false
+  "linked": true,
+  "signed": true,
+  "loaded": true,
+  "subsequent_actual_result": {
+    "native_link_exit": 0,
+    "unsigned_sha256": "459c50201ebd54dd911150e6da060f8517333b1f02aedb46724f9c02f75867ce",
+    "PE_CMS_RSA_signed_payload_check_pass": true,
+    "one_hardware_trial": "Same fatal start-call boundary after exact low-SQE readback",
+    "first_CP_fence": false,
+    "acceleration": false,
+    "software_recovery_WinPE_control_returned": true,
+    "offline_future_start_fences_verified": true,
+    "packet_and_COFF_fields_describe_their_creation_stage": true
+  }
 }

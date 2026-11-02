@@ -21,3 +21,8 @@ REA was exported and closed. Native linking and static review do not prove
 hardware fetch, a real GPU fence, acceleration, current-boot admission or a
 successful driver load. No reviewer signing, staging, loading or hardware
 operation occurred. The WDDM provider remains closed.
+
+Subsequently, the image was signed with the existing project test certificate,
+and independent PE/CMS/RSA checks verified the original payload bytes. Its
+[single hardware trial](HARDWARE-RESULT.md) confirmed the changed address but
+reached the same fatal start boundary. No first CP fence or acceleration followed.

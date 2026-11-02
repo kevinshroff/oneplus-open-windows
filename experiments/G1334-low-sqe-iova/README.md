@@ -1,5 +1,8 @@
 # G1334: SQE-only 1 MiB IOVA discriminator
 
+The [single hardware trial](HARDWARE-RESULT.md) reached the same fatal start
+boundary. This isolated candidate did not resolve first CP execution.
+
 Default-off source option `OGO_GPU_SQE_LOW_IOVA=1` moves only the 19-page SQE
 microcode BO to `0x00100000`. The selected candidate retains nonsecure64
 ring `0x4000000000`, shadow `0x4000008000`, and power-up `0x4000030000`.

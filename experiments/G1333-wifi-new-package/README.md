@@ -36,7 +36,23 @@ addresses. Do not reinitialize the consumed Boot167 instance. Success requires
 sustained returned credits, actual network discovery/association and traffic;
 a successful installation or scan notification alone is insufficient.
 
-At this checkpoint only host extraction/signature qualification has occurred.
-No phone driver-store import, binding, load or firmware replacement has run.
-The targeted compiled compatibility review and source-only installer preparation
-are in progress. See [the preceding result](../G1326-live-vdev2-observer/BOOT167-RESULT.md).
+Host extraction/signature qualification and the targeted compiled compatibility
+review are complete. The inspected WCN7850/resource/HTC/CE paths remain consistent
+with the baseline's core semantics; no specific credit fix was identified.
+No phone driver-store import, binding, load or firmware replacement has run. See [the preceding result](../G1326-live-vdev2-observer/BOOT167-RESULT.md).
+
+The [portable source](source) now includes the single-INF selector and task.
+Actual Windows host compilation of both C# units, PowerShell AST/default-inert
+checks and pure native64 layout/selection-flag checks passed with zero native
+constructors, SetupAPI, WLAN or device calls. See [qualification](SOURCE-QUALIFICATION.json).
+Runtime source is byte-identical to the private qualified copy; the public
+offline renderer omits only a historical private session-ID exclusion. It still
+requires actual future boot/session/admission evidence and emits false approvals.
+
+The task imports the complete signed package into DriverStore once, resolves
+its actual stored INF, selects that exact compatible node and calls
+DiInstallDevice once. It then checks installed runtime-member hashes and policy,
+issues one scan and reads one cached network list. It retains no guessed OEM
+INF name or interface GUID. Startup is fenced to disabled afterward. A changed
+policy or failed/reboot-requiring installation stops subsequent actions.
+These source checks do not establish successful package selection or networking.
