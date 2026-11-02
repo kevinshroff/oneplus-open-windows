@@ -1,0 +1,7 @@
+"""Build the G60 cancellation caller against the unchanged G59 kernel ABI."""
+from pathlib import Path
+import argparse,hashlib,json,os,subprocess
+p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--profile',choices=['active','idle'],required=True);a=p.parse_args();W=Path(__file__).resolve().parent;assert not a.output.exists();a.output.mkdir(parents=True);sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+sources=[W/n for n in ['g59_admin.go','g59_hwdecode.go','g59_hwclient.go','g59_fields.go','g59_session.go','g59_cancel.go','g59_paths.go','profile-'+a.profile+'.go']];before={p.name:sha(p)for p in sources};out=a.output/('g60-admin-'+a.profile+'-arm64.exe')
+env=dict(os.environ,GOOS='windows',GOARCH='arm64',CGO_ENABLED='0');q=subprocess.run(['go','build','-trimpath','-buildvcs=false','-ldflags=-s -w -buildid=','-o',str(out.resolve()),*map(lambda p:str(p.resolve()),sources)],env=env,capture_output=True,text=True);assert not q.returncode,q.stderr;assert before=={p.name:sha(p)for p in sources}
+v={'source_files_sha256':before,'binary_sha256':sha(out),'bytes':out.stat().st_size,'Go_version':subprocess.check_output(['go','version'],text=True).strip(),'target':'windows/arm64','cancellation_input_expectation':a.profile,'native_kernel_API':'G59 unchanged','native_operations':0};(a.output/'build.json').write_text(json.dumps(v,indent=2)+'\n');print(json.dumps(v))

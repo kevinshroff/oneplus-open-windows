@@ -1,0 +1,32 @@
+[Defines]
+ INF_VERSION = 0x00010017
+ BASE_NAME = OpenCxBootstrap
+ FILE_GUID = dcbbd052-7874-4c34-9421-891fc95a0150
+ MODULE_TYPE = DXE_DRIVER
+ VERSION_STRING = 1.0
+ ENTRY_POINT = G290GpuPowerEntry
+[Sources]
+ G290GpuPower.c
+ G530Lease.c
+[Packages]
+ MdePkg/MdePkg.dec
+ G290Pkg/G290Pkg.dec
+[LibraryClasses]
+ UefiDriverEntryPoint
+ UefiBootServicesTableLib
+ DxeServicesTableLib
+ BaseLib
+ BaseMemoryLib
+ MemoryAllocationLib
+ IoLib
+ TimerLib
+ DebugLib
+[Protocols]
+ gEfiAcpiTableProtocolGuid
+ gEfiLoadedImageProtocolGuid
+ gG290NpaProtocolGuid
+ gEfiBdsArchProtocolGuid
+ gEfiCpuArchProtocolGuid
+ gG335ClockProtocolGuid
+[Depex]
+ gEfiAcpiTableProtocolGuid AND gG290NpaProtocolGuid AND gEfiBdsArchProtocolGuid AND gEfiCpuArchProtocolGuid AND gG335ClockProtocolGuid

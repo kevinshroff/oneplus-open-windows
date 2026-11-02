@@ -1,0 +1,43 @@
+; SOURCE ONLY successor, preserves exact G18220resources and status ABI.
+[Version]
+Signature="$WINDOWS NT$"
+Class=System
+ClassGuid={4D36E97D-E325-11CE-BFC1-08002BE10318}
+Provider=%Provider%
+DriverVer=10/29/2026,1.0.0.746
+CatalogFile=OpenParent-G746.cat
+PnpLockdown=1
+[Manufacturer]
+%Provider%=Models,NTARM64.10.0...26100
+[Models.NTARM64.10.0...26100]
+%Description%=Install,ACPI\OPEN0182
+[DestinationDirs]
+DriverCopy=13
+[SourceDisksNames]
+1=%Disk%
+[SourceDisksFiles]
+OpenG184.sys=1
+[Install.NT]
+CopyFiles=DriverCopy
+[DriverCopy]
+OpenG184.sys
+[Install.NT.HW]
+AddReg=Hardware
+[Hardware]
+HKR,,"Security",0x00000000,"D:P(A;;GA;;;SY)(A;;GA;;;BA)"
+[Install.NT.Services]
+AddService=OpenG184,0x00000002,Service
+[Service]
+DisplayName=%Description%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%13%\OpenG184.sys
+[Install.NT.Wdf]
+KmdfService=OpenG184,Wdf
+[Wdf]
+KmdfLibraryVersion=1.15
+[Strings]
+Provider="OnePlus Open Private Lab"
+Description="Open OPBM sensor and fixed current parent-query source successor"
+Disk="OnePlus Open G184 source-built package"

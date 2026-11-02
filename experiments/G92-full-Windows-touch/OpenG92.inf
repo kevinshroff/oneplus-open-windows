@@ -1,0 +1,58 @@
+; Source-built G92 bounded live touchscreen qualification.
+[Version]
+Signature="$WINDOWS NT$"
+Class=HIDClass
+ClassGuid={745A17A0-74D3-11D0-B6FE-00A0C90F57DA}
+Provider=%Provider%
+DriverVer=10/21/2026,0.0.57.0
+CatalogFile=OpenG92.cat
+PnpLockdown=1
+
+[Manufacturer]
+%Provider%=Models,NTARM64.10.0...19041
+
+[Models.NTARM64.10.0...19041]
+%Description%=Install,Root\OnePlusOpenTouchG92
+
+[DestinationDirs]
+DriverCopy=13
+
+[SourceDisksNames]
+1=%Disk%
+
+[SourceDisksFiles]
+OpenG92.sys=1
+
+[Install.NT]
+CopyFiles=DriverCopy
+
+[DriverCopy]
+OpenG92.sys
+
+[Install.NT.HW]
+AddReg=Hardware
+
+[Hardware]
+HKR,,"LowerFilters",0x00010000,"vhf"
+HKR,,"Security",0x00000000,"D:P(A;;GA;;;SY)(A;;GA;;;BA)"
+
+[Install.NT.Services]
+AddService=OpenG92,0x00000002,Service
+
+[Service]
+DisplayName=%Description%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%13%\OpenG92.sys
+
+[Install.NT.Wdf]
+KmdfService=OpenG92,Wdf
+
+[Wdf]
+KmdfLibraryVersion=1.15
+
+[Strings]
+Provider="OnePlus Open Private Lab"
+Description="OnePlus Open G92 Bounded Live Touch Qualification"
+Disk="OnePlus Open G92 source-built test package"

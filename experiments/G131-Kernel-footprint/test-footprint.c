@@ -1,0 +1,132 @@
+/* Actual probe C, real UEFI headers, modeled services and metadata only. */
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdarg.h>
+#undef NULL
+#include "OpenKernelFootprint.c"
+
+EFI_GUID gEfiLoadedImageProtocolGuid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
+static EFI_BOOT_SERVICES Bs;
+static EFI_DXE_SERVICES Ds;
+static EFI_SYSTEM_TABLE St;
+static EFI_RUNTIME_SERVICES Rt;
+EFI_BOOT_SERVICES *gBS = &Bs;
+EFI_DXE_SERVICES *gDS = &Ds;
+EFI_SYSTEM_TABLE *gST = &St;
+static ARM_MEMORY_REGION_DESCRIPTOR_EX Platform[2];
+static UINT64 HobStorage[1024];
+static EFI_LOADED_IMAGE_PROTOCOL Images[40];
+static EFI_CONFIGURATION_TABLE Configs[40];
+static const char *Case;
+static char Text[32768];
+static size_t Used, Allocations, Frees;
+static int Is(const char *name) { return strcmp(Case,name)==0; }
+
+INTN EFIAPI AsciiStrCmp(CONST CHAR8 *a, CONST CHAR8 *b) { return strcmp(a,b); }
+VOID *EFIAPI AllocatePool(UINTN n) { if(Is("pool-fail")&&n==MAP_BYTES)return NULL;Allocations++;return calloc(1,n); }
+VOID EFIAPI FreePool(VOID *p) { assert(p);Frees++;free(p); }
+VOID *EFIAPI GetHobList(VOID) { return Is("hob-null")?NULL:HobStorage; }
+ARM_MEMORY_REGION_DESCRIPTOR_EX *GetPlatformMemoryMap(VOID) { return Is("platform-null")?NULL:Platform; }
+
+static void Report(const CHAR8 *f, ...) {
+  char fmt[1024];size_t at=0,i;int n;va_list args;
+  for(i=0;f[i];i++) {
+    assert(at+5<sizeof(fmt));
+    if(f[i]=='%'&&f[i+1]=='a') { fmt[at++]='%';fmt[at++]='s';i++; }
+    else if(f[i]=='%'&&f[i+1]=='r') { memcpy(fmt+at,"%lx",3);at+=3;i++; }
+    else if(f[i]=='%'&&f[i+1]=='g') { memcpy(fmt+at,"%p",2);at+=2;i++; }
+    else fmt[at++]=f[i];
+  }
+  fmt[at]=0;va_start(args,f);n=vsnprintf(Text+Used,sizeof(Text)-Used,fmt,args);va_end(args);
+  assert(n>=0&&(size_t)n<sizeof(Text)-Used);Used+=(size_t)n;
+}
+static EFI_STATUS EFIAPI GcdMap(UINTN *n, EFI_GCD_MEMORY_SPACE_DESCRIPTOR **out) {
+  UINTN i, count=Is("gcd-many")?33:1;
+  if(Is("gcd-error"))return EFI_DEVICE_ERROR;
+  if(Is("gcd-null")){*n=1;*out=NULL;return EFI_SUCCESS;}
+  if(Is("gcd-count")){*n=4097;*out=NULL;return EFI_SUCCESS;}
+  *out=AllocatePool(count*sizeof(**out));*n=count;
+  for(i=0;i<count;i++) {
+    (*out)[i].BaseAddress=count==1?KERNEL_START:WINDOW_START+i*4096;
+    (*out)[i].Length=count==1?KERNEL_BYTES:4096;
+    (*out)[i].GcdMemoryType=EfiGcdMemoryTypeSystemMemory;(*out)[i].Attributes=EFI_MEMORY_WB;
+  }
+  if(Is("gcd-overflow")){(*out)[0].BaseAddress=MAX_UINT64-7;(*out)[0].Length=16;}
+  return EFI_SUCCESS;
+}
+static EFI_STATUS EFIAPI EfiMap(UINTN *bytes, EFI_MEMORY_DESCRIPTOR *map, UINTN *key, UINTN *stride, UINT32 *version) {
+  UINTN i,n=Is("efi-many")?33:1;(void)key;
+  if(Is("efi-error"))return EFI_DEVICE_ERROR;
+  *stride=sizeof(*map);*version=EFI_MEMORY_DESCRIPTOR_VERSION;*bytes=n*sizeof(*map);
+  for(i=0;i<n;i++) {
+    map[i].PhysicalStart=n==1?KERNEL_START:WINDOW_START+i*4096;
+    map[i].NumberOfPages=n==1?KERNEL_BYTES/4096:1;
+    map[i].Type=EfiReservedMemoryType;map[i].Attribute=EFI_MEMORY_WB;
+  }
+  if(Is("efi-zero-stride"))*stride=0;
+  if(Is("efi-short-stride"))*stride=8;
+  if(Is("efi-large-stride"))*stride=2048;
+  if(Is("efi-bad-size"))(*bytes)--;
+  if(Is("efi-too-large"))*bytes=MAP_BYTES+1;
+  if(Is("efi-version"))*version=0;
+  if(Is("efi-overflow")){map[0].PhysicalStart=MAX_UINT64-7;map[0].NumberOfPages=1;}
+  if(Is("efi-unreserved"))map[0].Type=EfiConventionalMemory;
+  return EFI_SUCCESS;
+}
+static EFI_STATUS EFIAPI ImageHandles(EFI_LOCATE_SEARCH_TYPE how, EFI_GUID *guid, VOID *search, UINTN *n, EFI_HANDLE **out) {
+  UINTN i,count=Is("images-many-overlap")?33:1;(void)how;(void)guid;(void)search;
+  if(Is("images-error"))return EFI_DEVICE_ERROR;
+  if(Is("images-null")){*n=1;*out=NULL;return EFI_SUCCESS;}
+  if(Is("images-count")){*n=513;*out=NULL;return EFI_SUCCESS;}
+  *out=AllocatePool(count*sizeof(**out));*n=count;
+  for(i=0;i<count;i++){(*out)[i]=&Images[i];Images[i].ImageBase=(VOID *)(UINTN)(Is("image-overlap")||Is("images-many-overlap")?WINDOW_START:0xc0000000);Images[i].ImageSize=4096;}
+  if(Is("image-overflow")){Images[0].ImageBase=(VOID *)(UINTN)(MAX_UINT64-7);Images[0].ImageSize=16;}
+  return EFI_SUCCESS;
+}
+static EFI_STATUS EFIAPI ImageProtocol(EFI_HANDLE handle, EFI_GUID *guid, VOID **out) {
+  (void)guid;if(Is("image-error"))return EFI_DEVICE_ERROR;
+  *out=Is("image-null")?NULL:handle;return EFI_SUCCESS;
+}
+static void Hobs(void) {
+  EFI_HOB_HANDOFF_INFO_TABLE *phit=(VOID *)HobStorage;
+  EFI_HOB_MEMORY_ALLOCATION *a=(VOID *)((UINT8 *)phit+sizeof(*phit));
+  EFI_HOB_GENERIC_HEADER *end=(VOID *)((UINT8 *)a+sizeof(*a));
+  phit->Header.HobType=EFI_HOB_TYPE_HANDOFF;phit->Header.HobLength=sizeof(*phit);
+  phit->EfiEndOfHobList=(UINTN)end;
+  a->Header.HobType=EFI_HOB_TYPE_MEMORY_ALLOCATION;a->Header.HobLength=sizeof(*a);
+  a->AllocDescriptor.MemoryBaseAddress=KERNEL_START;a->AllocDescriptor.MemoryLength=KERNEL_BYTES;a->AllocDescriptor.MemoryType=EfiReservedMemoryType;
+  end->HobType=EFI_HOB_TYPE_END_OF_HOB_LIST;end->HobLength=sizeof(*end);
+  if(Is("hob-first-type"))phit->Header.HobType=0;
+  if(Is("hob-bad-length"))a->Header.HobLength=1;
+  if(Is("hob-short-alloc"))a->Header.HobLength=8;
+  if(Is("hob-no-end"))end->HobType=0;
+  if(Is("hob-end-mismatch"))phit->EfiEndOfHobList-=8;
+  if(Is("hob-too-far"))phit->EfiEndOfHobList=(UINTN)phit+2*1024*1024;
+  if(Is("hob-overflow")){a->AllocDescriptor.MemoryBaseAddress=MAX_UINT64-7;a->AllocDescriptor.MemoryLength=16;}
+  if(Is("hob-fv-overflow")){a->Header.HobType=EFI_HOB_TYPE_FV;((EFI_HOB_FIRMWARE_VOLUME *)a)->BaseAddress=MAX_UINT64-7;((EFI_HOB_FIRMWARE_VOLUME *)a)->Length=16;}
+}
+int main(int argc,char **argv) {
+  int complete;assert(argc==2);Case=argv[1];
+  strcpy(Platform[0].Name,"Kernel");Platform[0].Address=KERNEL_START;Platform[0].Length=KERNEL_BYTES;
+  Platform[0].MemoryType=EfiReservedMemoryType;Platform[0].ResourceType=EFI_RESOURCE_SYSTEM_MEMORY;
+  if(Is("platform-missing"))strcpy(Platform[0].Name,"Other");
+  Bs.GetMemoryMap=EfiMap;Bs.LocateHandleBuffer=ImageHandles;Bs.HandleProtocol=ImageProtocol;Ds.GetMemorySpaceMap=GcdMap;
+  St.RuntimeServices=&Rt;St.ConfigurationTable=Configs;St.NumberOfTableEntries=1;Configs[0].VendorTable=(VOID *)(UINTN)0x81a04000;
+  if(Is("config-count"))St.NumberOfTableEntries=1025;
+  if(Is("config-null"))St.ConfigurationTable=NULL;
+  if(Is("config-overlap"))Configs[0].VendorTable=(VOID *)(UINTN)WINDOW_START;
+  if(Is("config-many")){St.NumberOfTableEntries=33;for(unsigned i=0;i<33;i++)Configs[i].VendorTable=(VOID *)(UINTN)WINDOW_START;}
+  Hobs();OpenAppendKernelFootprint(Report);
+  complete=Is("success")||Is("image-overlap")||Is("config-overlap")||Is("efi-unreserved")||Is("duplicate");
+  assert(strstr(Text,complete?"K131_DONE queries_complete=1":"K131_DONE queries_complete=0"));
+  assert(strstr(Text,"PAS_allowed=0 DMA_ownership=not_proved region_writes=0"));
+  if(Is("image-overlap"))assert(strstr(Text,"K131_image_overlaps=1"));
+  if(Is("config-overlap"))assert(strstr(Text,"K131_config_pointer "));
+  if(Is("efi-unreserved"))assert(strstr(Text,"type=7"));
+  if(Is("duplicate")){size_t before=Allocations;OpenAppendKernelFootprint(Report);assert(Allocations==before&&strstr(Text,"duplicate_call"));}
+  assert(Allocations==Frees);
+  printf("{\"passed\":true,\"case\":\"%s\",\"queries_complete\":%s,\"report_bytes\":%zu,\"allocations\":%zu,\"native_operations\":0}\n",Case,complete?"true":"false",Used,Allocations);
+  return 0;
+}

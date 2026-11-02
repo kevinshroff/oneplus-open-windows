@@ -1,0 +1,27 @@
+/* Compile-only actual ARM64 WDK ABI audit; no DriverEntry or native call. */
+#include <ntifs.h>
+#include "g104_core.h"
+#include "g160_protocol.h"
+#include "g167_protocol.h"
+#include "health_capture.h"
+#include "health_monitor.h"
+#include "health_layout.h"
+C_ASSERT(sizeof(G160_CAPTURE)==CH_GAUGE_BYTES);
+C_ASSERT(sizeof(G167_CAPTURE)==CH_CONFIG_BYTES);
+C_ASSERT(sizeof(G160_REQUEST)==32);
+C_ASSERT(sizeof(G167_REQUEST)==32);
+C_ASSERT(FIELD_OFFSET(G160_REQUEST,Nonce)==16);
+C_ASSERT(FIELD_OFFSET(G167_REQUEST,Nonce)==16);
+C_ASSERT(FIELD_OFFSET(G160_CAPTURE,Result)==120);
+C_ASSERT(FIELD_OFFSET(G167_CAPTURE,Result)==120);
+C_ASSERT(FIELD_OFFSET(G104_RESULT,Values)==80);
+C_ASSERT(FIELD_OFFSET(G111_RESULT,Values)==64);
+C_ASSERT(FIELD_OFFSET(G111_RESULT,Trace)==216);
+C_ASSERT(FIELD_OFFSET(G104_RESULT,After)==G178_GAUGE_AFTER);
+C_ASSERT(FIELD_OFFSET(G104_RESULT,Trace)==G178_GAUGE_TRACE);
+C_ASSERT(G160_IOCTL_RESULT==2255304);
+C_ASSERT(G167_IOCTL_RESULT==2255368);
+C_ASSERT(sizeof(CH_HEALTH)==112);
+C_ASSERT(sizeof(CH_MONITOR)==152);
+const uint32_t G178ProviderABI[]={sizeof(G160_CAPTURE),sizeof(G167_CAPTURE),
+ G160_IOCTL_RESULT,G167_IOCTL_RESULT,sizeof(CH_HEALTH),sizeof(CH_MONITOR)};

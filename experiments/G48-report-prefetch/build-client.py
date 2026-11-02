@@ -1,0 +1,8 @@
+import argparse,json,subprocess,hashlib,os,shutil
+from pathlib import Path
+p=argparse.ArgumentParser();p.add_argument('--binding',required=True,type=Path);p.add_argument('--output',required=True,type=Path);p.add_argument('--source',default='g48_client.go',choices=['g48_client.go','g48_client-v1.go']);a=p.parse_args();assert not a.output.exists();a.output.mkdir(parents=True);W=Path(__file__).resolve().parent
+b=json.loads((a.binding/'binding.json').read_text());s=a.output/'src';s.mkdir();shutil.copy2(W/a.source,s/'g48_client.go')
+(s/'g48_fields.go').write_text('package main\nconst registerCount='+str(len(b['fields']))+'\nvar registerFields=[]registerField{'+','.join('{Name:'+json.dumps(x['name'])+',Address:0x%x}'%x['address']for x in b['fields'])+'}\n')
+env=dict(os.environ,GOOS='windows',GOARCH='arm64',CGO_ENABLED='0');out=a.output/'g48-client-arm64.exe';cmd=['go','build','-trimpath','-buildvcs=false','-ldflags=-s -w -buildid=','-o',str(out.resolve()),'g48_client.go','g48_fields.go'];r=subprocess.run(cmd,cwd=s,env=env,capture_output=True,text=True);(a.output/'compiler.txt').write_text(r.stdout+r.stderr);assert r.returncode==0,r.stdout+r.stderr
+report={'source_sha256':hashlib.sha256((W/a.source).read_bytes()).hexdigest(),'binding_sha256':hashlib.sha256((a.binding/'binding.json').read_bytes()).hexdigest(),'output_sha256':hashlib.sha256(out.read_bytes()).hexdigest(),'bytes':out.stat().st_size,'argv':cmd,'Go_version':subprocess.check_output(['go','version'],text=True).strip(),'target':'windows/arm64','no_external_modules':True}
+(a.output/'build.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps({'bytes':report['bytes'],'sha256':report['output_sha256']}))

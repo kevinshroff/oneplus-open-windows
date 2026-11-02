@@ -1,0 +1,5 @@
+--- g38_client-v1.go
++++ g38_client.go
+@@ -605 +605 @@
+-		if r["operation_code"] != uint32(1002) || before.MapCalls != after.MapCalls || r["transaction_count"] != uint32(0) || r["pmic_count"] != uint32(0) {
++		if r["operation_code"] != uint32(1002) || before.MapCalls != after.MapCalls || len(r["trace"].([]map[string]any)) != 0 {

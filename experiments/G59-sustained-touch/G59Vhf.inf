@@ -1,0 +1,39 @@
+; Temporary G59-owned child binding to the existing inbox miniport.
+; No controller, firmware, disk or driver-image copy directive.
+[Version]
+Signature="$WINDOWS NT$"
+Class=HIDClass
+ClassGuid={745A17A0-74D3-11D0-B6FE-00A0C90F57DA}
+Provider=%Provider%
+DriverVer=10/21/2026,0.0.59.1
+CatalogFile=G59Vhf.cat
+PnpLockdown=1
+
+[Manufacturer]
+%Provider%=Models,NTARM64.10.0...19041
+
+[Models.NTARM64.10.0...19041]
+%Description%=Binding,OPENLAB\ONEPLUSOPENTOUCHG59
+
+[Binding.NT]
+
+[Binding.NT.HW]
+AddReg=Hardware
+
+[Hardware]
+HKR,,DeviceResetNotificationEnabled,0x00010001,1
+
+[Binding.NT.Services]
+; Preserve existing service display/start/error/group/dependency settings.
+AddService=mshidkmdf,0x000000fa,InboxMiniport
+
+[InboxMiniport]
+DisplayName="Pass-through HID to KMDF Filter Driver"
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%12%\mshidkmdf.sys
+
+[Strings]
+Provider="OnePlus Open Private Lab"
+Description="G59 owned VHF child using Microsoft inbox miniport"

@@ -1,0 +1,15 @@
+/* SPDX-License-Identifier: MIT */
+#ifndef G161_PROTOCOL_H
+#define G161_PROTOCOL_H
+#include "g111_core.h"
+#define G161_MAGIC 0x314d50313631474fULL
+#define G161_ABI 1u
+#define G161_IOCTL_STATUS CTL_CODE(FILE_DEVICE_UNKNOWN,0xa80,METHOD_BUFFERED,FILE_READ_ACCESS)
+#define G161_IOCTL_READ CTL_CODE(FILE_DEVICE_UNKNOWN,0xa81,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define G161_IOCTL_RESULT CTL_CODE(FILE_DEVICE_UNKNOWN,0xa82,METHOD_BUFFERED,FILE_READ_ACCESS)
+typedef struct{ULONG Size,Version;ULONGLONG Magic,Nonce;ULONG Count,Reserved;}G161_REQUEST;
+typedef struct{ULONG Size,Version;ULONGLONG Magic;ULONG KernelBuild,Processors,Irql,FirmwareBytes,FirmwareMatch,FirmwareStatus,MapCalls,Attempts,Ready,Fault;ULONGLONG InterruptTime,Frequency,Sequence;}G161_STATUS;
+typedef struct{G161_STATUS Status;ULONGLONG Nonce;ULONG NativeReads,NativeWrites,NativeGuard,Reserved;ULONGLONG Begin,End;G111_RESULT Result;}G161_CAPTURE;
+C_ASSERT(sizeof(G161_REQUEST)==32);C_ASSERT(sizeof(G161_STATUS)==80);C_ASSERT(sizeof(G111_RESULT)==880);
+C_ASSERT(FIELD_OFFSET(G161_CAPTURE,Result)==120);C_ASSERT(sizeof(G161_CAPTURE)==1000);
+#endif

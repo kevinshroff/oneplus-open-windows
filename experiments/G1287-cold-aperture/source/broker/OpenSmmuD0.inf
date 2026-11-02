@@ -1,0 +1,35 @@
+; SOURCE PROPOSAL ONLY. No linked SYS/catalog, signing or install authorization.
+[Version]
+Signature="$WINDOWS NT$"
+Class=System
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider=%Provider%
+DriverVer=10/29/2026,0.0.0.1
+CatalogFile=OpenSmmuD0.cat
+PnpLockdown=1
+[Manufacturer]
+%Provider%=Open,NTarm64.10.0
+[Open.NTarm64.10.0]
+%Description%=Device,ACPI\OPEN0D01
+[DestinationDirs]
+Files=12
+[SourceDisksNames]
+1=%Disk%,,,
+[SourceDisksFiles]
+OpenSmmuD0.sys=1
+[Device.NT]
+CopyFiles=Files
+[Files]
+OpenSmmuD0.sys
+[Device.NT.Services]
+AddService=OpenSmmuD0,0x00000002,Service
+[Service]
+DisplayName=%Description%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%12%\OpenSmmuD0.sys
+[Strings]
+Provider="Open source-owned bring-up"
+Description="Open dedicated GPU SMMU S0 clock lease (power-only)"
+Disk="Open SMMU source proposal"

@@ -1,0 +1,10 @@
+--- a/Platforms/KailuaPkg/Device/oneplus-open/PcdsFixedAtBuild.dsc.inc
++++ b/Platforms/KailuaPkg/Device/oneplus-open/PcdsFixedAtBuild.dsc.inc
+@@ -2 +2 @@
+-gAndromedaPkgTokenSpaceGuid.PcdOpenBringupMode|11
++gAndromedaPkgTokenSpaceGuid.PcdOpenBringupMode|9
+--- a/Platforms/AndromedaPkg/Library/DeviceBootManagerLib/OpenGptSnapshot.c
++++ b/Platforms/AndromedaPkg/Library/DeviceBootManagerLib/OpenGptSnapshot.c
+@@ -166 +166 @@
+-  CopyMem (&S->Acpi.OemTableId, (Mode == 10) ? "GPTG16  " : ((Mode == 11) ? "GPTG16U " : "GPTG15  "), 8);
++  CopyMem (&S->Acpi.OemTableId, (Mode == 10) ? "GPTG16  " : ((Mode == 11) ? "GPTG16U " : "GPTG18T1"), 8);

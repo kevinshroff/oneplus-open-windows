@@ -1,0 +1,17 @@
+/* SPDX-License-Identifier: MIT */
+#ifndef G116_PROTOCOL_H
+#define G116_PROTOCOL_H
+#define G116_MAGIC 0x315044363131474fULL
+#define G116_ABI 1u
+#define G116_IOCTL_STATUS CTL_CODE(FILE_DEVICE_UNKNOWN,0xa56,METHOD_BUFFERED,FILE_READ_ACCESS)
+#define G116_IOCTL_READ CTL_CODE(FILE_DEVICE_UNKNOWN,0xa57,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define G116_IOCTL_RESULT CTL_CODE(FILE_DEVICE_UNKNOWN,0xa58,METHOD_BUFFERED,FILE_READ_ACCESS)
+#define G116_PAYLOAD 4096u
+typedef struct{ULONG Size,Version;ULONGLONG Magic,Nonce;ULONG Count,Reserved;}G116_REQUEST;
+typedef struct{ULONG Size,Version;ULONGLONG Magic;ULONG KernelBuild,Processors,Irql,FirmwareBytes,FirmwareMatch,FirmwareStatus,MapCalls,Attempts,Ready,Fault;ULONGLONG InterruptTime,Frequency,Sequence;}G116_STATUS;
+typedef struct{ULONGLONG Address;ULONG Bytes,Offset,Host0,Host1,Kind,Status;}G116_REGION;
+typedef struct{G116_STATUS Status;ULONGLONG Nonce;ULONG Code,CompleteMask,ReadBytes,MapCalls;ULONGLONG Begin,End;ULONG RegionCount,PayloadBytes;G116_REGION Regions[20];UCHAR Payload[G116_PAYLOAD];}G116_CAPTURE;
+C_ASSERT(sizeof(G116_REQUEST)==32);C_ASSERT(sizeof(G116_STATUS)==80);
+C_ASSERT(sizeof(G116_REGION)==32);C_ASSERT(FIELD_OFFSET(G116_CAPTURE,Payload)==768);
+C_ASSERT(sizeof(G116_CAPTURE)==4864);
+#endif

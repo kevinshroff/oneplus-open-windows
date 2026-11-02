@@ -1,0 +1,89 @@
+"""Validate saved native prerequisites and generate one bounded enable trial.
+
+No native commands are executed. Supply writes are confined to the RPMh enable
+message; the direct SPMI write channel never appears in the generated code.
+"""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import re
+import secrets
+
+p = argparse.ArgumentParser(description=__doc__)
+p.add_argument('--inputs', type=Path, required=True)
+p.add_argument('--work', type=Path, default=Path(__file__).resolve().parent)
+p.add_argument('--output', type=Path, required=True)
+p.add_argument('--nonce', help='Saved nonce for offline reproduction only')
+a = p.parse_args()
+assert not a.output.exists()
+W = a.work
+sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+raw_path = W / 'private/baseline-debug.txt'
+capture = json.loads((W / 'baseline-capture.json').read_text())
+assert sha(raw_path) == capture['receipt']['sha256']
+raw = raw_path.read_text(errors='replace').replace('\r\n', '\n')
+part = raw[raw.rindex('\nG31_BASELINE_BEGIN\n'):raw.rindex('\nG31_BASELINE_END\n')]
+def result(marker):
+    rows = [json.loads(x[len(marker):]) for x in part.splitlines() if x.startswith(marker)]
+    assert len(rows) == 1
+    return rows[0]
+hdr = result('G29_RSC_HEADERS_JSON ')
+rsc = result('G29_RSC_SHADOW_JSON ')
+pmic = result('G30_PMIC_OBSERVER_JSON ')
+assert hdr['success'] and hdr['MMIO_writes'] == 0 and len(hdr['headers']) == 8
+assert hdr['irq'] == {'RSC_DRV_IRQ_ENABLE': 1, 'RSC_DRV_IRQ_STATUS': 0}
+assert all(x['RSC_DRV_STATUS'] == 1 and x['RSC_DRV_CONTROL'] == x['RSC_DRV_CMD_ENABLE'] == 0 for x in hdr['headers'])
+assert rsc['success'] and rsc['MMIO_writes'] == 0 and len(rsc['reads']) == 17
+previous = json.loads((a.inputs / 'rpmh-G30/native-post-queries-shadow.json').read_text())
+assert rsc['values'] == previous['native_result']['values']
+assert pmic['read_commands'] == 5 and pmic['pmic_write_commands'] == pmic['configuration_writes'] == 0
+assert len(pmic['targets']) == 3 and all(not t['error'] for t in pmic['targets'])
+ldo, = [t for t in pmic['targets'] if t['ppid'] == 0x1c4]
+assert ldo['identity'] == [0, 4, 1, 1, 4, 0xab, 0, 0]
+assert ldo['configuration'] == [8, 7, 0, 0, 7, 7, 0, 0] and ldo['status'] == [3]
+pins = []
+for address in [0xf10a000, 0xf118000]:
+    matches = re.findall(r'^\s*#\s*' + format(address, 'x') + r'\s+([0-9a-fA-F]{8})\s+([0-9a-fA-F]{8})\s*$', part, re.M)
+    assert len(matches) == 1
+    pins += [int(x, 16) for x in matches[0]]
+assert pins == [1, 0, 0x201, 0]
+nonce = a.nonce if a.nonce else secrets.token_hex(8)
+assert re.fullmatch('[a-f0-9]{16}', nonce)
+binding = {'nonce': nonce, 'phone_session': previous['phone_session'], 'rsc': rsc['values'],
+           'pmic': {'identity': ldo['identity'], 'configuration': ldo['configuration'], 'status': ldo['status'][0]},
+           'pins': pins, 'native_baseline_sha256': sha(raw_path),
+           'expected_client_votes': {'voltage': 1800, 'mode': 7, 'enable': 0}}
+shadow = json.loads((a.inputs / 'rpmh-G29/shadow-plan.json').read_text())
+addresses = {k: int(v, 16) for k, v in shadow['fields'].items()}
+assert addresses.keys() == binding['rsc'].keys()
+ready = json.loads((W / 'ready-emulation.json').read_text())
+assert ready['passed'] == 17 and 'status bit7 for model73' in ready['result']
+body_path = Path(__file__).resolve().parent / 'trial-template.js'
+body = body_path.read_text()
+for forbidden in ['0xc7b7000', '0xc7b7008', '0xb000000']:
+    assert forbidden not in body
+assert 'WRITE_ENABLE",0x40804,1,' in body and 'WRITE_ENABLE",0x40804,0,' in body
+prefix = '"use strict";\nvar G31_BINDING=' + json.dumps(binding, separators=(',', ':')) + ';\n'
+prefix += 'var G31_RSC_ADDR=' + json.dumps(addresses, separators=(',', ':')) + ';\n'
+prefix += 'Object.freeze(G31_BINDING.rsc);Object.freeze(G31_BINDING.pmic.identity);Object.freeze(G31_BINDING.pmic.configuration);Object.freeze(G31_BINDING.pmic);Object.freeze(G31_BINDING.pins);Object.freeze(G31_BINDING);Object.freeze(G31_RSC_ADDR);\n'
+a.output.mkdir(parents=True)
+source = a.output / 'G31-enable-only.js'
+source.write_text(prefix + body)
+(a.output / 'binding.json').write_text(json.dumps(binding, indent=2) + '\n')
+(a.output / 'source-proof.json').write_text(json.dumps({
+    'source_sha256': sha(source), 'template_sha256': sha(body_path),
+    'raw_native_baseline_sha256': sha(raw_path), 'ready_emulation_sha256': sha(W / 'ready-emulation.json'),
+    'G30_prior_shadow_sha256': sha(a.inputs / 'rpmh-G30/native-post-queries-shadow.json'),
+    'G28_platform_binding_sha256': sha(a.inputs / 'touch-G28/RPMh-platform-binding.json'),
+    'RSC_address_plan_sha256': sha(a.inputs / 'rpmh-G29/shadow-plan.json'),
+    'G29_original_HAL_validation_sha256': sha(a.inputs / 'rpmh-G29/HAL-emulation.json'),
+    'source_RSC_read_and_reclaim_parent': 'G29/G30 native READ implementation',
+    'write_encoding_basis': 'G29 original RpmhDxe SetupDrv2Tcs kind1 uses MSGID10108/address40804; downstream regulator enable data1/release0',
+    'only_supply_write_address': '0x40804', 'max_enable_messages': 1, 'max_release_messages': 1,
+    'voltage_mode_pinmux_reset_clock_GIC_or_raw_partition_writes_permitted': 0
+}, indent=2) + '\n')
+(a.output / 'native-headers-baseline.json').write_text(json.dumps(hdr, indent=2) + '\n')
+(a.output / 'native-shadow-baseline.json').write_text(json.dumps(rsc, indent=2) + '\n')
+(a.output / 'native-PMIC-baseline.json').write_text(json.dumps(pmic, indent=2) + '\n')
+print(json.dumps({'source_sha256': sha(source), 'nonce': nonce, 'only_supply_write_address': '0x40804'}))

@@ -1,0 +1,43 @@
+; Firmware-described resource lifetime only. No hardware producer is enabled.
+[Version]
+Signature="$WINDOWS NT$"
+Class=System
+ClassGuid={4D36E97D-E325-11CE-BFC1-08002BE10318}
+Provider=%Provider%
+DriverVer=10/26/2026,0.0.182.0
+CatalogFile=OpenG182.cat
+PnpLockdown=1
+[Manufacturer]
+%Provider%=Models,NTARM64.10.0...26100
+[Models.NTARM64.10.0...26100]
+%Description%=Install,ACPI\OPEN0182
+[DestinationDirs]
+DriverCopy=13
+[SourceDisksNames]
+1=%Disk%
+[SourceDisksFiles]
+OpenG182.sys=1
+[Install.NT]
+CopyFiles=DriverCopy
+[DriverCopy]
+OpenG182.sys
+[Install.NT.HW]
+AddReg=Hardware
+[Hardware]
+HKR,,"Security",0x00000000,"D:P(A;;GA;;;SY)(A;;GA;;;BA)"
+[Install.NT.Services]
+AddService=OpenG182,0x00000002,Service
+[Service]
+DisplayName=%Description%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%13%\OpenG182.sys
+[Install.NT.Wdf]
+KmdfService=OpenG182,Wdf
+[Wdf]
+KmdfLibraryVersion=1.15
+[Strings]
+Provider="OnePlus Open Private Lab"
+Description="OnePlus Open G182 Platform Resource Lifetime"
+Disk="OnePlus Open G182 source-built package"

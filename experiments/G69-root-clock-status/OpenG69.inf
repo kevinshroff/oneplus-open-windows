@@ -1,0 +1,57 @@
+; Source-built bounded QUP1 GCC clock component. No SPB/GPIO/PEP declared.
+[Version]
+Signature="$WINDOWS NT$"
+Class=System
+ClassGuid={4D36E97D-E325-11CE-BFC1-08002BE10318}
+Provider=%Provider%
+DriverVer=10/22/2026,0.0.69.0
+CatalogFile=OpenG69.cat
+PnpLockdown=1
+
+[Manufacturer]
+%Provider%=Models,NTARM64.10.0...26100
+
+[Models.NTARM64.10.0...26100]
+%Description%=Install,ACPI\OPEN0067
+
+[DestinationDirs]
+DriverCopy=13
+
+[SourceDisksNames]
+1=%Disk%
+
+[SourceDisksFiles]
+OpenG69.sys=1
+
+[Install.NT]
+CopyFiles=DriverCopy
+
+[DriverCopy]
+OpenG69.sys
+
+[Install.NT.HW]
+AddReg=Hardware
+
+[Hardware]
+HKR,,"Security",0x00000000,"D:P(A;;GA;;;SY)(A;;GA;;;BA)"
+
+[Install.NT.Services]
+AddService=OpenG69,0x00000002,Service
+
+[Service]
+DisplayName=%Description%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%13%\OpenG69.sys
+
+[Install.NT.Wdf]
+KmdfService=OpenG69,Wdf
+
+[Wdf]
+KmdfLibraryVersion=1.15
+
+[Strings]
+Provider="OnePlus Open Private Lab"
+Description="OnePlus Open G69 QUP1 GCC Clock Component"
+Disk="OnePlus Open G69 source-built test package"

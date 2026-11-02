@@ -1,0 +1,4 @@
+from pathlib import Path
+import argparse,hashlib,json,subprocess,os
+p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);a=p.parse_args();assert not a.output.exists();a.output.mkdir(parents=True);W=Path(__file__).resolve().parent;exe=a.output/'g51-admin-arm64.exe';source=W/'g51_admin.go';q=subprocess.run(['go','build','-trimpath','-buildvcs=false','-ldflags=-s -w -buildid=','-o',str(exe.resolve()),str(source.resolve())],env=dict(os.environ,GOOS='windows',GOARCH='arm64',CGO_ENABLED='0'),capture_output=True,text=True);assert not q.returncode,q.stderr
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest();v={'source_sha256':sha(source),'binary_sha256':sha(exe),'bytes':exe.stat().st_size,'target':'windows/arm64','Go_version':subprocess.check_output(['go','version'],text=True).strip(),'native_installation_qualified':False};(a.output/'build.json').write_text(json.dumps(v,indent=2)+'\n');print(v)

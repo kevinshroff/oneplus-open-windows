@@ -1,0 +1,25 @@
+[Defines]
+ INF_VERSION = 0x00010017
+ BASE_NAME = OpenScmQueryG1245
+ FILE_GUID = e67fa7b4-0f2d-4911-b4c1-bb5fc15a1245
+ MODULE_TYPE = DXE_DRIVER
+ VERSION_STRING = 1.0
+ ENTRY_POINT = QueryEntry
+[Sources]
+ Query.c
+ ScmIdentity.h
+ OpenSha256.h
+[Packages]
+ MdePkg/MdePkg.dec
+ QueryPkg/Query.dec
+[LibraryClasses]
+ UefiDriverEntryPoint
+ UefiBootServicesTableLib
+ BaseMemoryLib
+[Protocols]
+ gOpenG1245ScmProtocolGuid
+ gEfiLoadedImageProtocolGuid
+ gEfiAcpiTableProtocolGuid
+ gEfiAcpiSdtProtocolGuid
+[Depex]
+ gOpenG1245ScmProtocolGuid AND gEfiAcpiTableProtocolGuid AND gEfiAcpiSdtProtocolGuid

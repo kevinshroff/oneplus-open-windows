@@ -1,0 +1,43 @@
+; Fixed paired sensor acquisition on the exact G182 ACPI resources.
+[Version]
+Signature="$WINDOWS NT$"
+Class=System
+ClassGuid={4D36E97D-E325-11CE-BFC1-08002BE10318}
+Provider=%Provider%
+DriverVer=10/26/2026,0.0.184.1
+CatalogFile=OpenG184.cat
+PnpLockdown=1
+[Manufacturer]
+%Provider%=Models,NTARM64.10.0...26100
+[Models.NTARM64.10.0...26100]
+%Description%=Install,ACPI\OPEN0182
+[DestinationDirs]
+DriverCopy=13
+[SourceDisksNames]
+1=%Disk%
+[SourceDisksFiles]
+OpenG184.sys=1
+[Install.NT]
+CopyFiles=DriverCopy
+[DriverCopy]
+OpenG184.sys
+[Install.NT.HW]
+AddReg=Hardware
+[Hardware]
+HKR,,"Security",0x00000000,"D:P(A;;GA;;;SY)(A;;GA;;;BA)"
+[Install.NT.Services]
+AddService=OpenG184,0x00000002,Service
+[Service]
+DisplayName=%Description%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%13%\OpenG184.sys
+[Install.NT.Wdf]
+KmdfService=OpenG184,Wdf
+[Wdf]
+KmdfLibraryVersion=1.15
+[Strings]
+Provider="OnePlus Open Private Lab"
+Description="OnePlus Open G184 Ongoing Fixed Sensor Producer (PE and Windows)"
+Disk="OnePlus Open G184 source-built package"

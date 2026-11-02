@@ -1,0 +1,166 @@
+--- work/gpu-windows-bringup-G290/experimental-a740/source/a740_hal.h	2026-10-28 17:01:23
++++ work/gpu-a740-kmd-G741/source/a740_hal.h	2026-11-01 01:11:20
+@@ -21,12 +21,24 @@
+     A740_HAL_REPORT Report;
+     PIOMMU_DMA_DEVICE ProbeRetained;
+ } A740_HAL;
++/* One retained record per attempted map. The caller owns the MDL/backing and
++ * must keep it alive until an exact unmap AND FlushDomain both succeed.
++ * An uncertain HAL result poisons the role and retains every record. */
++typedef struct A740_HAL_MAPPING {
++    struct A740_HAL_MAPPING *Next;
++    PMDL Mdl;
++    ULONGLONG Iova, ActualIova;
++    SIZE_T Bytes;
++    ULONG Permissions;
++} A740_HAL_MAPPING;
+ typedef struct {
+     A740_HAL *Hal;
+     PIOMMU_DMA_DOMAIN Domain;
+     PIOMMU_DMA_DEVICE Device[A740_HAL_MAX_ROLE_INPUTS];
+     ULONG Count, Attached, Type, Mappings;
+     BOOLEAN Poisoned;
++    A740_HAL_MAPPING *MapHead;
++    KMUTEX MapLock; /* Last: preserved while CloseStopped clears role state. */
+ } A740_HAL_ROLE;
+ /* PASSIVE, caller serialized. No MMIO, mapping, domain attach or power action. */
+ NTSTATUS A740HalDiscover(A740_HAL *Hal, PDEVICE_OBJECT Pdo);
+@@ -39,9 +51,15 @@
+ NTSTATUS A740HalOpenRole(A740_HAL_ROLE *Role, A740_HAL *Hal,
+     const ULONG *InputIds, ULONG Count, IOMMU_DMA_DOMAIN_TYPE Type);
+ /* Explicit IOVA mapping of a retained owned whole-page MDL. Permissions: bit0
+- * device read, bit1 device write. No CPU cache ownership change is implied. */
++ * device read, bit1 device write. No CPU cache ownership change is implied.
++ * Overlap is rejected before HAL entry. Success is the only map result that
++ * permits normal use; a failed HAL attempt requires reset/recovery and retention.
++ * PASSIVE. Map/unmap/close serialize using MapLock; open/discover/recovery
++ * lifecycle must be externally serialized. Only whole MDLs (offset=0,
++ * ByteCount=Bytes) are supported; subranges are deliberately rejected. */
+ NTSTATUS A740HalMap(A740_HAL_ROLE *Role, PMDL Mdl, ULONGLONG Iova,
+                     SIZE_T Bytes, ULONG Permissions);
++/* Only the original whole mapping is accepted; no partial/foreign unmaps. */
+ NTSTATUS A740HalUnmap(A740_HAL_ROLE *Role, ULONGLONG Iova, SIZE_T Bytes);
+ /* Requires genuinely stopped master(s), all mappings already removed. */
+ NTSTATUS A740HalCloseStopped(A740_HAL_ROLE *Role);
+--- work/gpu-windows-bringup-G290/experimental-a740/source/a740_hal.c	2026-10-28 17:01:23
++++ work/gpu-a740-kmd-G741/source/a740_hal.c	2026-11-01 01:11:20
+@@ -77,6 +77,7 @@
+             return STATUS_NOT_SUPPORTED;
+         for(ULONG j=0;j<i;++j) if(Ids[i]==Ids[j]) return STATUS_INVALID_PARAMETER;
+     }
++    KeInitializeMutex(&R->MapLock,0);
+     R->Hal=H;R->Type=Type;R->Count=N;
+     /* No registered allocator: each subsequent mapping supplies exact IOVA. */
+     st=H->Api.V2.CreateDomainEx(Type,flags,NULL,NULL,&R->Domain);
+@@ -94,36 +95,61 @@
+     R->Poisoned=TRUE;
+     return NT_SUCCESS(st)?STATUS_DEVICE_CONFIGURATION_ERROR:st;
+ }
+-NTSTATUS A740HalMap(A740_HAL_ROLE *R,PMDL M,ULONGLONG Va,SIZE_T Bytes,ULONG P)
++static BOOLEAN ValidRange(ULONGLONG Va, SIZE_T Bytes)
+ {
++    return Bytes && !(Bytes & (PAGE_SIZE-1)) && !(Va & (PAGE_SIZE-1)) &&
++           Va + Bytes > Va;
++}
++static NTSTATUS MapLocked(A740_HAL_ROLE *R,PMDL M,ULONGLONG Va,SIZE_T Bytes,ULONG P)
++{
+     IOMMU_MAP_PHYSICAL_ADDRESS physical={0};IOMMU_DMA_LOGICAL_ADDRESS actual=0;
+-    NTSTATUS st;
+-    if(!R||!M||!Passive()||R->Poisoned||!R->Domain||R->Attached!=R->Count||
+-       R->Mappings==MAXULONG||!Bytes||(Bytes&(PAGE_SIZE-1))||(Va&(PAGE_SIZE-1))||Va+Bytes<Va||
+-       MmGetMdlByteOffset(M)||MmGetMdlByteCount(M)!=Bytes||!(P&3)||(P&~3u))
++    A740_HAL_MAPPING *entry, *it; NTSTATUS st;
++    if(!R||!M||!Passive()||R->Poisoned||!R->Hal||!R->Domain||
++       !R->Count||R->Attached!=R->Count||R->Mappings==MAXULONG||
++       !ValidRange(Va,Bytes)||MmGetMdlByteOffset(M)||
++       MmGetMdlByteCount(M)!=Bytes||!(P&3)||(P&~3u))
+         return STATUS_INVALID_PARAMETER;
++    for(it=R->MapHead;it;it=it->Next)
++        if(Va<it->Iova+it->Bytes && it->Iova<Va+Bytes)
++            return STATUS_CONFLICTING_ADDRESSES;
++    entry=ExAllocatePool2(POOL_FLAG_NON_PAGED,sizeof(*entry),A740_HAL_TAG);
++    if(!entry) return STATUS_INSUFFICIENT_RESOURCES;
++    entry->Mdl=M;entry->Iova=Va;entry->ActualIova=0;
++    entry->Bytes=Bytes;entry->Permissions=P;
++    entry->Next=R->MapHead;R->MapHead=entry;R->Mappings++;
+     physical.MapType=MapPhysicalAddressTypeMdl;physical.Mdl.Mdl=M;
+     st=R->Hal->Api.V2.MapLogicalRangeEx(R->Domain,P,&physical,&Va,NULL,NULL,&actual);
+-    if(NT_SUCCESS(st)&&actual!=Va) {R->Poisoned=TRUE;return STATUS_DEVICE_CONFIGURATION_ERROR;}
+-    if(NT_SUCCESS(st)) R->Mappings++;
++    entry->ActualIova=actual;
++    /* Do not infer from a failed HAL status that no translation was installed.
++     * Retain the MDL identity and freeze this domain until explicit recovery. */
++    if(!NT_SUCCESS(st)||actual!=entry->Iova) {
++        R->Poisoned=TRUE;
++        return NT_SUCCESS(st)?STATUS_DEVICE_CONFIGURATION_ERROR:st;
++    }
+     return st;
+ }
+-NTSTATUS A740HalUnmap(A740_HAL_ROLE *R,ULONGLONG Va,SIZE_T Bytes)
++static NTSTATUS UnmapLocked(A740_HAL_ROLE *R,ULONGLONG Va,SIZE_T Bytes)
+ {
+-    NTSTATUS st;
+-    if(!R||!Passive()||R->Poisoned||!R->Domain||!R->Mappings||!Bytes||
+-       (Bytes&(PAGE_SIZE-1))||(Va&(PAGE_SIZE-1))||Va+Bytes<Va)
+-        return STATUS_INVALID_PARAMETER;
++    A740_HAL_MAPPING **link,*entry;NTSTATUS st;
++    if(!R||!Passive()||R->Poisoned||!R->Hal||!R->Domain||
++       !R->Mappings||!ValidRange(Va,Bytes)) return STATUS_INVALID_PARAMETER;
++    for(link=&R->MapHead;*link;link=&(*link)->Next)
++        if((*link)->Iova==Va && (*link)->Bytes==Bytes) break;
++    entry=*link;
++    if(!entry) return STATUS_NOT_FOUND;
+     st=R->Hal->Api.V2.UnmapLogicalRange(R->Domain,Va,Bytes/PAGE_SIZE);
+     if(NT_SUCCESS(st)) st=R->Hal->Api.V2.FlushDomain(R->Domain);
+     if(!NT_SUCCESS(st)) R->Poisoned=TRUE;
+-    else R->Mappings--;
++    else {
++        *link=entry->Next;R->Mappings--;
++        ExFreePoolWithTag(entry,A740_HAL_TAG);
++    }
+     return st;
+ }
+-NTSTATUS A740HalCloseStopped(A740_HAL_ROLE *R)
++static NTSTATUS CloseStoppedLocked(A740_HAL_ROLE *R)
+ {
+     NTSTATUS st;A740_HAL *H;
+-    if(!R||!Passive()||!R->Hal||R->Poisoned||R->Mappings) return STATUS_INVALID_DEVICE_STATE;
++    if(!R||!Passive()||!R->Hal||R->Poisoned||R->Mappings||R->MapHead) return STATUS_INVALID_DEVICE_STATE;
+     H=R->Hal;
+     while(R->Attached) {
+         ULONG i=R->Attached-1;
+@@ -138,5 +164,33 @@
+         st=H->Api.V2.DeleteDomain(R->Domain);
+         if(!NT_SUCCESS(st)) {R->Poisoned=TRUE;return st;}
+     }
+-    RtlZeroMemory(R,sizeof(*R));return STATUS_SUCCESS;
++    RtlZeroMemory(R,FIELD_OFFSET(A740_HAL_ROLE,MapLock));return STATUS_SUCCESS;
+ }
++
++/* A kernel mutex preserves PASSIVE_LEVEL, unlike FAST_MUTEX. Open/discover and
++ * device lifetime changes require external serialization. MapLock is initialized
++ * before OpenRole publishes Hal and is preserved by successful close. */
++NTSTATUS A740HalMap(A740_HAL_ROLE *R,PMDL M,ULONGLONG Va,SIZE_T Bytes,ULONG P)
++{
++    NTSTATUS st;
++    if(!R||!Passive()||!R->Hal) return STATUS_INVALID_PARAMETER;
++    KeWaitForSingleObject(&R->MapLock,Executive,KernelMode,FALSE,NULL);
++    st=MapLocked(R,M,Va,Bytes,P);
++    KeReleaseMutex(&R->MapLock,FALSE);return st;
++}
++NTSTATUS A740HalUnmap(A740_HAL_ROLE *R,ULONGLONG Va,SIZE_T Bytes)
++{
++    NTSTATUS st;
++    if(!R||!Passive()||!R->Hal) return STATUS_INVALID_PARAMETER;
++    KeWaitForSingleObject(&R->MapLock,Executive,KernelMode,FALSE,NULL);
++    st=UnmapLocked(R,Va,Bytes);
++    KeReleaseMutex(&R->MapLock,FALSE);return st;
++}
++NTSTATUS A740HalCloseStopped(A740_HAL_ROLE *R)
++{
++    NTSTATUS st;
++    if(!R||!Passive()||!R->Hal) return STATUS_INVALID_DEVICE_STATE;
++    KeWaitForSingleObject(&R->MapLock,Executive,KernelMode,FALSE,NULL);
++    st=CloseStoppedLocked(R);
++    KeReleaseMutex(&R->MapLock,FALSE);return st;
++}

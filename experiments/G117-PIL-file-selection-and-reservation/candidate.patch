@@ -1,0 +1,22 @@
+--- a/Platforms/KailuaPkg/Device/oneplus-open/Library/PlatformMemoryMapLib/PlatformMemoryMapLib.c
++++ b/Platforms/KailuaPkg/Device/oneplus-open/Library/PlatformMemoryMapLib/PlatformMemoryMapLib.c
+@@ -18,2 +18,2 @@
+-    { "PIL Reserved",      0x8A800000, 0x18280000, AddMem, MEM_RES, UNCACHEABLE, Reserv, UNCACHED_UNBUFFERED_XN },
+-    { "Display Demura",    0xA2A80000, 0x02B00000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_THROUGH_XN },
++    { "PIL Reserved",      0x8A800000, 0x18A80000, AddMem, MEM_RES, UNCACHEABLE, Reserv, UNCACHED_UNBUFFERED_XN },
++    { "Display Demura",    0xA3280000, 0x02300000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_THROUGH_XN },
+--- a/Platforms/KailuaPkg/Device/oneplus-open/Binaries/RawFiles/uefiplat.cfg
++++ b/Platforms/KailuaPkg/Device/oneplus-open/Binaries/RawFiles/uefiplat.cfg
+@@ -15,2 +15,2 @@
+-0x8A800000, 0x18280000, "PIL Reserved",      AddMem, MEM_RES, UNCACHEABLE, Reserv, UNCACHED_UNBUFFERED_XN
+-0xA2A80000, 0x02B00000, "Display Demura",    AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_THROUGH_XN
++0x8A800000, 0x18A80000, "PIL Reserved",      AddMem, MEM_RES, UNCACHEABLE, Reserv, UNCACHED_UNBUFFERED_XN
++0xA3280000, 0x02300000, "Display Demura",    AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_THROUGH_XN
+--- a/Platforms/KailuaPkg/Device/oneplus-open/Binaries/RawFiles/uefipil.cfg
++++ b/Platforms/KailuaPkg/Device/oneplus-open/Binaries/RawFiles/uefipil.cfg
+@@ -49 +49 @@
+-PartiGuid = "EBD0A0A2 B9E5 4433 87C0 68B6B72699C7"
++PartiLabel = modem_a
+@@ -62 +62 @@
+-PartiGuid = "EBD0A0A2 B9E5 4433 87C0 68B6B72699C7"
++PartiLabel = modem_a

@@ -1,0 +1,14 @@
+/* SPDX-License-Identifier: MIT */
+#ifndef G125_PROTOCOL_H
+#define G125_PROTOCOL_H
+#define G125_MAGIC 0x314f49353231474fULL
+#define G125_ABI 1u
+#define G125_IOCTL_STATUS CTL_CODE(FILE_DEVICE_UNKNOWN,0xa6c,METHOD_BUFFERED,FILE_READ_ACCESS)
+#define G125_IOCTL_READ CTL_CODE(FILE_DEVICE_UNKNOWN,0xa6d,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define G125_IOCTL_RESULT CTL_CODE(FILE_DEVICE_UNKNOWN,0xa6e,METHOD_BUFFERED,FILE_READ_ACCESS)
+typedef struct{ULONG Size,Version;ULONGLONG Magic,Nonce;ULONG Count,Reserved;}G125_REQUEST;
+typedef struct{ULONG Size,Version;ULONGLONG Magic;ULONG KernelBuild,Processors,Irql,FirmwareBytes,FirmwareMatch,FirmwareStatus,MapCalls,Attempts,Ready,Fault;ULONGLONG InterruptTime,Frequency,Sequence;}G125_STATUS;
+typedef struct{G125_STATUS Status;ULONGLONG Nonce;ULONG Code,CompleteMask,ReadBytes,MapCalls;ULONGLONG Begin,End;ULONG WordMasks[2];ULONG Samples[2][24];}G125_CAPTURE;
+C_ASSERT(sizeof(G125_REQUEST)==32);C_ASSERT(sizeof(G125_STATUS)==80);
+C_ASSERT(FIELD_OFFSET(G125_CAPTURE,Samples)==128);C_ASSERT(sizeof(G125_CAPTURE)==320);
+#endif

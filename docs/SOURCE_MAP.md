@@ -1,0 +1,302 @@
+# Source map
+
+Current source groups are listed first. `experiments/` also contains older source generations; their presence does not mean they are installed or current. Private operator wrappers, captured inputs and build caches are excluded.
+
+| Component | Source | Important boundary |
+|---|---|---|
+| Current input | `drivers/touch/G379/` | 23-TU linked closure; older 19-TU builder is incomplete; key unit needs `G293_POWER_REPORTS=1`. |
+| Clock-only parent | `drivers/parent/G746/` | Seven-TU closure; do not substitute historical sensor-producing parents. |
+| UEFI / ACPI | `firmware/` | Authored overlays and reconstruction recipes; fetch pinned MU dependencies and obtain OEM inputs separately. |
+| GPU native startup | `experiments/G1287-cold-aperture/` | Latest attempted cold-aperture baseline; still no first CP completion. |
+| Secure query transport | `experiments/G1268-runtime-query/` | Fixed query only, explicit once operation, no arbitrary SMC interface. |
+| Wi-Fi epoch reader | `experiments/G1295-wifi-fault-epoch/` | Phase-qualified read-only diagnostic for a future authorized boot; not a Wi-Fi fix. |
+| WDDM / Mesa | See exported group index below | Offline scaffolding/patches; no accelerated adapter demonstrated. |
+
+## Exact curated file index
+
+The following files were selected from the latest private work products, then privacy-filtered for this publication. Original source hashes, paths and test manifests do not authenticate transformed publication bytes.
+
+- [`drivers/touch/G379/source/buttons192.c`](../drivers/touch/G379/source/buttons192.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/buttons192.h`](../drivers/touch/G379/source/buttons192.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g100_bus.c`](../drivers/touch/G379/source/g100_bus.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g100_bus.h`](../drivers/touch/G379/source/g100_bus.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g100_keys.c`](../drivers/touch/G379/source/g100_keys.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g100_keys.h`](../drivers/touch/G379/source/g100_keys.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g100_protocol.h`](../drivers/touch/G379/source/g100_protocol.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g293_keys.c`](../drivers/touch/G379/source/g293_keys.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g293_keys.h`](../drivers/touch/G379/source/g293_keys.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_contract.c`](../drivers/touch/G379/source/g98_contract.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_contract.h`](../drivers/touch/G379/source/g98_contract.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_driver.c`](../drivers/touch/G379/source/g98_driver.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_engine.c`](../drivers/touch/G379/source/g98_engine.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_engine.h`](../drivers/touch/G379/source/g98_engine.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_hardware.c`](../drivers/touch/G379/source/g98_hardware.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_hwapi.h`](../drivers/touch/G379/source/g98_hwapi.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_input.c`](../drivers/touch/G379/source/g98_input.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_input.h`](../drivers/touch/G379/source/g98_input.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_observer.c`](../drivers/touch/G379/source/g98_observer.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_observer.h`](../drivers/touch/G379/source/g98_observer.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_plan.c`](../drivers/touch/G379/source/g98_plan.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_poll.c`](../drivers/touch/G379/source/g98_poll.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_poll.h`](../drivers/touch/G379/source/g98_poll.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_power.c`](../drivers/touch/G379/source/g98_power.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_power.h`](../drivers/touch/G379/source/g98_power.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_protocol.h`](../drivers/touch/G379/source/g98_protocol.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_report.c`](../drivers/touch/G379/source/g98_report.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_report.h`](../drivers/touch/G379/source/g98_report.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_rsc.c`](../drivers/touch/G379/source/g98_rsc.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_rsc_profile.h`](../drivers/touch/G379/source/g98_rsc_profile.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_spi.c`](../drivers/touch/G379/source/g98_spi.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_spi.h`](../drivers/touch/G379/source/g98_spi.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_spi_vote.h`](../drivers/touch/G379/source/g98_spi_vote.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_touch.c`](../drivers/touch/G379/source/g98_touch.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_touch.h`](../drivers/touch/G379/source/g98_touch.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98_trial.h`](../drivers/touch/G379/source/g98_trial.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98hid_baseline.h`](../drivers/touch/G379/source/g98hid_baseline.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98hid_lifecycle.c`](../drivers/touch/G379/source/g98hid_lifecycle.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98hid_lifecycle.h`](../drivers/touch/G379/source/g98hid_lifecycle.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98hid_protocol.h`](../drivers/touch/G379/source/g98hid_protocol.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98hid_report.c`](../drivers/touch/G379/source/g98hid_report.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g98hid_report.h`](../drivers/touch/G379/source/g98hid_report.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g99_core.c`](../drivers/touch/G379/source/g99_core.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g99_core.h`](../drivers/touch/G379/source/g99_core.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/g99_protocol.h`](../drivers/touch/G379/source/g99_protocol.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/geni_fifo.c`](../drivers/touch/G379/source/geni_fifo.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/geni_fifo.h`](../drivers/touch/G379/source/geni_fifo.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/inputs/g98_binding.h`](../drivers/touch/G379/source/inputs/g98_binding.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/power291.c`](../drivers/touch/G379/source/power291.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/power291.h`](../drivers/touch/G379/source/power291.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/protocol293.h`](../drivers/touch/G379/source/protocol293.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/vhf291.c`](../drivers/touch/G379/source/vhf291.c) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/source/vhf291.h`](../drivers/touch/G379/source/vhf291.h) — Current G379 linked 23-TU touch/key driver local include closure; includes G100 bus/key core and fixed binding
+- [`drivers/touch/G379/OpenG98.inf`](../drivers/touch/G379/OpenG98.inf) — Current touch package source identity
+- [`drivers/parent/G746/source/binding.h`](../drivers/parent/G746/source/binding.h) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/core/g102_core.c`](../drivers/parent/G746/source/core/g102_core.c) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/core/g102_core.h`](../drivers/parent/G746/source/core/g102_core.h) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/core/g102_resources.h`](../drivers/parent/G746/source/core/g102_resources.h) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/core/g104_core.c`](../drivers/parent/G746/source/core/g104_core.c) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/core/g104_core.h`](../drivers/parent/G746/source/core/g104_core.h) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/core/g104_policy.h`](../drivers/parent/G746/source/core/g104_policy.h) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/core/g111_core.c`](../drivers/parent/G746/source/core/g111_core.c) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/core/g111_core.h`](../drivers/parent/G746/source/core/g111_core.h) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/driver.c`](../drivers/parent/G746/source/driver.c) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/identity.inc`](../drivers/parent/G746/source/identity.inc) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/open_parent_interface.h`](../drivers/parent/G746/source/open_parent_interface.h) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/os_identity.c`](../drivers/parent/G746/source/os_identity.c) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/os_identity.h`](../drivers/parent/G746/source/os_identity.h) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/parent_clock_data_policy.h`](../drivers/parent/G746/source/parent_clock_data_policy.h) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/protocol.h`](../drivers/parent/G746/source/protocol.h) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/resources.c`](../drivers/parent/G746/source/resources.c) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/resources.h`](../drivers/parent/G746/source/resources.h) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/sensor.c`](../drivers/parent/G746/source/sensor.c) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/source/sensor.h`](../drivers/parent/G746/source/sensor.h) — Current installed G746 clock-only parent seven-TU source/include closure
+- [`drivers/parent/G746/OpenParent.inf`](../drivers/parent/G746/OpenParent.inf) — Current parent .746 package identity
+- [`firmware/G203Pkg/CoverHandoff/CoverHandoffG203.inf`](../firmware/G203Pkg/CoverHandoff/CoverHandoffG203.inf) — Small G203 authored standalone DXE overlay; upstream MU tree excluded
+- [`firmware/G203Pkg/CoverHandoff/G203Dispatch.h`](../firmware/G203Pkg/CoverHandoff/G203Dispatch.h) — Small G203 authored standalone DXE overlay; upstream MU tree excluded
+- [`firmware/G203Pkg/CoverHandoff/G203Driver.c`](../firmware/G203Pkg/CoverHandoff/G203Driver.c) — Small G203 authored standalone DXE overlay; upstream MU tree excluded
+- [`firmware/G203Pkg/CoverHandoff/OPCHG203.asl`](../firmware/G203Pkg/CoverHandoff/OPCHG203.asl) — Small G203 authored standalone DXE overlay; upstream MU tree excluded
+- [`firmware/G203Pkg/CoverHandoff/OpenCoverHandoff.c`](../firmware/G203Pkg/CoverHandoff/OpenCoverHandoff.c) — Small G203 authored standalone DXE overlay; upstream MU tree excluded
+- [`firmware/G203Pkg/CoverHandoff/OpenSha256.h`](../firmware/G203Pkg/CoverHandoff/OpenSha256.h) — Small G203 authored standalone DXE overlay; upstream MU tree excluded
+- [`firmware/G203Pkg/CoverHandoff/g201_binding.h`](../firmware/G203Pkg/CoverHandoff/g201_binding.h) — Small G203 authored standalone DXE overlay; upstream MU tree excluded
+- [`firmware/G203Pkg/CoverHandoff/g201_handoff.c`](../firmware/G203Pkg/CoverHandoff/g201_handoff.c) — Small G203 authored standalone DXE overlay; upstream MU tree excluded
+- [`firmware/G203Pkg/CoverHandoff/g201_handoff.h`](../firmware/G203Pkg/CoverHandoff/g201_handoff.h) — Small G203 authored standalone DXE overlay; upstream MU tree excluded
+- [`firmware/G203Pkg/CoverHandoff/g201_plan.h`](../firmware/G203Pkg/CoverHandoff/g201_plan.h) — Small G203 authored standalone DXE overlay; upstream MU tree excluded
+- [`firmware/G203Pkg/CoverHandoff/g201_report_aml.h`](../firmware/G203Pkg/CoverHandoff/g201_report_aml.h) — Small G203 authored standalone DXE overlay; upstream MU tree excluded
+- [`firmware/G203Pkg/G203Standalone.dsc`](../firmware/G203Pkg/G203Standalone.dsc) — Small G203 authored standalone DXE overlay; upstream MU tree excluded
+- [`firmware/G203Pkg/MemoryMap/PlatformMemoryMapLib.c`](../firmware/G203Pkg/MemoryMap/PlatformMemoryMapLib.c) — Small G203 authored standalone DXE overlay; upstream MU tree excluded
+- [`firmware/G203Pkg/MemoryMap/PlatformMemoryMapLib.inf`](../firmware/G203Pkg/MemoryMap/PlatformMemoryMapLib.inf) — Small G203 authored standalone DXE overlay; upstream MU tree excluded
+- [`firmware/G736r2/G290Pkg/ClockPins.h`](../firmware/G736r2/G290Pkg/ClockPins.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/G290GpuPower.c`](../firmware/G736r2/G290Pkg/G290GpuPower.c) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/G290GpuPower.inf`](../firmware/G736r2/G290Pkg/G290GpuPower.inf) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/G290GpuSsdt.h`](../firmware/G736r2/G290Pkg/G290GpuSsdt.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/G290Pkg.dec`](../firmware/G736r2/G290Pkg/G290Pkg.dec) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/G417LoadedBase.h`](../firmware/G736r2/G290Pkg/G417LoadedBase.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/G465Ddr.h`](../firmware/G736r2/G290Pkg/G465Ddr.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/G467Ddr.c`](../firmware/G736r2/G290Pkg/G467Ddr.c) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/G467Ddr.h`](../firmware/G736r2/G290Pkg/G467Ddr.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/G467DdrPins.h`](../firmware/G736r2/G290Pkg/G467DdrPins.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/G530Lease.c`](../firmware/G736r2/G290Pkg/G530Lease.c) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/G530Lease.h`](../firmware/G736r2/G290Pkg/G530Lease.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/G535Gpu.dsc`](../firmware/G736r2/G290Pkg/G535Gpu.dsc) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/Include/Protocol/EFIClock.h`](../firmware/G736r2/G290Pkg/Include/Protocol/EFIClock.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/OpenSha256.h`](../firmware/G736r2/G290Pkg/OpenSha256.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/g290_power_report.h`](../firmware/G736r2/G290Pkg/g290_power_report.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/g323_clock_policy.h`](../firmware/G736r2/G290Pkg/g323_clock_policy.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/g335_cx_context.h`](../firmware/G736r2/G290Pkg/g335_cx_context.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/g335_hub_report.h`](../firmware/G736r2/G290Pkg/g335_hub_report.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/g366_external_report.h`](../firmware/G736r2/G290Pkg/g366_external_report.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/G736r2/G290Pkg/g400_gpll0_policy.h`](../firmware/G736r2/G290Pkg/g400_gpll0_policy.h) — Actual current bootstrap/power-prefix module source; r2 removes GX collapse/de-collapse block
+- [`firmware/abi7/G289Pkg/G289Pkg.dec`](../firmware/abi7/G289Pkg/G289Pkg.dec) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/G289Wlan.dsc`](../firmware/abi7/G289Pkg/G289Wlan.dsc) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Include/Protocol/EFIClock.h`](../firmware/abi7/G289Pkg/Include/Protocol/EFIClock.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Include/Protocol/EFITlmm.h`](../firmware/abi7/G289Pkg/Include/Protocol/EFITlmm.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/G289Crt.c`](../firmware/abi7/G289Pkg/Wlan/G289Crt.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/G289Driver.c`](../firmware/abi7/G289Pkg/Wlan/G289Driver.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/G289Report.h`](../firmware/abi7/G289Pkg/Wlan/G289Report.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/G289Wlan.inf`](../firmware/abi7/G289Pkg/Wlan/G289Wlan.inf) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/G401ExpectedMcfg.h`](../firmware/abi7/G289Pkg/Wlan/G401ExpectedMcfg.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/G401Publish.c`](../firmware/abi7/G289Pkg/Wlan/G401Publish.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/G401Publish.h`](../firmware/abi7/G289Pkg/Wlan/G401Publish.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/G403TableData.h`](../firmware/abi7/G289Pkg/Wlan/G403TableData.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/WIFI401Aml.h`](../firmware/abi7/G289Pkg/Wlan/WIFI401Aml.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g200_borrowed_rate.c`](../firmware/abi7/G289Pkg/Wlan/g200_borrowed_rate.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g200_clock.c`](../firmware/abi7/G289Pkg/Wlan/g200_clock.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g200_clock.h`](../firmware/abi7/G289Pkg/Wlan/g200_clock.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g200_gcc_controls.c`](../firmware/abi7/G289Pkg/Wlan/g200_gcc_controls.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g200_phy_plan.h`](../firmware/abi7/G289Pkg/Wlan/g200_phy_plan.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g200_uefi_bind.c`](../firmware/abi7/G289Pkg/Wlan/g200_uefi_bind.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g200_uefi_gcc_bind.c`](../firmware/abi7/G289Pkg/Wlan/g200_uefi_gcc_bind.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g202_efi_pins_bind.c`](../firmware/abi7/G289Pkg/Wlan/g202_efi_pins_bind.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g202_efi_qmp_bind.c`](../firmware/abi7/G289Pkg/Wlan/g202_efi_qmp_bind.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g202_efi_rail_bind.c`](../firmware/abi7/G289Pkg/Wlan/g202_efi_rail_bind.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g202_pdc_frames.h`](../firmware/abi7/G289Pkg/Wlan/g202_pdc_frames.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g202_pins.c`](../firmware/abi7/G289Pkg/Wlan/g202_pins.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g202_pins.h`](../firmware/abi7/G289Pkg/Wlan/g202_pins.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g202_qmp.c`](../firmware/abi7/G289Pkg/Wlan/g202_qmp.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g202_qmp.h`](../firmware/abi7/G289Pkg/Wlan/g202_qmp.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g202_rail_calls.c`](../firmware/abi7/G289Pkg/Wlan/g202_rail_calls.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g202_rpmh_abi.h`](../firmware/abi7/G289Pkg/Wlan/g202_rpmh_abi.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g289_boot_votes.c`](../firmware/abi7/G289Pkg/Wlan/g289_boot_votes.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g289_boot_votes.h`](../firmware/abi7/G289Pkg/Wlan/g289_boot_votes.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g289_efi_npa.c`](../firmware/abi7/G289Pkg/Wlan/g289_efi_npa.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g289_rc0.c`](../firmware/abi7/G289Pkg/Wlan/g289_rc0.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g289_rc0.h`](../firmware/abi7/G289Pkg/Wlan/g289_rc0.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g401_transport.c`](../firmware/abi7/G289Pkg/Wlan/g401_transport.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g401_transport.h`](../firmware/abi7/G289Pkg/Wlan/g401_transport.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g403_platform.h`](../firmware/abi7/G289Pkg/Wlan/g403_platform.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g403_sid.c`](../firmware/abi7/G289Pkg/Wlan/g403_sid.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g403_tables.c`](../firmware/abi7/G289Pkg/Wlan/g403_tables.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g735_sid_guard.c`](../firmware/abi7/G289Pkg/Wlan/g735_sid_guard.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g735_smmu_identity.c`](../firmware/abi7/G289Pkg/Wlan/g735_smmu_identity.c) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/abi7/G289Pkg/Wlan/g735_smmu_identity.h`](../firmware/abi7/G289Pkg/Wlan/g735_smmu_identity.h) — Actual current WLAN ABI7 DXE overlay preserved in G991/9906 image
+- [`firmware/G991/OpenOwnerPkg/Gpu0.h`](../firmware/G991/OpenOwnerPkg/Gpu0.h) — Current GPU/MMU ACPI publisher source, five/six memory grants and three exclusive IRQs
+- [`firmware/G991/OpenOwnerPkg/IortLevel.h`](../firmware/G991/OpenOwnerPkg/IortLevel.h) — Current GPU/MMU ACPI publisher source, five/six memory grants and three exclusive IRQs
+- [`firmware/G991/OpenOwnerPkg/IortOriginal.h`](../firmware/G991/OpenOwnerPkg/IortOriginal.h) — Current GPU/MMU ACPI publisher source, five/six memory grants and three exclusive IRQs
+- [`firmware/G991/OpenOwnerPkg/Mmu1.h`](../firmware/G991/OpenOwnerPkg/Mmu1.h) — Current GPU/MMU ACPI publisher source, five/six memory grants and three exclusive IRQs
+- [`firmware/G991/OpenOwnerPkg/Owner.dsc`](../firmware/G991/OpenOwnerPkg/Owner.dsc) — Current GPU/MMU ACPI publisher source, five/six memory grants and three exclusive IRQs
+- [`firmware/G991/OpenOwnerPkg/Publish.c`](../firmware/G991/OpenOwnerPkg/Publish.c) — Current GPU/MMU ACPI publisher source, five/six memory grants and three exclusive IRQs
+- [`firmware/G991/OpenOwnerPkg/Publish.inf`](../firmware/G991/OpenOwnerPkg/Publish.inf) — Current GPU/MMU ACPI publisher source, five/six memory grants and three exclusive IRQs
+- [`firmware/G1245/QueryPkg/OpenSha256.h`](../firmware/G1245/QueryPkg/OpenSha256.h) — Actual booted outer9906 query-only module; identity guard bug means no SIP called
+- [`firmware/G1245/QueryPkg/Query.c`](../firmware/G1245/QueryPkg/Query.c) — Actual booted outer9906 query-only module; identity guard bug means no SIP called
+- [`firmware/G1245/QueryPkg/Query.dec`](../firmware/G1245/QueryPkg/Query.dec) — Actual booted outer9906 query-only module; identity guard bug means no SIP called
+- [`firmware/G1245/QueryPkg/Query.dsc`](../firmware/G1245/QueryPkg/Query.dsc) — Actual booted outer9906 query-only module; identity guard bug means no SIP called
+- [`firmware/G1245/QueryPkg/Query.inf`](../firmware/G1245/QueryPkg/Query.inf) — Actual booted outer9906 query-only module; identity guard bug means no SIP called
+- [`firmware/G1245/QueryPkg/ScmIdentity.h`](../firmware/G1245/QueryPkg/ScmIdentity.h) — Actual booted outer9906 query-only module; identity guard bug means no SIP called
+- [`firmware/G1245r2/QueryPkg/OpenSha256.h`](../firmware/G1245r2/QueryPkg/OpenSha256.h) — Corrected e_lfanew e58 source, built/reviewed but not booted
+- [`firmware/G1245r2/QueryPkg/Query.c`](../firmware/G1245r2/QueryPkg/Query.c) — Corrected e_lfanew e58 source, built/reviewed but not booted
+- [`firmware/G1245r2/QueryPkg/Query.dec`](../firmware/G1245r2/QueryPkg/Query.dec) — Corrected e_lfanew e58 source, built/reviewed but not booted
+- [`firmware/G1245r2/QueryPkg/Query.dsc`](../firmware/G1245r2/QueryPkg/Query.dsc) — Corrected e_lfanew e58 source, built/reviewed but not booted
+- [`firmware/G1245r2/QueryPkg/Query.inf`](../firmware/G1245r2/QueryPkg/Query.inf) — Corrected e_lfanew e58 source, built/reviewed but not booted
+- [`firmware/G1245r2/QueryPkg/ScmIdentity.h`](../firmware/G1245r2/QueryPkg/ScmIdentity.h) — Corrected e_lfanew e58 source, built/reviewed but not booted
+- [`firmware/G991/Mmu1.asl`](../firmware/G991/Mmu1.asl) — Current MMU1 AML source, IRQ709 appended after705/711
+- [`firmware/recipes/gpu-cp-irq709-firmware-G991/build.py`](../firmware/recipes/gpu-cp-irq709-firmware-G991/build.py) — Offline build/package recipe reference; workspace paths and dependency seams must be parameterized before claiming portable rebuild
+- [`firmware/recipes/gpu-cp-irq709-firmware-G991/package.py`](../firmware/recipes/gpu-cp-irq709-firmware-G991/package.py) — Offline build/package recipe reference; workspace paths and dependency seams must be parameterized before claiming portable rebuild
+- [`firmware/config/gpu-cp-irq709-firmware-G991/target.txt`](../firmware/config/gpu-cp-irq709-firmware-G991/target.txt) — Actual build configuration overlay; sanitize machine-specific tool paths, exclude cache
+- [`firmware/config/gpu-cp-irq709-firmware-G991/tools_def.txt`](../firmware/config/gpu-cp-irq709-firmware-G991/tools_def.txt) — Actual build configuration overlay; sanitize machine-specific tool paths, exclude cache
+- [`firmware/config/gpu-cp-irq709-firmware-G991/build_rule.txt`](../firmware/config/gpu-cp-irq709-firmware-G991/build_rule.txt) — Actual build configuration overlay; sanitize machine-specific tool paths, exclude cache
+- [`firmware/recipes/gpu-aperture-query-G1245/build.py`](../firmware/recipes/gpu-aperture-query-G1245/build.py) — Offline build/package recipe reference; workspace paths and dependency seams must be parameterized before claiming portable rebuild
+- [`firmware/recipes/gpu-aperture-query-G1245/package.py`](../firmware/recipes/gpu-aperture-query-G1245/package.py) — Offline build/package recipe reference; workspace paths and dependency seams must be parameterized before claiming portable rebuild
+- [`firmware/config/gpu-aperture-query-G1245/target.txt`](../firmware/config/gpu-aperture-query-G1245/target.txt) — Actual build configuration overlay; sanitize machine-specific tool paths, exclude cache
+- [`firmware/config/gpu-aperture-query-G1245/tools_def.txt`](../firmware/config/gpu-aperture-query-G1245/tools_def.txt) — Actual build configuration overlay; sanitize machine-specific tool paths, exclude cache
+- [`firmware/config/gpu-aperture-query-G1245/build_rule.txt`](../firmware/config/gpu-aperture-query-G1245/build_rule.txt) — Actual build configuration overlay; sanitize machine-specific tool paths, exclude cache
+- [`firmware/recipes/gpu-aperture-query-G1245r2/build.py`](../firmware/recipes/gpu-aperture-query-G1245r2/build.py) — Offline build/package recipe reference; workspace paths and dependency seams must be parameterized before claiming portable rebuild
+- [`firmware/recipes/gpu-aperture-query-G1245r2/package.py`](../firmware/recipes/gpu-aperture-query-G1245r2/package.py) — Offline build/package recipe reference; workspace paths and dependency seams must be parameterized before claiming portable rebuild
+- [`firmware/config/gpu-aperture-query-G1245r2/target.txt`](../firmware/config/gpu-aperture-query-G1245r2/target.txt) — Actual build configuration overlay; sanitize machine-specific tool paths, exclude cache
+- [`firmware/config/gpu-aperture-query-G1245r2/tools_def.txt`](../firmware/config/gpu-aperture-query-G1245r2/tools_def.txt) — Actual build configuration overlay; sanitize machine-specific tool paths, exclude cache
+- [`firmware/config/gpu-aperture-query-G1245r2/build_rule.txt`](../firmware/config/gpu-aperture-query-G1245r2/build_rule.txt) — Actual build configuration overlay; sanitize machine-specific tool paths, exclude cache
+- [`firmware/recipes/wifi-gpu-combined-abi7/build_dxe.py`](../firmware/recipes/wifi-gpu-combined-abi7/build_dxe.py) — Offline build/package recipe reference; workspace paths and dependency seams must be parameterized before claiming portable rebuild
+- [`firmware/recipes/wifi-gpu-combined-abi7/package.py`](../firmware/recipes/wifi-gpu-combined-abi7/package.py) — Offline build/package recipe reference; workspace paths and dependency seams must be parameterized before claiming portable rebuild
+- [`firmware/config/wifi-gpu-combined-abi7/target.txt`](../firmware/config/wifi-gpu-combined-abi7/target.txt) — Actual build configuration overlay; sanitize machine-specific tool paths, exclude cache
+- [`firmware/config/wifi-gpu-combined-abi7/tools_def.txt`](../firmware/config/wifi-gpu-combined-abi7/tools_def.txt) — Actual build configuration overlay; sanitize machine-specific tool paths, exclude cache
+- [`firmware/config/wifi-gpu-combined-abi7/build_rule.txt`](../firmware/config/wifi-gpu-combined-abi7/build_rule.txt) — Actual build configuration overlay; sanitize machine-specific tool paths, exclude cache
+- [`firmware/packaging-support/inventory-fd.py`](../firmware/packaging-support/inventory-fd.py) — Source dependency of actual firmware structural packaging parsers; contains no original OEM binary
+- [`firmware/packaging-support/audit-image.py`](../firmware/packaging-support/audit-image.py) — Source dependency of actual firmware structural packaging parsers; contains no original OEM binary
+- [`drivers/gpu/gpu-a740-kmd-G741/source/a740_backend.h`](../drivers/gpu/gpu-a740-kmd-G741/source/a740_backend.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/source/a740_hal.c`](../drivers/gpu/gpu-a740-kmd-G741/source/a740_hal.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/source/a740_hal.h`](../drivers/gpu/gpu-a740-kmd-G741/source/a740_hal.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/source/a740_power.c`](../drivers/gpu/gpu-a740-kmd-G741/source/a740_power.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/source/ddi.c`](../drivers/gpu/gpu-a740-kmd-G741/source/ddi.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/source/disp.c`](../drivers/gpu/gpu-a740-kmd-G741/source/disp.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/source/eng.c`](../drivers/gpu/gpu-a740-kmd-G741/source/eng.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/source/g290_power_report.h`](../drivers/gpu/gpu-a740-kmd-G741/source/g290_power_report.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/source/hw.c`](../drivers/gpu/gpu-a740-kmd-G741/source/hw.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/source/log.c`](../drivers/gpu/gpu-a740-kmd-G741/source/log.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/source/msm.c`](../drivers/gpu/gpu-a740-kmd-G741/source/msm.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/source/msm_drm_k.h`](../drivers/gpu/gpu-a740-kmd-G741/source/msm_drm_k.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/source/probe_entry.c`](../drivers/gpu/gpu-a740-kmd-G741/source/probe_entry.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/source/tgpu.h`](../drivers/gpu/gpu-a740-kmd-G741/source/tgpu.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/source/topazgpu_escape.h`](../drivers/gpu/gpu-a740-kmd-G741/source/topazgpu_escape.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-a740-kmd-G741/g741-hal.patch`](../drivers/gpu/gpu-a740-kmd-G741/g741-hal.patch) — Narrow source delta provenance
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/OpenSha256.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/OpenSha256.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/a740_backend.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/a740_backend.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/a740_hal.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/a740_hal.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/a740_hal.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/a740_hal.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/a740_power.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/a740_power.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/ddi.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/ddi.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/disp.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/disp.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/eng.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/eng.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g190_backend.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/g190_backend.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g190_backend.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g190_backend.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g191_stock_gmu_profile.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g191_stock_gmu_profile.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g196_pins.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g196_pins.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g196_preflight.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/g196_preflight.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g196_preflight.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g196_preflight.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g290_power_report.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g290_power_report.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g321_plan.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/g321_plan.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g321_plan.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g321_plan.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g321_runtime.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/g321_runtime.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g321_runtime.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g321_runtime.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g323_clock_policy.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g323_clock_policy.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g433_cp.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/g433_cp.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g433_cp.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g433_cp.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g433_runtime.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/g433_runtime.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g433_runtime.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g433_runtime.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g433_sqe_pin.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g433_sqe_pin.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g440_gpu_power.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/g440_gpu_power.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g440_gpu_power.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g440_gpu_power.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g456_hwinit.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/g456_hwinit.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g456_hwinit.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g456_hwinit.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g456_tables.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g456_tables.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g482_board.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/g482_board.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g482_board.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g482_board.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g482_resources.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/g482_resources.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g482_resources.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g482_resources.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/g482_rsc_pin.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/g482_rsc_pin.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/hw.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/hw.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/log.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/log.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/msm.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/msm.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/msm_drm_k.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/msm_drm_k.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/msm_validate.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/msm_validate.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/tgpu.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/tgpu.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/topazgpu_escape.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/topazgpu_escape.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/vendor/AdrenoFirmware.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/vendor/AdrenoFirmware.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/vendor/AdrenoFirmware.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/vendor/AdrenoFirmware.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/vendor/AdrenoHfiEncode.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/vendor/AdrenoHfiEncode.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/vendor/AdrenoHfiEncode.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/vendor/AdrenoHfiEncode.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/vendor/AdrenoPM4-LICENSE`](../drivers/gpu/gpu-wddm-bridge-G779/source/vendor/AdrenoPM4-LICENSE) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/vendor/AdrenoPM4.c`](../drivers/gpu/gpu-wddm-bridge-G779/source/vendor/AdrenoPM4.c) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/vendor/AdrenoPM4.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/vendor/AdrenoPM4.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/vendor/LICENSE`](../drivers/gpu/gpu-wddm-bridge-G779/source/vendor/LICENSE) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/vendor/NativeAdreno-LICENSE`](../drivers/gpu/gpu-wddm-bridge-G779/source/vendor/NativeAdreno-LICENSE) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/source/vendor/NativeAdrenoPwrupRegs.h`](../drivers/gpu/gpu-wddm-bridge-G779/source/vendor/NativeAdrenoPwrupRegs.h) — Retained WDDM source checkpoint; not connected to a qualified real A740 CP provider
+- [`drivers/gpu/gpu-wddm-bridge-G779/G779-BRIDGE.patch`](../drivers/gpu/gpu-wddm-bridge-G779/G779-BRIDGE.patch) — Narrow source delta provenance
+- [`userspace/mesa-G739/final-tracked.patch`](../userspace/mesa-G739/final-tracked.patch) — Complete tracked overlay against Mesa62f1e49a1eb3a408f748725326fe53447887f97d; do not also apply baseline/delta patches
+- [`userspace/mesa-G739/overlay/src/freedreno/drm/wddm/fd_wddm.c`](../userspace/mesa-G739/overlay/src/freedreno/drm/wddm/fd_wddm.c) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/overlay/src/freedreno/drm/wddm/fd_wddm_compat.h`](../userspace/mesa-G739/overlay/src/freedreno/drm/wddm/fd_wddm_compat.h) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/arpa/inet.h`](../userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/arpa/inet.h) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/ftw.h`](../userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/ftw.h) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/poll.h`](../userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/poll.h) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/pthread.h`](../userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/pthread.h) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/sys/ioccom.h`](../userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/sys/ioccom.h) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/sys/ioctl.h`](../userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/sys/ioctl.h) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/sys/mman.h`](../userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/sys/mman.h) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/sys/syscall.h`](../userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/sys/syscall.h) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/sys/sysinfo.h`](../userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/sys/sysinfo.h) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/unistd.h`](../userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/unistd.h) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/xf86drm.h`](../userspace/mesa-G739/overlay/src/freedreno/drm/wddm/include/xf86drm.h) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/overlay/src/freedreno/drm/wddm/topazgpu_escape.h`](../userspace/mesa-G739/overlay/src/freedreno/drm/wddm/topazgpu_escape.h) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/overlay/src/gallium/frontends/d3d10umd/topaz_wddm.cpp`](../userspace/mesa-G739/overlay/src/gallium/frontends/d3d10umd/topaz_wddm.cpp) — Exact final-untracked WDDM shim/header source corresponding to G739 compiled UMD
+- [`userspace/mesa-G739/license.rst`](../userspace/mesa-G739/license.rst) — Mesa per-component licensing; upstream files retain notices
+- [`firmware/licenses/mu_aloha_platforms-LICENSE`](../firmware/licenses/mu_aloha_platforms-LICENSE) — Upstream root license retained separately from MU_BASECORE BSD-2-Clause-Patent
+- [`firmware/licenses/MU_BASECORE-License.txt`](../firmware/licenses/MU_BASECORE-License.txt) — Upstream MU_BASECORE license
+- [`firmware/G991/Gpu0.asl`](../firmware/G991/Gpu0.asl) — Unchanged GPU0 AML source corresponding to embedded G991 Gpu0.h; source not compiled AML binary

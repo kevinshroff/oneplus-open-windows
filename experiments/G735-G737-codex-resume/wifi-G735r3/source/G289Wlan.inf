@@ -1,0 +1,53 @@
+[Defines]
+ INF_VERSION = 0x00010017
+ BASE_NAME = WlanBringupG622
+ FILE_GUID = 82f10622-a583-4e53-87da-2d41b22aa622
+ MODULE_TYPE = DXE_DRIVER
+ VERSION_STRING = 622.1
+ ENTRY_POINT = G289DriverEntry
+[Sources]
+  g735_smmu_identity.c
+  g735_sid_guard.c
+ G289Crt.c
+ G289Driver.c
+ g200_clock.c
+ g200_borrowed_rate.c
+ g200_gcc_controls.c
+ g200_uefi_bind.c
+ g200_uefi_gcc_bind.c
+ g202_efi_pins_bind.c
+ g202_efi_qmp_bind.c
+ g202_efi_rail_bind.c
+ g202_pins.c
+ g202_qmp.c
+ g202_rail_calls.c
+ g289_boot_votes.c
+ g289_efi_npa.c
+ g289_rc0.c
+ g401_transport.c
+ G401Publish.c
+ g403_sid.c
+ g403_tables.c
+[Packages]
+ MdePkg/MdePkg.dec
+ MdeModulePkg/MdeModulePkg.dec
+ ArmPkg/ArmPkg.dec
+ G289Pkg/G289Pkg.dec
+[LibraryClasses]
+ UefiDriverEntryPoint
+ UefiBootServicesTableLib
+ DxeServicesTableLib
+ BaseLib
+ BaseMemoryLib
+ ArmLib
+ IoLib
+ TimerLib
+[Guids]
+ gEfiEventReadyToBootGuid
+ gEfiEventExitBootServicesGuid
+[Protocols]
+ gEfiAcpiSdtProtocolGuid
+ gEfiAcpiTableProtocolGuid
+ gEfiBdsArchProtocolGuid
+[Depex]
+ gEfiAcpiTableProtocolGuid AND gEfiBdsArchProtocolGuid

@@ -1,0 +1,39 @@
+/* SPDX-License-Identifier: MIT
+ * Ten-contact parallel touchscreen transport. Logical axes are provisional
+ * panel units. Physical maxima 145x135 mm follow the pinned inner-panel DTB
+ * and dsi_panel.c millimetre contract. Edge calibration remains provisional.
+ * G95HID replays saved contacts solely into an owned Windows receiver window.
+ */
+#include "g95hid_report.h"
+#define FINGER \
+ 0x05,0x0d,0x09,0x22,0xa1,0x02, \
+ 0x09,0x42,0x09,0x47,0x15,0,0x25,1,0x75,1,0x95,2,0x81,2, \
+ 0x75,6,0x95,1,0x81,3, \
+ 0x09,0x51,0x15,0,0x25,15,0x75,8,0x95,1,0x81,2, \
+ 0xa4,0x05,1,0x09,0x30,0x15,0,0x26,0x98,0x58,0x35,0,0x46,0xaa,5,0x65,0x11,0x55,0x0e,0x75,16,0x95,1,0x81,2, \
+ 0x09,0x31,0x26,0x50,0x5f,0x46,0x46,5,0x81,2,0xb4,0xc0
+uint8_t G95HIDDescriptor[]={
+ 0x05,0x0d,0x09,4,0xa1,1,0x85,1,
+ FINGER,FINGER,FINGER,FINGER,FINGER,FINGER,FINGER,FINGER,FINGER,FINGER,
+ 0x05,0x0d,0x09,0x56,0x55,0x0c,0x66,1,0x10,0x15,0,0x27,0xff,0xff,0,0,0x75,16,0x95,1,0x81,2,
+ 0x55,0,0x65,0,0x09,0x54,0x15,0,0x25,10,0x75,8,0x95,1,0x81,2,
+ 0x85,2,0x09,0x55,0x15,0,0x25,10,0x75,8,0x95,1,0xb1,2,0xc0
+};
+const uint32_t G95HIDDescriptorBytes=sizeof(G95HIDDescriptor);
+void G95HIDEmptyReport(uint8_t*out,uint16_t scan)
+{
+ uint32_t i;for(i=0;i<G95HID_REPORT_BYTES;i++)out[i]=0;out[0]=1;
+ for(i=0;i<G95HID_CONTACTS;i++)out[2+i*6]=(uint8_t)i;
+ out[61]=(uint8_t)scan;out[62]=(uint8_t)(scan>>8);
+}
+int G95HIDIsEmptyReport(const uint8_t*p,uint32_t n)
+{
+ uint32_t i;if(!p||n!=G95HID_REPORT_BYTES||p[0]!=1||p[63]!=0)return 0;
+ for(i=0;i<G95HID_CONTACTS;i++)if(p[1+i*6]||p[2+i*6]!=i||p[3+i*6]||p[4+i*6]||p[5+i*6]||p[6+i*6])return 0;
+ return 1;
+}
+int G95HIDGetFeature(uint8_t id,uint8_t*out,uint32_t capacity,uint32_t*written)
+{
+ if(!written)return 0;*written=0;if(id!=2||!out||capacity<2)return 0;
+ out[0]=2;out[1]=G95HID_CONTACTS;*written=2;return 1;
+}

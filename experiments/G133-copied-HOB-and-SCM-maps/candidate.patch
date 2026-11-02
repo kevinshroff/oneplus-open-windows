@@ -1,0 +1,155 @@
+--- a/Platforms/AndromedaPkg/Library/DeviceBootManagerLib/OpenKernelFootprint.c
++++ b/Platforms/AndromedaPkg/Library/DeviceBootManagerLib/OpenKernelFootprint.c
+@@ -2 +2 @@
+-  G131 inventory of a proposed DSP staging window. No mapping or region writes,
++  G133 inventory of a proposed DSP staging window. No mapping or region writes,
+@@ -24,0 +25 @@
++#define HOB_BYTES (1024U * 1024U)
+@@ -26,0 +28 @@
++STATIC EFI_GUID mScmInventory = {0x77ed108d,0x8524,0x4b8b,{0x9d,0x2e,0x34,0x98,0x7a,0xec,0xb9,0xc1}};
+@@ -38 +40 @@
+-  R ("K131_object %a base=%lx bytes=%lx valid_range=%u overlap=%u\n", Name,
++  R ("K133_object %a base=%lx bytes=%lx valid_range=%u overlap=%u\n", Name,
+@@ -47,0 +50 @@
++  EFI_GCD_MEMORY_SPACE_DESCRIPTOR ScmGcd;
+@@ -56 +59 @@
+-  VOID *HobBase;
++  VOID *HobBase, *Scm = NULL;
+@@ -58 +61,2 @@
+-  UINTN HobBytes = 0, Hobs = 0, ImageFailures = 0, ImageOverlaps = 0, HobEndAddress = 0;
++  UINTN HobBytes = 0, Hobs = 0, ImageFailures = 0, ImageOverlaps = 0;
++  UINTN HobLimit = 0, HobMatches = 0, ScmMatches = 0, ScmSlot = 0;
+@@ -64 +68 @@
+-  if (mRan) { R ("K131_ERROR duplicate_call no_PAS=1\n"); return; }
++  if (mRan) { R ("K133_ERROR duplicate_call no_PAS=1\n"); return; }
+@@ -66,2 +70,2 @@
+-  R ("OPEN-KERNEL-FOOTPRINT G131 version=1\n");
+-  R ("K131_proposed dtb=A9F80000:80000 main=AA000000:4880000 region_writes=0 PAS_requests=0\n");
++  R ("OPEN-KERNEL-FOOTPRINT G133 version=1\n");
++  R ("K133_proposed dtb=A9F80000:80000 main=AA000000:4880000 region_writes=0 PAS_requests=0\n");
+@@ -76 +80 @@
+-      R ("K131_compiled base=%lx bytes=%lx hob=%u resource=%u memtype=%u cap=%lx arm=%lx exact_bounds=%u\n",
++      R ("K133_compiled base=%lx bytes=%lx hob=%u resource=%u memtype=%u cap=%lx arm=%lx exact_bounds=%u\n",
+@@ -84 +88 @@
+-  R ("K131_compiled_matches=%lu\n", (UINT64)Count);
++  R ("K133_compiled_matches=%lu\n", (UINT64)Count);
+@@ -88 +92 @@
+-  R ("K131_gcd_status=%r count=%lu\n", Status, (UINT64)Count);
++  R ("K133_gcd_status=%r count=%lu\n", Status, (UINT64)Count);
+@@ -96 +100 @@
+-      R ("K131_gcd base=%lx bytes=%lx type=%u cap=%lx attr=%lx image=%p device=%p\n",
++      R ("K133_gcd base=%lx bytes=%lx type=%u cap=%lx attr=%lx image=%p device=%p\n",
+@@ -100 +104 @@
+-    R ("K131_gcd_overlaps=%lu\n", (UINT64)Rows);
++    R ("K133_gcd_overlaps=%lu\n", (UINT64)Rows);
+@@ -103,0 +108,20 @@
++  /* Query the original callback slot's published maps, never the callback or
++     table contents. OPAS independently binds its image/protocol identity. */
++  Status = gBS->LocateProtocol (&mScmInventory, NULL, &Scm);
++  if (Status != EFI_SUCCESS || Scm == NULL || (UINTN)Scm > MAX_UINTN-64) { Complete = FALSE; }
++  else { ScmSlot = (UINTN)Scm+56; }
++  R ("K133_scm locate=%r table=%p slot=%lx table_reads=0 hook_writes=0\n", Status, Scm, (UINT64)ScmSlot);
++  if (ScmSlot != 0) {
++    Status = gDS->GetMemorySpaceDescriptor (ScmSlot, &ScmGcd);
++    R ("K133_scm_gcd_status=%r\n", Status);
++    if (Status != EFI_SUCCESS) { Complete = FALSE; }
++    else {
++      R ("K133_scm_gcd base=%lx bytes=%lx type=%u cap=%lx attr=%lx\n",
++        ScmGcd.BaseAddress, ScmGcd.Length, ScmGcd.GcdMemoryType, ScmGcd.Capabilities, ScmGcd.Attributes);
++      if (ScmGcd.GcdMemoryType != EfiGcdMemoryTypeSystemMemory ||
++          ScmGcd.BaseAddress > MAX_UINT64-ScmGcd.Length || ScmGcd.BaseAddress > ScmSlot ||
++          ScmGcd.Length < 8 || ScmSlot-ScmGcd.BaseAddress > ScmGcd.Length-8) { Complete = FALSE; }
++    }
++  }
++
++  HobBase = GetHobList ();
+@@ -109 +133 @@
+-    R ("K131_efi_status=%r bytes=%lu stride=%lu version=%u\n", Status, (UINT64)Size, (UINT64)Stride, Version);
++    R ("K133_efi_status=%r bytes=%lu stride=%lu version=%u\n", Status, (UINT64)Size, (UINT64)Stride, Version);
+@@ -117,0 +142,15 @@
++        if (HobBase != NULL && D->PhysicalStart <= (UINTN)HobBase && (UINTN)HobBase-D->PhysicalStart < Bytes) {
++          HobMatches++;
++          R ("K133_hob_storage base=%lx pages=%lx type=%u attr=%lx\n",
++            D->PhysicalStart, D->NumberOfPages, D->Type, D->Attribute);
++          if (D->Type == EfiBootServicesData) {
++            UINT64 Room = D->PhysicalStart+Bytes-(UINTN)HobBase;
++            HobLimit = (UINTN)HobBase+(UINTN)(Room > HOB_BYTES ? HOB_BYTES : Room);
++          }
++        }
++        if (ScmSlot != 0 && D->PhysicalStart <= ScmSlot && Bytes >= 8 && ScmSlot-D->PhysicalStart <= Bytes-8) {
++          ScmMatches++;
++          R ("K133_scm_efi base=%lx pages=%lx type=%u attr=%lx\n",
++            D->PhysicalStart, D->NumberOfPages, D->Type, D->Attribute);
++          if (D->Type < EfiBootServicesCode || D->Type > EfiRuntimeServicesData) { Complete = FALSE; }
++        }
+@@ -120 +159 @@
+-        R ("K131_efi base=%lx pages=%lx type=%u attr=%lx\n",
++        R ("K133_efi base=%lx pages=%lx type=%u attr=%lx\n",
+@@ -123 +162 @@
+-      R ("K131_efi_overlaps=%lu\n", (UINT64)Rows);
++      R ("K133_efi_overlaps=%lu\n", (UINT64)Rows);
+@@ -127,3 +166,4 @@
+-  if (Mem == NULL) { R ("K131_efi_status=%r\n", Status); }
+-
+-  HobBase = GetHobList ();
++  if (Mem == NULL) { R ("K133_efi_status=%r\n", Status); }
++  R ("K133_scm_efi_matches=%lu\n", (UINT64)ScmMatches);
++  if (ScmMatches != 1) { Complete = FALSE; }
++
+@@ -131,2 +171,4 @@
+-  H = HobBase;
+-  if (HobBase != NULL) {
++  R ("K133_hob_storage_matches=%lu base=%p limit=%lx\n", (UINT64)HobMatches, HobBase, (UINT64)HobLimit);
++  H = NULL;
++  if (HobBase != NULL && HobMatches == 1 && HobLimit >= (UINTN)HobBase && HobLimit-(UINTN)HobBase >= sizeof (*Phit)) {
++    H = HobBase;
+@@ -134,3 +176,5 @@
+-    if (H->HobType != EFI_HOB_TYPE_HANDOFF || H->HobLength < sizeof (*Phit) ||
+-        Phit->EfiEndOfHobList < (UINTN)HobBase ||
+-        Phit->EfiEndOfHobList - (UINTN)HobBase > 1024*1024-sizeof (*H)) {
++    /* DXE copies the HOB allocation without rebasing PHIT's absolute fields.
++       Record them, but bound the current list by its actual mapped storage. */
++    R ("K133_phit type=%u length=%u memory_bottom=%lx free_bottom=%lx original_end=%lx\n",
++      H->HobType, H->HobLength, Phit->EfiMemoryBottom, Phit->EfiFreeMemoryBottom, Phit->EfiEndOfHobList);
++    if (H->HobType != EFI_HOB_TYPE_HANDOFF || H->HobLength < sizeof (*Phit)) {
+@@ -138,2 +182,2 @@
+-    } else { HobEndAddress = (UINTN)Phit->EfiEndOfHobList; }
+-  }
++    }
++  } else { Complete = FALSE; }
+@@ -141 +185,2 @@
+-  while (H != NULL && Hobs < 4096 && HobBytes <= 1024*1024-sizeof (*H)) {
++  while (H != NULL && Hobs < 4096 && HobBytes <= HOB_BYTES-sizeof (*H)) {
++    if ((UINTN)H > HobLimit || HobLimit-(UINTN)H < sizeof (*H)) { Complete = FALSE; break; }
+@@ -143,3 +188 @@
+-        H->HobLength > 1024*1024-HobBytes || (UINTN)H > MAX_UINTN-H->HobLength ||
+-        (UINTN)H > HobEndAddress ||
+-        (H->HobType != EFI_HOB_TYPE_END_OF_HOB_LIST && H->HobLength > HobEndAddress-(UINTN)H)) { Complete = FALSE; break; }
++        H->HobLength > HobLimit-(UINTN)H) { Complete = FALSE; break; }
+@@ -148 +191 @@
+-      HobEnd = (UINTN)H == HobEndAddress && H->HobLength == sizeof (*H);
++      HobEnd = H->HobLength == sizeof (*H);
+@@ -157 +200 @@
+-          R ("K131_hob_alloc base=%lx bytes=%lx type=%u name=%g static_kernel_bounds=%u\n",
++          R ("K133_hob_alloc base=%lx bytes=%lx type=%u name=%g static_kernel_bounds=%u\n",
+@@ -168 +211 @@
+-        if (++Rows <= MAX_ROWS) { R ("K131_hob_fv base=%lx bytes=%lx type=%u\n", F->BaseAddress, F->Length, H->HobType); }
++        if (++Rows <= MAX_ROWS) { R ("K133_hob_fv base=%lx bytes=%lx type=%u\n", F->BaseAddress, F->Length, H->HobType); }
+@@ -176 +219 @@
+-  R ("K131_hob_count=%lu walked_bytes=%lu overlaps=%lu end=%u\n", (UINT64)Hobs, (UINT64)HobBytes, (UINT64)Rows, HobEnd);
++  R ("K133_hob_count=%lu walked_bytes=%lu overlaps=%lu end=%u\n", (UINT64)Hobs, (UINT64)HobBytes, (UINT64)Rows, HobEnd);
+@@ -180 +223 @@
+-  R ("K131_images_status=%r count=%lu\n", Status, (UINT64)Count);
++  R ("K133_images_status=%r count=%lu\n", Status, (UINT64)Count);
+@@ -189 +232 @@
+-        if (ImageOverlaps <= MAX_ROWS) { R ("K131_image base=%p bytes=%lx handle=%p\n", Image->ImageBase, Image->ImageSize, Handles[I]); }
++        if (ImageOverlaps <= MAX_ROWS) { R ("K133_image base=%p bytes=%lx handle=%p\n", Image->ImageBase, Image->ImageSize, Handles[I]); }
+@@ -196 +239 @@
+-  R ("K131_image_overlaps=%lu failures=%lu\n", (UINT64)ImageOverlaps, (UINT64)ImageFailures);
++  R ("K133_image_overlaps=%lu failures=%lu\n", (UINT64)ImageOverlaps, (UINT64)ImageFailures);
+@@ -210 +253 @@
+-          R ("K131_config_pointer guid=%g table=%p object_bytes=unknown\n",
++          R ("K133_config_pointer guid=%g table=%p object_bytes=unknown\n",
+@@ -216 +259 @@
+-  R ("K131_DONE queries_complete=%u PAS_allowed=0 DMA_ownership=not_proved region_writes=0\n", Complete);
++  R ("K133_DONE queries_complete=%u PAS_allowed=0 DMA_ownership=not_proved region_writes=0\n", Complete);

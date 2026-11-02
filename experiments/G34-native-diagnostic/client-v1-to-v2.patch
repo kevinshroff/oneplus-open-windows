@@ -1,0 +1,32 @@
+--- a/g34_client.go
++++ b/g34_client.go
+@@ -4 +3,0 @@
+-//
+@@ -312 +311,6 @@
+-func selftest(h uintptr) (any, error) {
++func selftest() (any, error) {
++	h, e := openDevice(device)
++	if e != nil {
++		return nil, e
++	}
++	defer func() { closeHandle(h) }()
+@@ -347 +351 @@
+-	if !errors.Is(e, syscall.Errno(32)) {
++	if !errors.Is(e, syscall.Errno(5)) {
+@@ -350 +354,3 @@
+-	rows = append(rows, map[string]any{"case": "exclusive-open", "expected_error": 32})
++	rows = append(rows, map[string]any{"case": "exclusive-open", "expected_error": 5})
++	closeHandle(h)
++	h = 0
+@@ -377,0 +384,4 @@
++	h, e = openDevice(device)
++	if e != nil {
++		return rows, e
++	}
+@@ -427,0 +438,3 @@
++	if cmd == "selftest" {
++		return selftest()
++	}
+@@ -440,2 +452,0 @@
+-	case "selftest":
+-		return selftest(h)

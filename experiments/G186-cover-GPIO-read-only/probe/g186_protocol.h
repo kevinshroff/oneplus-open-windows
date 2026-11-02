@@ -1,0 +1,15 @@
+/* SPDX-License-Identifier: MIT */
+#ifndef G186_PROTOCOL_H
+#define G186_PROTOCOL_H
+#include "g186_core.h"
+#define G186_MAGIC 0x315243363831474fULL
+#define G186_ABI 1u
+#define G186_IOCTL_STATUS CTL_CODE(FILE_DEVICE_UNKNOWN,0xb24,METHOD_BUFFERED,FILE_READ_ACCESS)
+#define G186_IOCTL_READ CTL_CODE(FILE_DEVICE_UNKNOWN,0xb25,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define G186_IOCTL_RESULT CTL_CODE(FILE_DEVICE_UNKNOWN,0xb26,METHOD_BUFFERED,FILE_READ_ACCESS)
+typedef struct{ULONG Size,Version;ULONGLONG Magic,Nonce;ULONG Count,Reserved;}G186_REQUEST;
+typedef struct{ULONG Size,Version;ULONGLONG Magic;ULONG KernelBuild,Processors,Irql,FirmwareBytes,FirmwareMatch,FirmwareStatus,MapCalls,Attempts,Ready,Fault;ULONGLONG InterruptTime,Frequency,Sequence;}G186_STATUS;
+typedef struct{G186_STATUS Status;ULONGLONG Nonce;ULONG NativeReads,NativeWrites,NativeGuard,Reserved;ULONGLONG Begin,End;G186_RESULT Result;}G186_CAPTURE;
+C_ASSERT(sizeof(G186_REQUEST)==32);C_ASSERT(sizeof(G186_STATUS)==80);C_ASSERT(sizeof(G186_RESULT)==496);
+C_ASSERT(FIELD_OFFSET(G186_CAPTURE,Result)==120);C_ASSERT(sizeof(G186_CAPTURE)==616);
+#endif

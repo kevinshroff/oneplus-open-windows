@@ -1,0 +1,213 @@
+--- G759/a740_backend.h
++++ G779/a740_backend.h
+@@ -30,3 +30,6 @@
+ NTSTATUS A740ReleaseCpStopped(ULONGLONG);
+ 
+ NTSTATUS A740QualifyRuntime(const G321_OWNER *,ULONGLONG Generation,ULONGLONG StopSerial);
++
++/* Kernel provider only; exact already-running CP runtime. Does NOT set Ready. */
++NTSTATUS A740BindSubmitAuthorization(const G433_SUBMIT_AUTH *);
+--- G759/g433_runtime.c
++++ G779/g433_runtime.c
+@@ -131,3 +131,54 @@
+  }
+ done:if(entered)r->Gmu->Owner.Leave(r->Gmu->Owner.Cookie);if(locked)KeReleaseMutex(&r->Gmu->Lock,FALSE);r->LastStatus=s;KeReleaseMutex(&r->Lock,FALSE);return s;
+ }
++
++NTSTATUS G433SubmitAuthorized(G433_RUNTIME*r,PVOID device,PEPROCESS process,
++ const G433_SUBMIT_BO*bo,ULONG nb,const g433_ib*ib,ULONG ni,const G433_SUBMIT_AUTH*auth,PULONG fence){
++ NTSTATUS st;BOOLEAN gLocked=FALSE,entered=FALSE,mLocked=FALSE;PVOID token=NULL;ULONG completed=0;
++ if(!r||!r->Initialized||!device||!process||process!=PsGetCurrentProcess()||!bo||!nb||nb>4096||!ib||!ni||ni>512||!fence)return STATUS_INVALID_PARAMETER;
++ if(!auth||!auth->Begin||!auth->End)return STATUS_DEVICE_NOT_READY;
++ st=Lock(&r->Lock);if(st!=STATUS_SUCCESS)return st;
++ if(!r->Prepared||!r->RunAttempted||!r->MastersMayRun||r->Poisoned||r->Closed||r->Core.stage!=9||r->Core.poisoned||r->Core.issued!=r->Core.completed){st=STATUS_DEVICE_NOT_READY;goto done;}
++ st=Lock(&r->Gmu->Lock);if(st!=STATUS_SUCCESS)goto done;gLocked=TRUE;
++ st=Enter(r);if(st!=STATUS_SUCCESS)goto done;entered=TRUE;
++ if(GpuLease(r)||r->Role.Poisoned||!r->Role.Domain||r->Role.Type!=DomainTypeTranslateS1){st=STATUS_DEVICE_NOT_READY;goto done;}
++ st=Lock(&r->Role.MapLock);if(st!=STATUS_SUCCESS)goto done;mLocked=TRUE;
++ for(ULONG i=0;i<nb;i++){
++  A740_HAL_MAPPING*m;BOOLEAN found=FALSE;
++  if(!bo[i].Flags||(bo[i].Flags&~3u)||!bo[i].Handle||!bo[i].Mdl||!bo[i].Cpu||!bo[i].Bytes||bo[i].Bytes>0x40000000u||bo[i].Iova>UINT64_MAX-bo[i].Bytes){st=STATUS_INVALID_PARAMETER;goto done;}
++  for(ULONG j=0;j<i;j++)if(bo[j].Handle==bo[i].Handle){st=STATUS_INVALID_PARAMETER;goto done;}
++  for(m=r->Role.MapHead;m;m=m->Next)if(m->Mdl==bo[i].Mdl&&m->Iova==bo[i].Iova&&m->ActualIova==bo[i].Iova&&m->Bytes==bo[i].Bytes&&(m->Permissions&bo[i].Flags)==bo[i].Flags){found=TRUE;break;}
++  if(!found){st=STATUS_INVALID_HANDLE;goto done;}
++  st=r->Gmu->Owner.ValidateBacking(r->Gmu->Owner.Cookie,bo[i].Mdl,bo[i].Cpu,bo[i].Iova,bo[i].Bytes);if(st!=STATUS_SUCCESS)goto done;
++ }
++ for(ULONG i=0;i<ni;i++){
++  BOOLEAN found=FALSE;ULONGLONG bytes=(ULONGLONG)ib[i].words*4;
++  if(!bytes||ib[i].words>0xfffff||(ib[i].iova&3)){st=STATUS_INVALID_PARAMETER;goto done;}
++  for(ULONG j=0;j<nb;j++)if((bo[j].Flags&1)&&ib[i].iova>=bo[j].Iova&&bytes<=bo[j].Bytes&&ib[i].iova-bo[j].Iova<=bo[j].Bytes-bytes){found=TRUE;break;}
++  if(!found){st=STATUS_INVALID_HANDLE;goto done;}
++ }
++ st=auth->Begin(auth->Cookie,device,process,r->Generation,bo,nb,ib,ni,&token);
++ if(st!=STATUS_SUCCESS||!token){if(st==STATUS_SUCCESS)st=STATUS_DEVICE_NOT_READY;goto done;}
++ if(GpuLease(r)){st=STATUS_DEVICE_NOT_READY;goto done;}
++ {g433_status cs=g433_cp_submit_run(&r->Core,ib,ni,500000);
++  st=cs==G433_OK?STATUS_SUCCESS:cs==G433_BUSY?STATUS_DEVICE_BUSY:cs==G433_ARGUMENT?STATUS_INVALID_PARAMETER:cs==G433_TIMEOUT?STATUS_IO_TIMEOUT:cs==G433_CANCELLED?STATUS_CANCELLED:STATUS_DEVICE_NOT_READY;
++  if(cs==G433_OK){completed=r->Core.completed;*fence=completed;}
++  if(r->Core.poisoned)r->Poisoned=TRUE;
++ }
++ done:if(token)auth->End(auth->Cookie,token,st,completed);
++ if(mLocked)KeReleaseMutex(&r->Role.MapLock,FALSE);if(entered)r->Gmu->Owner.Leave(r->Gmu->Owner.Cookie);if(gLocked)KeReleaseMutex(&r->Gmu->Lock,FALSE);
++ r->LastStatus=st;KeReleaseMutex(&r->Lock,FALSE);return st;
++}
++
++NTSTATUS G433MapOwnedBo(G433_RUNTIME*r,PMDL mdl,PVOID cpu,ULONGLONG va,SIZE_T bytes){
++ NTSTATUS st;BOOLEAN gLocked=FALSE,entered=FALSE;
++ if(!r||!r->Initialized||!mdl||!cpu||!bytes||bytes>0x40000000u||(va&4095)||(bytes&4095)||va>UINT64_MAX-bytes)return STATUS_INVALID_PARAMETER;
++ st=Lock(&r->Lock);if(st!=STATUS_SUCCESS)return st;
++ if(!r->Prepared||!r->RunAttempted||!r->MastersMayRun||r->Poisoned||r->Closed||r->Core.stage!=9||r->Core.poisoned||r->Core.issued!=r->Core.completed){st=STATUS_DEVICE_NOT_READY;goto done;}
++ st=Lock(&r->Gmu->Lock);if(st!=STATUS_SUCCESS)goto done;gLocked=TRUE;
++ st=Enter(r);if(st!=STATUS_SUCCESS)goto done;entered=TRUE;
++ if(GpuLease(r)||r->Role.Poisoned||!r->Role.Domain||r->Role.Type!=DomainTypeTranslateS1){st=STATUS_DEVICE_NOT_READY;goto done;}
++ st=r->Gmu->Owner.ValidateBacking(r->Gmu->Owner.Cookie,mdl,cpu,va,bytes);if(st!=STATUS_SUCCESS)goto done;
++ st=A740HalMap(&r->Role,mdl,va,bytes,3);if(r->Role.Poisoned)r->Poisoned=TRUE;
++ done:if(entered)r->Gmu->Owner.Leave(r->Gmu->Owner.Cookie);if(gLocked)KeReleaseMutex(&r->Gmu->Lock,FALSE);r->LastStatus=st;KeReleaseMutex(&r->Lock,FALSE);return st;
++}
+--- G759/g433_runtime.h
++++ G779/g433_runtime.h
+@@ -41,3 +41,27 @@
+  * readiness. The WDDM adapter must prove BO lifetime/mappings/cache ownership
+  * before calling, and retain that ownership until this real fence completes. */
+ NTSTATUS G433Submit(G433_RUNTIME *,const g433_ib *,SIZE_T Count,PULONG Fence);
++
++/* G779 exact authorized BO bridge. All metadata is copied kernel state, not
++ * a user assertion. Begin runs under CP->GMU->owner->MapLock and must not
++ * reenter any runtime/HAL operation. It must seal/authorize command bytes and
++ * all resource address/register effects, and own cache/coherency/lifetime.
++ * Listing a BO or a stable IOVA alone does not authorize arbitrary PM4.
++ * End must retain ALL backing/seals on uncertain failure until actual stop;
++ * success is the only normal completion/release boundary. No provider exists
++ * in this candidate; no readiness flag can replace these native operations. */
++typedef struct {
++ ULONG Handle,Flags;PMDL Mdl;PVOID Cpu;ULONGLONG Iova;SIZE_T Bytes;
++} G433_SUBMIT_BO;
++typedef struct {
++ PVOID Cookie;
++ NTSTATUS (*Begin)(PVOID,PVOID device,PEPROCESS process,ULONGLONG generation,
++  const G433_SUBMIT_BO *,ULONG,const g433_ib *,ULONG,PVOID *lease);
++ VOID (*End)(PVOID,PVOID lease,NTSTATUS actual_status,ULONG actual_completed_fence);
++} G433_SUBMIT_AUTH;
++NTSTATUS G433SubmitAuthorized(G433_RUNTIME *,PVOID device,PEPROCESS process,
++ const G433_SUBMIT_BO *,ULONG,const g433_ib *,ULONG,const G433_SUBMIT_AUTH *,PULONG);
++
++/* Managed-S1 BO map in the SAME live CP role, with actual owner exclusion.
++ * No caller can substitute the separate legacy g_A740.Gpu domain. */
++NTSTATUS G433MapOwnedBo(G433_RUNTIME *,PMDL,PVOID Cpu,ULONGLONG Iova,SIZE_T Bytes);
+--- G759/hw.c
++++ G779/hw.c
+@@ -10,7 +10,7 @@
+     KMUTEX Lock; G321_RUNTIME GmuRuntime; G433_RUNTIME CpRuntime; G482_BINDING NativeIo; A740_HAL Hal; A740_HAL_ROLE Gpu,Gmu;
+     PDEVICE_OBJECT Pdo; PCM_RESOURCE_LIST Resources;
+     NTSTATUS Status; BOOLEAN Bound, RolesOpened, MastersStarted, CpReady;
+-    ULONGLONG ChipId, NextVa;
++    ULONGLONG ChipId, NextVa; G433_SUBMIT_AUTH SubmitAuth;
+ } g_A740;
+ VOID HwInit(VOID)
+ {
+@@ -174,13 +174,13 @@
+ VOID VaFree(ULONGLONG Va,SIZE_T Bytes)
+ {UNREFERENCED_PARAMETER(Va);UNREFERENCED_PARAMETER(Bytes); /* no unsafe reuse across outstanding work */}
+ NTSTATUS MmuMap(ULONGLONG Va,PMDL Mdl,SIZE_T Bytes)
+-{return A740HalMap(&g_A740.Gpu,Mdl,Va,Bytes,3);}
++{UNREFERENCED_PARAMETER(Va);UNREFERENCED_PARAMETER(Mdl);UNREFERENCED_PARAMETER(Bytes);return STATUS_NOT_SUPPORTED; /* No legacy-role BO attach. */}
+ VOID MmuUnmap(ULONGLONG Va,SIZE_T Bytes)
+ {(void)A740HalUnmap(&g_A740.Gpu,Va,Bytes);}
+ PMDL TgAllocPages(SIZE_T Bytes,PULONGLONG Iova,PVOID *KernelVa)
+ {
+     PHYSICAL_ADDRESS low={0},high,skip={0};PMDL mdl;PVOID va;ULONGLONG gpu;
+-    if(!Iova||!KernelVa||!g_A740.RolesOpened||!Bytes||Bytes>0x40000000u||
++    if(!Iova||!KernelVa||!g_A740.CpRuntime.Prepared||g_A740.CpRuntime.Core.stage!=9||!Bytes||Bytes>0x40000000u||
+        (Bytes&(PAGE_SIZE-1))) return NULL;
+     high.QuadPart=MAXLONGLONG;
+     mdl=MmAllocatePagesForMdlEx(low,high,skip,Bytes,MmWriteCombined,MM_ALLOCATE_FULLY_REQUIRED);
+@@ -189,8 +189,8 @@
+                                    NormalPagePriority|MdlMappingNoExecute);
+     if(!va) {MmFreePagesFromMdl(mdl);ExFreePool(mdl);return NULL;}
+     RtlZeroMemory(va,Bytes);gpu=VaAlloc(Bytes);
+-    if(!gpu||!NT_SUCCESS(MmuMap(gpu,mdl,Bytes))) {
+-        if(g_A740.Gpu.Poisoned) {
++    if(!gpu||!NT_SUCCESS(G433MapOwnedBo(&g_A740.CpRuntime,mdl,va,gpu,Bytes))) {
++        if(g_A740.CpRuntime.Role.Poisoned) {
+             LogPrint("A740 retain uncertain HAL mapping mdl %p cpu %p\n",mdl,va);return NULL;
+         }
+         MmUnmapLockedPages(va,mdl);MmFreePagesFromMdl(mdl);ExFreePool(mdl);return NULL;
+@@ -286,3 +286,23 @@
+   * render readiness. No producer of the actual owner is fabricated here. */
+ done:if(entered)Owner->Leave(Owner->Cookie);g_A740.Status=st;KeReleaseMutex(&g_A740.Lock,FALSE);return st;
+ }
++
++NTSTATUS A740BindSubmitAuthorization(const G433_SUBMIT_AUTH*auth){
++ NTSTATUS st=LockOwnerComposition();if(st!=STATUS_SUCCESS)return st;
++ if(!auth||!auth->Begin||!auth->End||g_A740.SubmitAuth.Begin||!g_A740.CpRuntime.Prepared||g_A740.CpRuntime.Core.stage!=9||g_A740.CpRuntime.Poisoned||g_A740.CpRuntime.Closed)st=STATUS_DEVICE_NOT_READY;
++ else {g_A740.SubmitAuth=*auth;st=STATUS_SUCCESS;}
++ /* Provider binding is not WDDM readiness and does not change CpReady. */
++ KeReleaseMutex(&g_A740.Lock,FALSE);return st;
++}
++NTSTATUS HwSubmitOwned(PVOID device,PEPROCESS process,TGPU_BO*const*bos,const struct drm_msm_gem_submit_bo*access,ULONG nb,const ULONGLONG*va,const ULONG*words,ULONG ni,PULONG fence){
++ NTSTATUS st;G433_SUBMIT_BO*owned=NULL;g433_ib*ib=NULL;
++ if(!device||!process||process!=PsGetCurrentProcess()||!bos||!access||!nb||nb>4096||!va||!words||!ni||ni>512||!fence)return STATUS_INVALID_PARAMETER;
++ st=LockOwnerComposition();if(st!=STATUS_SUCCESS)return st;
++ if(!g_A740.SubmitAuth.Begin){st=STATUS_DEVICE_NOT_READY;goto done;}
++ owned=ExAllocatePool2(POOL_FLAG_NON_PAGED,sizeof(*owned)*nb,TGPU_POOL_TAG);ib=ExAllocatePool2(POOL_FLAG_NON_PAGED,sizeof(*ib)*ni,TGPU_POOL_TAG);
++ if(!owned||!ib){st=STATUS_INSUFFICIENT_RESOURCES;goto done;}
++ for(ULONG i=0;i<nb;i++){TGPU_BO*b=bos[i];if(!b||b->Refs<=0||b->Handle!=access[i].handle){st=STATUS_INVALID_HANDLE;goto done;}owned[i]=(G433_SUBMIT_BO){b->Handle,access[i].flags,b->Mdl,b->KernelVa,b->Iova,b->Size};}
++ for(ULONG i=0;i<ni;i++)ib[i]=(g433_ib){va[i],words[i]};
++ st=G433SubmitAuthorized(&g_A740.CpRuntime,device,process,owned,nb,ib,ni,&g_A740.SubmitAuth,fence);
++ done:if(owned)ExFreePoolWithTag(owned,TGPU_POOL_TAG);if(ib)ExFreePoolWithTag(ib,TGPU_POOL_TAG);KeReleaseMutex(&g_A740.Lock,FALSE);return st;
++}
+--- G759/msm.c
++++ G779/msm.c
+@@ -317,6 +317,7 @@
+     ULONG *dw = NULL, i, fence = 0;
+     NTSTATUS st = STATUS_SUCCESS;
+     TGPU_BO *bo;
++    TGPU_BO **owned=NULL;
+ 
+     struct drm_msm_gem_submit snapshot=*A,*output=A;
+     __u64 boBytes=0,cmdBytes=0;int validation;
+@@ -329,7 +330,8 @@
+         (SIZE_T)boBytes, TGPU_POOL_TAG);
+     cmds = (struct drm_msm_gem_submit_cmd *)ExAllocatePool2(POOL_FLAG_NON_PAGED,
+         (SIZE_T)cmdBytes, TGPU_POOL_TAG);
+-    if (bos == NULL || cmds == NULL || ib == NULL || dw == NULL) {
++    owned=(TGPU_BO **)ExAllocatePool2(POOL_FLAG_NON_PAGED,sizeof(*owned)*A->nr_bos,TGPU_POOL_TAG);
++    if (bos == NULL || cmds == NULL || ib == NULL || dw == NULL || owned == NULL) {
+         st = STATUS_NO_MEMORY;
+         goto out;
+     }
+@@ -349,6 +351,7 @@
+             goto out;
+         }
+     }
++    for(i=0;i<A->nr_bos;i++)owned[i]=BoGet(bos[i].handle);
+     for (i = 0; i < A->nr_cmds; i++) {
+         if (cmds[i].submit_idx >= A->nr_bos) {
+             st = STATUS_INVALID_PARAMETER;
+@@ -362,7 +365,7 @@
+     }
+     /* Recovery and DMA are reached only after copied-array validation. */
+     if(HwWedged()&&!HwRecover()) {st=STATUS_DEVICE_HARDWARE_ERROR;goto out;}
+-    st = HwSubmit(ib, dw, A->nr_cmds, &fence);
++    st = HwSubmitOwned(Owner,PsGetCurrentProcess(),owned,bos,A->nr_bos,ib,dw,A->nr_cmds,&fence);
+     if (NT_SUCCESS(st)) {
+         for (i = 0; i < A->nr_bos; i++) {
+             BoGet(bos[i].handle)->LastFence = fence;
+@@ -371,6 +374,7 @@
+         output->fence_fd = -1;
+     }
+ out:
++    if(owned)ExFreePoolWithTag(owned,TGPU_POOL_TAG);
+     if (bos != NULL) {
+         ExFreePoolWithTag(bos, TGPU_POOL_TAG);
+     }
+--- G759/tgpu.h
++++ G779/tgpu.h
+@@ -165,3 +165,7 @@
+ /* WDK macro expands to a bare expression in C; cast explicitly for clang. */
+ #undef UNREFERENCED_PARAMETER
+ #define UNREFERENCED_PARAMETER(x) ((void)(x))
++
++/* Caller holds g_BoLock and references every BO for this synchronous call. */
++NTSTATUS HwSubmitOwned(PVOID Device,PEPROCESS Process,TGPU_BO *const *Bos,const struct drm_msm_gem_submit_bo *Access,ULONG BoCount,
++ const ULONGLONG *IbIova,const ULONG *IbDwords,ULONG Count,PULONG Fence);

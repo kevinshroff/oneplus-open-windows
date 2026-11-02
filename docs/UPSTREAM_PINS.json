@@ -1,0 +1,56 @@
+{
+  "url": "https://github.com/Project-Aloha/mu_aloha_platforms.git",
+  "commit": "68ae12fafdcd873240d8635afecac542c2c4c563",
+  "submodules": [
+    {
+      "path": "MU_BASECORE",
+      "url": "https://github.com/microsoft/mu_basecore.git",
+      "commit": "931f6e0322dc4a8ba7cb218e7bfd7d6d0dc5219e"
+    },
+    {
+      "path": "Common/MU",
+      "url": "https://github.com/microsoft/mu_plus.git",
+      "commit": "49625b8f6cabe7e4d9797d192c354b14af0490d1"
+    },
+    {
+      "path": "Common/MU_OEM_SAMPLE",
+      "url": "https://github.com/microsoft/mu_oem_sample.git",
+      "commit": "15c43745132537ef047d0fac6403ed78e520f3f8"
+    },
+    {
+      "path": "Binaries",
+      "url": "https://github.com/Project-Aloha/SurfaceDuoBinaries-fork",
+      "commit": "ce59dcf54753e112d7b847dd997d3ae934094e0d"
+    },
+    {
+      "path": "Platforms/SurfaceDuoACPI",
+      "url": "https://github.com/Project-Aloha/acpi_oem_third_party_common",
+      "commit": "d742758fe575c08b5278d84fec1b3b313551a587"
+    },
+    {
+      "path": "Features/DFCI",
+      "url": "https://github.com/microsoft/mu_feature_dfci",
+      "commit": "cd33bec609f4d55dc753eb7b485ea251a5fb6be6"
+    },
+    {
+      "path": "Features/CONFIG",
+      "url": "https://github.com/microsoft/mu_feature_config.git",
+      "commit": "6789841f35d417fafbe6a9ff9427360b52ca37d9"
+    },
+    {
+      "path": "Platforms/CranePkg",
+      "url": "https://github.com/Project-Aloha/CrDK",
+      "commit": "2d9ab7412377aa6401174edc2cd6227a171aa6b7"
+    },
+    {
+      "path": "Platforms/OpensslPkg/Library/OpensslLib/openssl",
+      "url": "https://github.com/openssl/openssl",
+      "commit": "aea7aaf2abb04789f5868cbabec406ea43aa84bf"
+    },
+    {
+      "path": "Platforms/MbedTlsPkg/Library/MbedTlsLib/mbedtls",
+      "url": "https://github.com/ARMmbed/mbedtls",
+      "commit": "e185d7fd85499c8ce5ca2a54f5cf8fe7dbe3f8df"
+    }
+  ]
+}

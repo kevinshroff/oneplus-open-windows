@@ -1,0 +1,15 @@
+--- a/g35_protocol.h
++++ b/g35_protocol.h
+@@ -7,0 +8 @@
++#define G35_IOCTL_PMIC CTL_CODE(FILE_DEVICE_UNKNOWN,0x802,METHOD_BUFFERED,FILE_READ_ACCESS)
+@@ -16,0 +18,5 @@
++typedef struct {
++ G35_STATUS Status;G35_OBS_RESULT Observer;
++ ULONG FixedRegistersUnchanged;ULONG Attempt;ULONG Reserved;
++ ULONGLONG ElapsedTicks;ULONGLONG CounterFrequency;
++} G35_PMIC;
+@@ -19,0 +26,4 @@
++C_ASSERT(sizeof(G35_OBS_RESULT)==1620);
++C_ASSERT(FIELD_OFFSET(G35_PMIC,Observer)==80);
++C_ASSERT(FIELD_OFFSET(G35_PMIC,ElapsedTicks)==1712);
++C_ASSERT(sizeof(G35_PMIC)==1728);

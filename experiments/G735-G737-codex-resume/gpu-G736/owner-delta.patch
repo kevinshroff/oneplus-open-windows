@@ -1,0 +1,46 @@
+--- work/zcode-G732-tcs-relax/src/source/cold_hold.c	2026-10-31 21:46:53
++++ work/gpu-cold-start-reconcile-G736/owner/cold_hold.c	2026-11-01 00:20:19
+@@ -34,12 +34,10 @@
+  if(!s||!io||s->state!=CGH_NEW||!serial||!io->generation||!io->current||!io->read||!io->write_halt||!io->barrier||!io->wait10us||!budget||budget>10000)return CGH_ARGUMENT;
+  memset(s,0,sizeof(*s));s->io=*io;s->generation=io->generation;s->serial=serial;
+  if((e=cold(s)))return fail(s,e);
+- {enum cgh_status e1=haltword(s,&a);
+-  if(e1==CGH_IO_ERROR){ /* G730: GPU/GBIF bank unreadable (GX domain down pre-GMU).
+-   * kgsl never touches +0xf114/f118 before GMU boot; hold via the readable
+-   * GMU-window cold state alone; the halt handshake is skipped and marked. */
+-   s->deferred=1;s->owned=1;s->before_halt=0;s->state=CGH_HELD;s->error=CGH_OK;return CGH_OK;}
+-  if(e1)return fail(s,e1);}
++ /* G736: an unreadable GBIF register does not establish a traffic hold.
++  * Refuse before mutation; a future cold-start activation mode must carry
++  * its own proof instead of fabricating CGH_HELD/owned. */
++ if((e=haltword(s,&a)))return fail(s,e);
+  if((e=haltword(s,&b)))return fail(s,e);
+  if(a!=b||(b&OWN))return fail(s,CGH_FOREIGN);s->before_halt=b;
+  if((e=ackword(s)))return fail(s,e);if(s->last_ack&OWN)return fail(s,CGH_FOREIGN);
+@@ -55,7 +53,7 @@
+ }
+ enum cgh_status CghCheck(CGH_HOLD*s){
+  enum cgh_status e;uint32_t v;if(!s||s->state!=CGH_HELD||!s->owned)return CGH_OWNER;
+- if(s->deferred){if((e=cold(s)))return fail(s,e);s->io.barrier(s->io.cookie);return CGH_OK;}
++ if(s->deferred)return fail(s,CGH_OWNER);
+  if((e=cold(s))||(e=haltword(s,&v))||(e=ackword(s)))return fail(s,e);
+  if(v!=(s->before_halt|OWN)||!(s->last_ack&OWN))return fail(s,CGH_FOREIGN);
+  s->io.barrier(s->io.cookie);return CGH_OK;
+@@ -63,7 +61,7 @@
+ enum cgh_status CghReleaseToReset(CGH_HOLD*s,unsigned budget){
+  enum cgh_status e;uint32_t v;if(!s||!budget||budget>10000)return CGH_ARGUMENT;
+  if((e=CghCheck(s)))return e;
+- if(s->deferred){s->owned=0;s->state=CGH_RELEASED;s->error=CGH_OK;return CGH_OK;}
++ if(s->deferred)return fail(s,CGH_OWNER);
+  if((e=store(s,s->before_halt|OWN,s->before_halt)))return fail(s,e);
+  for(unsigned i=0;i<budget;i++){
+   if((e=cold(s))||(e=haltword(s,&v))||(e=ackword(s)))return fail(s,e);s->polls++;
+@@ -76,7 +74,7 @@
+ 
+ enum cgh_status CghCheckReleased(CGH_HOLD*s){
+  enum cgh_status e;uint32_t v;if(!s||s->state!=CGH_RELEASED||s->owned)return CGH_OWNER;
+- if(s->deferred){if((e=cold(s)))return fail(s,e);s->io.barrier(s->io.cookie);return CGH_OK;}
++ if(s->deferred)return fail(s,CGH_OWNER);
+  if((e=cold(s))||(e=haltword(s,&v))||(e=ackword(s)))return fail(s,e);
+  if(v!=s->before_halt||(s->last_ack&OWN))return fail(s,CGH_FOREIGN);
+  s->io.barrier(s->io.cookie);return CGH_OK;

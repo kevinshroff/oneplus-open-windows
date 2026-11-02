@@ -1,0 +1,71 @@
+--- G778/source/open_smmu_activate.c
++++ G790/source/open_smmu_activate.c
+@@ -3,7 +3,8 @@
+ #include <string.h>
+ #define NEED (OSMA_CURRENT|OSMA_PHYSICAL_STOP|OSMA_BANK_STREAM|OSMA_SECURE_ACCESS|OSMA_TABLES_VISIBLE|OSMA_FAULT_HANDLER)
+ #define NS_MASK UINT32_C(0x00c0fc37)
+-#define NS_VALUE UINT32_C(0x00c01c36)
++#define NS_VALUE UINT32_C(0x00c00406)
++#define NS_RAZ_PROFILE UINT32_C(0x00001830)
+ #define FSR_FAULT UINT32_C(0xc00001fe)
+ static enum osma_status fail(OSMA_SESSION*s,enum osma_status e){s->Status=e;if(s->Writes){s->Phase=OSMA_POISONED;s->MustRetain=1;}else{s->MustRetain=0;s->ScopePinned=0;}return e;}
+ static int check(OSMA_SESSION*s,const OSMA_REQUEST*q,unsigned extra){return s->LastOwnerStatus=q->Proof.check(q->Proof.Context,&q->Proof,NEED|extra,5,q->Bank,q->Asid,q->Slot);}
+@@ -16,6 +17,10 @@
+  memset(v,0,sizeof(*v));if(r32(s,q,0x20,&v->Id0)||r32(s,q,0x24,&v->Id1)||r32(s,q,0x28,&v->Id2))return OSMA_IO;
+  if(v->Id0!=0x4c017e18u||v->Id1!=0x40000016u||v->Id2!=0x5511u)return OSMA_HANDOFF;
+  if(r32(s,q,0,&v->Nscr0)||r32(s,q,0x10,&v->Nsacr))return OSMA_IO;
++ /* G790 exact-ID profile: optional GCFG fault controls and private VMID/PTM
++  * hints read zero in the observed implementation. Do not request them or
++  * reinterpret a mismatch as success. Full write/readback equality remains. */
++ if(v->Nscr0&NS_RAZ_PROFILE)return OSMA_HANDOFF;
+  for(unsigned i=0;i<OSH_SMRS;i++)if(r32(s,q,0x800+4*i,&v->Smr[i])||r32(s,q,0xc00+4*i,&v->S2cr[i]))return OSMA_IO;
+  return OSMA_OK;
+ }
+@@ -104,7 +109,7 @@
+   if(s->Before.Nsacr&(1u<<26)){uint32_t a=s->Before.Nsacr&~(1u<<26);
+    if(check(s,q,OSMA_NS_BLOCK)||w32(s,q,0x10,a)||barrier(s,q)||r32(s,q,0x10,&v)||v!=a)return fail(s,OSMA_MISMATCH);s->Expected.Nsacr=a;}
+   st=sync(s,q,cb,1);if(st)return fail(s,st);
+-  if(check(s,q,OSMA_NS_BLOCK)||w32(s,q,0,s->DesiredNscr0)||barrier(s,q)||r32(s,q,0,&v)||v!=s->DesiredNscr0)return fail(s,OSMA_MISMATCH);
++  if(check(s,q,OSMA_NS_BLOCK)||w32(s,q,0,s->DesiredNscr0)||barrier(s,q)||r32(s,q,0,&s->After.Nscr0)||s->After.Nscr0!=s->DesiredNscr0)return fail(s,OSMA_MISMATCH);
+   s->Expected.Nscr0=s->DesiredNscr0;
+  }
+  st=guarded_globals(s,q,s->Before.Smr[q->Slot],faulted);if(st)return fail(s,st);
+--- G778/source/open_smmu_activate.h
++++ G790/source/open_smmu_activate.h
+@@ -13,7 +13,8 @@
+  * It may not reenter this core or release the exclusion. No default producer
+  * is supplied: inactive never-published RAM proofs DO NOT satisfy this ABI.
+  * NsBlock check additionally owns dedicated NS-global configuration/quiescence
+- * and the global fault IRQ/handler enabled by NSCR0 GFIE/GCFGFIE; a bank-only
++ * and the implemented global fault IRQ/handler enabled by NSCR0 GFIE; the
++ * selected RAZ/WI GCFG fault controls are not claimed enabled. A bank-only
+  * fault handler cannot satisfy that whole-block scope. The existing Fault
+  * reference must cover the actually enabled global and context IRQ lifetimes.
+  * GMU SID5 does not require the unrelated G433 PAS13/ZAP result; optional Pas
+--- G778/source/open_smmu_activate_wdm.c
++++ G790/source/open_smmu_activate_wdm.c
+@@ -27,8 +27,8 @@
+  (at==cb+0x38&&v==0xf404ff44)||(at==cb+0x3c&&v==0xefe4)||
+  (at==cb+0x58&&v==0) /* a new fault belongs to the actual ISR; never hide it before Journal.Fatal */||(at==cb+0x610&&v==n->Bank)||
+  ((at==cb+0x7f0||at==0x70)&&v==MAXULONG);
+- if(at==0){ULONG now=READ_REGISTER_ULONG((PULONG)n->Base);ok=now!=MAXULONG&&
+-   !((now^v)&~0x00c0fc37u)&&(v&0x00c0fc37u)==0x00c01c36u;}
++ if(at==0){ULONG now=READ_REGISTER_ULONG((PULONG)n->Base);ok=now!=MAXULONG&&!(now&0x00001830u)&&
++   !((now^v)&~0x00c0fc37u)&&(v&0x00c0fc37u)==0x00c00406u;}
+  if(at==0x10){ULONG now=READ_REGISTER_ULONG((PULONG)(n->Base+0x10));ok=now!=MAXULONG&&v==(now&~(1u<<26));}
+  if(!ok)return -1;WRITE_REGISTER_ULONG((PULONG)(n->Base+at),v);return 0;
+ }
+--- G778/source/owner/owner_entry.c
++++ G790/source/owner/owner_entry.c
+@@ -24,7 +24,10 @@
+  /* G731: CGH hold forensics for the phase-8 0x483 — state/error/deferred and the
+   * cold() snapshot (reset/hfi/gx/fence) + halt handshake words (before/last/ack). */
+  LogPrint("CGH st%u err%u def%u owns%u rst%x hfi%x gx%x fen%x haltB%x haltL%x ack%x tcs%x,%x,%x,%x clockGen%llx hstat%08x clockTok%llu\n",(unsigned)p->Hold.Hold.state,(unsigned)p->Hold.Hold.error,(unsigned)p->Hold.Hold.deferred,(unsigned)p->Hold.Hold.owned,p->Hold.Hold.reset,p->Hold.Hold.hfi,p->Hold.Hold.gx,p->Hold.Hold.fence,p->Hold.Hold.before_halt,p->Hold.Hold.last_halt,p->Hold.Hold.last_ack,p->Hold.Hold.tcs[0],p->Hold.Hold.tcs[1],p->Hold.Hold.tcs[2],p->Hold.Hold.tcs[3],p->Hold.ClockGeneration,p->Hold.Status,p->Hold.Clock.Token);
+- LogPrint("G778 CGH reset-authority mode%u sampled%x coldFail%x reads%u writes%u polls%u attempted%u lastBank%u lastOff%x lastVal%x lastIo%d; TCS advisory, unset sampled bits mean NOT READ\n",p->Hold.Hold.reset_mode,p->Hold.Hold.sampled_mask,p->Hold.Hold.cold_fail_mask,p->Hold.Hold.reads,p->Hold.Hold.writes,p->Hold.Hold.polls,p->Hold.Hold.attempted,p->Hold.Hold.last_bank,p->Hold.Hold.last_offset,p->Hold.Hold.last_value,p->Hold.Hold.last_io);}
++ LogPrint("G778 CGH reset-authority mode%u sampled%x coldFail%x reads%u writes%u polls%u attempted%u lastBank%u lastOff%x lastVal%x lastIo%d; TCS advisory, unset sampled bits mean NOT READ\n",p->Hold.Hold.reset_mode,p->Hold.Hold.sampled_mask,p->Hold.Hold.cold_fail_mask,p->Hold.Hold.reads,p->Hold.Hold.writes,p->Hold.Hold.polls,p->Hold.Hold.attempted,p->Hold.Hold.last_bank,p->Hold.Hold.last_offset,p->Hold.Hold.last_value,p->Hold.Hold.last_io);
++ if(p->Active&&p->Active->Tables){OSMA_SESSION*s=&p->Active->Tables->Session;
++  LogPrint("G790 OSMA phase%u status%u reads%u writes%u retain%u nsBefore%08x nsWanted%08x partialAfterNs%08x owner%d\n",(unsigned)s->Phase,(unsigned)s->Status,s->Reads,s->Writes,s->MustRetain,s->Before.Nscr0,s->DesiredNscr0,s->After.Nscr0,s->LastOwnerStatus);
++ }}
+ static VOID ThreadMain(PVOID cookie){JOB*j=cookie;OGO_CONTEXT*p=j->P;NTSTATUS st=OgoBootstrap(p);
+  Report(p,"bootstrap-result");
+  if(st==STATUS_SUCCESS&&p->Active){PIRP irp=j->Irp;j->Irp=NULL;(void)Finish(p,irp,st);

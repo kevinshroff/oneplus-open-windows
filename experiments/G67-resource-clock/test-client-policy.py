@@ -1,0 +1,6 @@
+"""Validate client guards and packet checks against the actual adapter fixture."""
+from pathlib import Path
+import argparse,hashlib,json,subprocess
+p=argparse.ArgumentParser();p.add_argument('--fixture',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();W=Path(__file__).resolve().parent;assert not a.output.exists();a.output.mkdir(parents=True);exe=a.output/'client-policy-model'
+q=subprocess.run(['clang','-std=c11','-O1','-g','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I'+str(W),str(W/'test-client-policy.c'),str(W/'g67_client_policy.c'),str(W/'g67_clock.c'),'-o',str(exe)],capture_output=True,text=True);assert not q.returncode,(q.stdout,q.stderr)
+q=subprocess.run([str(exe),str(a.fixture)],capture_output=True,text=True);assert not q.returncode and not q.stderr,(q.stdout,q.stderr);v=json.loads(q.stdout);v.update(source_sha256={n:hashlib.sha256((W/n).read_bytes()).hexdigest()for n in ['g67_client_policy.c','g67_client_policy.h','g67_clock.c','g67_protocol.h','test-client-policy.c']},fixture_sha256=hashlib.sha256(a.fixture.read_bytes()).hexdigest(),sanitizers=['AddressSanitizer','UndefinedBehaviorSanitizer']);(a.output/'tests.json').write_text(json.dumps(v,indent=2)+'\n');print(json.dumps(v))

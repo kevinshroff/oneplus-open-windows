@@ -1,0 +1,120 @@
+package main
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
+)
+
+func op(h syscall.Handle, code uint32, n int, nonce uint64) ([]byte, error) {
+	q := make([]byte, 32)
+	le.PutUint32(q, 32)
+	le.PutUint32(q[4:], 1)
+	copy(q[8:], []byte("OG108MR1"))
+	le.PutUint64(q[16:], nonce)
+	b := make([]byte, n)
+	var got uint32
+	e := syscall.DeviceIoControl(h, code, &q[0], 32, &b[0], uint32(n), &got, nil)
+	if e != nil {
+		return nil, e
+	}
+	if got != uint32(n) {
+		return nil, fmt.Errorf("short result %d", got)
+	}
+	return b, nil
+}
+func main() {
+	result := map[string]any{"ok": false, "read_submitted": false}
+	defer func() {
+		if e := recover(); e != nil {
+			result["error"] = fmt.Sprint(e)
+		}
+		json.NewEncoder(os.Stdout).Encode(result)
+		if result["ok"] != true {
+			os.Exit(1)
+		}
+	}()
+	must := func(e error) {
+		if e != nil {
+			panic(e)
+		}
+	}
+	must(fullOSGuard())
+	if len(os.Args) < 2 {
+		panic("status | read nonce16 path | result nonce16 path")
+	}
+	mode := os.Args[1]
+	nonce := uint64(0)
+	path := ""
+	if mode == "status" {
+		if len(os.Args) != 2 {
+			panic("status arguments")
+		}
+	} else if mode == "read" || mode == "result" {
+		if len(os.Args) != 4 {
+			panic("read/result arguments")
+		}
+		text := os.Args[2]
+		var e error
+		nonce, e = strconv.ParseUint(text, 16, 64)
+		must(e)
+		if len(text) != 16 || nonce == 0 || strings.ToLower(text) != text {
+			panic("nonce")
+		}
+		path = os.Args[3]
+		want := "G108-result-" + text + ".bin"
+		recovered := "G108-result-" + text + "-recovered.bin"
+		if !strings.EqualFold(filepath.Dir(path), `C:\OpenG81\payloads`) || (filepath.Base(path) != want && filepath.Base(path) != recovered) {
+			panic("exclusive result path")
+		}
+	} else {
+		panic("unknown mode")
+	}
+	ptr, _ := syscall.UTF16PtrFromString(`\\.\OpenG108`)
+	h, e := syscall.CreateFile(ptr, syscall.GENERIC_READ|syscall.GENERIC_WRITE, 0, nil, syscall.OPEN_EXISTING, 0, 0)
+	must(e)
+	defer syscall.CloseHandle(h)
+	b, e := op(h, 0x226900, 80, 0)
+	must(e)
+	s, e := decodeStatus(b)
+	must(e)
+	result["status_before"] = s
+	if mode == "status" {
+		result["ok"] = true
+		return
+	}
+	if s["kernel_build"] != uint32(26300) || s["processors"] != uint32(8) || s["IRQL"] != uint32(0) || s["firmware_match"] != uint32(1) || s["firmware_bytes"] != uint32(576) {
+		panic("qualified platform required")
+	}
+	if mode == "read" && (s["attempts"] != uint32(0) || s["map_calls"] != uint32(0)) {
+		panic("owner consumed: observe frozen result")
+	}
+	f, e := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	must(e)
+	defer f.Close()
+	code := uint32(0x226908)
+	if mode == "read" {
+		code = 0x22e904
+		result["read_submitted"] = true
+	}
+	b, e = op(h, code, captureBytes, nonce)
+	must(e)
+	_, e = f.Write(b)
+	must(e)
+	must(f.Sync())
+	must(f.Close())
+	sum := sha256.Sum256(b)
+	result["path"] = path
+	result["bytes"] = len(b)
+	result["sha256"] = hex.EncodeToString(sum[:])
+	v, e := decodeCapture(b, nonce)
+	must(e)
+	result["result"] = v
+	result["ok"] = true
+}

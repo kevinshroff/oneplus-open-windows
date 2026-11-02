@@ -1,0 +1,74 @@
+--- a/g35_client.go
++++ b/g35_client.go
+@@ -25,0 +26 @@
++const ioctlPMIC uintptr = 0x226008
+@@ -337,0 +339 @@
++	tests = append(tests, test{"short-pmic-output", ioctlPMIC, request(), 1727, 122})
+@@ -396,0 +399,40 @@
++func capturePMIC(h uintptr) (map[string]any, error) {
++	b, n, e := ioctl(h, ioctlPMIC, request(), 1728)
++	if e != nil {
++		return nil, e
++	}
++	if n != 1728 {
++		return nil, errors.New("PMIC response size differs")
++	}
++	s, e := parseStatus(b)
++	if e != nil {
++		return nil, e
++	}
++	if e = checkStatus(s); e != nil {
++		return nil, e
++	}
++	u := func(i int) uint32 { return binary.LittleEndian.Uint32(b[i:]) }
++	q := func(i int) uint64 { return binary.LittleEndian.Uint64(b[i:]) }
++	count := u(160)
++	if count > 128 {
++		return nil, errors.New("PMIC trace count exceeds fixed buffer")
++	}
++	trace := make([]map[string]any, 0, count)
++	for i := uint32(0); i < count; i++ {
++		at := 164 + int(i)*12
++		trace = append(trace, map[string]any{"kind": u(at), "address": fmt.Sprintf("0x%x", u(at+4)), "value": u(at + 8)})
++	}
++	bytesAt := func(start, end int) []uint32 {
++		r := make([]uint32, end-start)
++		for i, v := range b[start:end] {
++			r[i] = uint32(v)
++		}
++		return r
++	}
++	completion := make([]uint32, 5)
++	for i := 0; i < 5; i++ {
++		completion[i] = u(104 + i*4)
++	}
++	r := map[string]any{"status": s, "operation_code": u(80), "stage": u(84), "register_reads": u(88), "observer_write_attempts": u(92), "polls": u(96), "observer_READ_commands": u(100), "completion": completion, "revision": bytesAt(124, 132), "anchor": bytesAt(132, 140), "identity": bytesAt(140, 148), "pmic_status_raw": uint32(b[148]), "configuration": bytesAt(149, 157), "trace": trace, "fixed_registers_unchanged": u(1700), "attempt": u(1704), "elapsed_ticks": q(1712), "counter_frequency": q(1720)}
++	return r, nil
++}
+@@ -446,0 +489,26 @@
++	case "pmic":
++		r, e := capturePMIC(h)
++		if e != nil {
++			return r, e
++		}
++		if r["operation_code"] != uint32(0) || r["fixed_registers_unchanged"] != uint32(1) {
++			return r, errors.New("PMIC observation failed; inspect the saved result without retrying")
++		}
++		return r, nil
++	case "budget":
++		before, e := getStatus(h)
++		if e != nil {
++			return nil, e
++		}
++		r, e := capturePMIC(h)
++		if e != nil {
++			return r, e
++		}
++		after, e := getStatus(h)
++		if e != nil {
++			return r, e
++		}
++		if r["operation_code"] != uint32(1002) || before.MapCalls != after.MapCalls || len(r["trace"].([]map[string]any)) != 0 {
++			return r, errors.New("two-capture lifetime budget guard failed")
++		}
++		return map[string]any{"passed": true, "denied_code": r["operation_code"], "map_calls_before": before.MapCalls, "map_calls_after": after.MapCalls, "observer_READ_commands": r["observer_READ_commands"]}, nil

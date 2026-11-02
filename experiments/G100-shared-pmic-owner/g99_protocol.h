@@ -1,0 +1,15 @@
+/* SPDX-License-Identifier: MIT */
+#ifndef G99_PROTOCOL_H
+#define G99_PROTOCOL_H
+#define G99_MAGIC 0x3159454b3939474fULL
+#define G99_ABI 1u
+#define G99_IOCTL_STATUS CTL_CODE(FILE_DEVICE_UNKNOWN,0xa00,METHOD_BUFFERED,FILE_READ_ACCESS)
+#define G99_IOCTL_SAMPLE CTL_CODE(FILE_DEVICE_UNKNOWN,0xa01,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define G99_IOCTL_RESULT CTL_CODE(FILE_DEVICE_UNKNOWN,0xa02,METHOD_BUFFERED,FILE_READ_ACCESS)
+typedef struct {ULONG Size,Version;ULONGLONG Magic,Nonce;ULONG Count,Reserved;}G99_REQUEST;
+typedef struct {ULONG Size,Version;ULONGLONG Magic;ULONG KernelBuild,Processors,Irql,FirmwareBytes,FirmwareMatch,FirmwareStatus,MapCalls,Attempts,Ready,Fault;ULONGLONG InterruptTime,Frequency,Sequence;}G99_STATUS;
+typedef struct {G99_STATUS Status;ULONGLONG Nonce;ULONG Requested,NativeReads,NativeWrites,NativeGuard;G99_RESULT Result;}G99_CAPTURE;
+C_ASSERT(sizeof(G99_REQUEST)==32);C_ASSERT(sizeof(G99_STATUS)==80);
+C_ASSERT(sizeof(G99_SAMPLE)==16);C_ASSERT(sizeof(G99_TRACE)==40);
+C_ASSERT(sizeof(G99_RESULT)==139616);C_ASSERT(FIELD_OFFSET(G99_CAPTURE,Result)==104);C_ASSERT(sizeof(G99_CAPTURE)==139720);
+#endif

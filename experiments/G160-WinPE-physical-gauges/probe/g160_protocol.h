@@ -1,0 +1,14 @@
+/* SPDX-License-Identifier: MIT */
+#ifndef G160_PROTOCOL_H
+#define G160_PROTOCOL_H
+#define G160_MAGIC 0x315147303631474fULL
+#define G160_ABI 1u
+#define G160_IOCTL_STATUS CTL_CODE(FILE_DEVICE_UNKNOWN,0xa70,METHOD_BUFFERED,FILE_READ_ACCESS)
+#define G160_IOCTL_READ CTL_CODE(FILE_DEVICE_UNKNOWN,0xa71,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define G160_IOCTL_RESULT CTL_CODE(FILE_DEVICE_UNKNOWN,0xa72,METHOD_BUFFERED,FILE_READ_ACCESS)
+typedef struct{ULONG Size,Version;ULONGLONG Magic,Nonce;ULONG Count,Reserved;}G160_REQUEST;
+typedef struct{ULONG Size,Version;ULONGLONG Magic;ULONG KernelBuild,Processors,Irql,FirmwareBytes,FirmwareMatch,FirmwareStatus,MapCalls,Attempts,Ready,Fault;ULONGLONG InterruptTime,Frequency,Sequence;}G160_STATUS;
+typedef struct{G160_STATUS Status;ULONGLONG Nonce;ULONG NativeReads,NativeWrites,MapCalls,Guard,PolicyCommands,PolicyCompleted,PolicyFault,Reserved;G104_RESULT Result;}G160_CAPTURE;
+C_ASSERT(sizeof(G160_REQUEST)==32);C_ASSERT(sizeof(G160_STATUS)==80);
+C_ASSERT(sizeof(G104_RESULT)==279760);C_ASSERT(FIELD_OFFSET(G160_CAPTURE,Result)==120);C_ASSERT(sizeof(G160_CAPTURE)==279880);
+#endif

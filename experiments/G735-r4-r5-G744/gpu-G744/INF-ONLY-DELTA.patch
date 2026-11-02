@@ -1,0 +1,26 @@
+--- G736/packages/broker/opensmmud0.inf
++++ G744/packages/broker/opensmmud0.inf
+@@ -4,8 +4,8 @@
+ Class=System
+ ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
+ Provider=%Provider%
+-DriverVer=10/29/2026,1.0.0.3
+-CatalogFile=OpenSmmuD0.cat
++DriverVer=10/29/2026,1.0.0.736
++CatalogFile=OpenSmmuD0-G736.cat
+ PnpLockdown=1
+ [Manufacturer]
+ %Provider%=Open,NTarm64.10.0
+--- G736/packages/owner-once/opengpustartonce.inf
++++ G744/packages/owner-once/opengpustartonce.inf
+@@ -4,8 +4,8 @@
+ Class=System
+ ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
+ Provider=%Provider%
+-DriverVer=10/29/2026,1.0.0.2
+-CatalogFile=OpenGpuStartOnce.cat
++DriverVer=10/29/2026,1.0.0.736
++CatalogFile=OpenGpuStartOnce-G736.cat
+ PnpLockdown=1
+ [Manufacturer]
+ %Provider%=Open,NTarm64.10.0

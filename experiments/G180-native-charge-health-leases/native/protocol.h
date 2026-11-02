@@ -1,0 +1,31 @@
+/* SPDX-License-Identifier: MIT */
+#ifndef OPEN_CL_NATIVE_PROTOCOL_H
+#define OPEN_CL_NATIVE_PROTOCOL_H
+#include <stdint.h>
+#define CLN_MAGIC UINT64_C(0x314b4c303831474f)
+#define CLN_ABI 1u
+#define CLN_STATUS CTL_CODE(FILE_DEVICE_UNKNOWN,0xad0,METHOD_BUFFERED,FILE_READ_ACCESS)
+#define CLN_START CTL_CODE(FILE_DEVICE_UNKNOWN,0xad1,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define CLN_SAMPLE CTL_CODE(FILE_DEVICE_UNKNOWN,0xad2,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define CLN_CLOSE CTL_CODE(FILE_DEVICE_UNKNOWN,0xad3,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define CLN_SNAPSHOT CTL_CODE(FILE_DEVICE_UNKNOWN,0xad4,METHOD_BUFFERED,FILE_READ_ACCESS)
+#define CLN_BOARD_FV CTL_CODE(FILE_DEVICE_UNKNOWN,0xad5,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define CLN_RESTART_PULSE CTL_CODE(FILE_DEVICE_UNKNOWN,0xad6,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define CLN_STOP_PULSE CTL_CODE(FILE_DEVICE_UNKNOWN,0xad7,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define CLN_HEALTH_RENEW CTL_CODE(FILE_DEVICE_UNKNOWN,0xad8,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+typedef struct {
+ uint32_t Size,Version;uint64_t Magic,Cookie,CommandId;uint32_t Flags,Reserved;uint64_t HealthNonce;
+}CLN_REQUEST;
+typedef struct {
+ uint32_t Size,Version;uint64_t Magic,Cookie,LastCommandId,NowUs,TimerCalls,MapCalls;
+ uint32_t KernelBuild,Processors,Irql,FirmwareBytes,FirmwareMatch,FirmwareStatus,WinPE;
+ uint32_t Attempted,AdmissionCode,MapsLive,Running,Stopped,SafeToUnload,NativeFault;
+ uint32_t LastAction,LastResult;
+ uint8_t FdtDigest[32];G158_SLOTS Slots;uint32_t InitialDescriptor[8],FinalDescriptor[8];
+ CL_STATE State;
+ uint32_t HealthBusy,HealthAction,HealthCode,ProviderUncertain;
+ uint64_t HealthCommandId,HealthNonce,LastRequestNonce;
+ CH_MONITOR Health;CH_IO_RESULT Provider;
+}CLN_SNAPSHOT_DATA;
+C_ASSERT(sizeof(CLN_REQUEST)==48);
+#endif

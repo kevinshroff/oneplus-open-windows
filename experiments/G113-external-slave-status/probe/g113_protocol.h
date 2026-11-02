@@ -1,0 +1,14 @@
+/* SPDX-License-Identifier: MIT */
+#ifndef G113_PROTOCOL_H
+#define G113_PROTOCOL_H
+#define G113_MAGIC 0x314353333131474fULL
+#define G113_ABI 1u
+#define G113_IOCTL_STATUS CTL_CODE(FILE_DEVICE_UNKNOWN,0xa20,METHOD_BUFFERED,FILE_READ_ACCESS)
+#define G113_IOCTL_READ CTL_CODE(FILE_DEVICE_UNKNOWN,0xa21,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define G113_IOCTL_RESULT CTL_CODE(FILE_DEVICE_UNKNOWN,0xa22,METHOD_BUFFERED,FILE_READ_ACCESS)
+typedef struct{ULONG Size,Version;ULONGLONG Magic,Nonce;ULONG Count,Reserved;}G113_REQUEST;
+typedef struct{ULONG Size,Version;ULONGLONG Magic;ULONG KernelBuild,Processors,Irql,FirmwareBytes,FirmwareMatch,FirmwareStatus,MapCalls,Attempts,Ready,Fault;ULONGLONG InterruptTime,Frequency,Sequence;}G113_STATUS;
+typedef struct{G113_STATUS Status;ULONGLONG Nonce;ULONG NativeReads,NativeWrites,MapCalls,Guard,PolicyCommands,PolicyCompleted,PolicyFault,Reserved;G113_RESULT Result;}G113_CAPTURE;
+C_ASSERT(sizeof(G113_REQUEST)==32);C_ASSERT(sizeof(G113_STATUS)==80);
+C_ASSERT(sizeof(G113_RESULT)==279760);C_ASSERT(FIELD_OFFSET(G113_CAPTURE,Result)==120);C_ASSERT(sizeof(G113_CAPTURE)==279880);
+#endif

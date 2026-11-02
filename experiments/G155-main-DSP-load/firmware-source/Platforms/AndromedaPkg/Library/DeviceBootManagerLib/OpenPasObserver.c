@@ -1,0 +1,125 @@
+/* SPDX-License-Identifier: MIT */
+#include "OpenPasObserver.h"
+_Static_assert(sizeof(OP_U64)==8 && sizeof(OP_U32)==4,"fixed ABI widths");
+_Static_assert(sizeof(OP_RECORD)==96,"report record ABI");
+void OpenPasInit(OP_OBSERVER *o,OP_SIP fn,void *protocol,OP_U32 abi)
+{
+ if(!o)return;
+ unsigned char *p=(unsigned char *)o;
+ for(unsigned long i=0;i<sizeof(*o);i++)p[i]=0;
+ o->Original=fn;o->ExpectedThis=protocol;o->ABI=abi;
+}
+OP_U64 OpenPasArm(OP_OBSERVER *o)
+{
+ if(!o||!o->Original||!o->ExpectedThis||!o->Verify||
+    !o->AuthorizeDtbCopy||!o->VerifyDtbPayload||!o->AuthorizeMainCopy||!o->VerifyMainPayload||
+    (o->ABI!=OP_ABI_LEGACY && o->ABI!=OP_ABI_ARMV8))return OP_ERR(2);
+ if(o->Consumed||o->Busy||o->Fault||o->Count)return OP_ERR(15);
+ o->Consumed=1;o->Active=1;return 0;
+}
+OP_U64 OpenPasDisarm(OP_OBSERVER *o)
+{
+ if(!o)return OP_ERR(2);
+ if(o->Busy)return OP_ERR(6);
+ o->Active=0;return 0;
+}
+static OP_U64 Refuse(OP_OBSERVER *o,OP_RECORD *r,OP_U32 why,OP_U64 status)
+{
+ o->Fault|=why;r->Refusal=why;r->ReturnedStatus=status;return status;
+}
+OP_U64 OpenPasFinishDtb(OP_OBSERVER *o,OP_U64 status)
+{
+ if(!o)return OP_ERR(2);
+ if(o->Busy){o->Fault|=OP_REENTRANT;return OP_ERR(15);}
+ if(!o->Active||!o->Consumed||o->Fault||o->DtbPublicComplete||o->Count!=3||
+    o->Phase[0]!=3||o->Phase[1]!=0||o->AuthEnteredMask!=1||o->AuthAcceptedMask!=1){
+  o->Fault|=OP_ORDER;return OP_ERR(15);
+ }
+ o->DtbPublicStatus=status;
+ if(status){o->Fault|=OP_DTB_PUBLIC;return OP_ERR(7);}
+ if(!o->Verify){o->Fault|=OP_OWNERSHIP;return OP_ERR(15);}
+ o->Busy=1;unsigned owned=o->Verify(o->ExpectedThis);o->Busy=0;
+ if(o->Fault)return OP_ERR(15);
+ if(owned!=1){o->Fault|=OP_OWNERSHIP;return OP_ERR(15);}
+ o->DtbPublicComplete=1;return 0;
+}
+OP_U64 OpenPasCall(OP_OBSERVER *o,void *self,OP_U32 command,OP_U32 param,
+                  OP_U64 *args,OP_U64 *results)
+{
+ OP_U32 id=command&~0xc0000000u,index,stage,n;
+ OP_U64 effective_image;
+ OP_U64 status,base,bytes;
+ OP_RECORD *r;
+ if(!o||!o->Original)return OP_ERR(2);
+ /* Legacy SCM packs only the low16 command bits and low32 argument bits. */
+ if(o->ABI==OP_ABI_LEGACY)id=0x02000000u|(command&0xffffu);
+ /* Outside the explicit window or PAS subset, preserve the existing API. */
+ if(!o->Active)
+  return o->Original(self,command,param,args,results);
+ if(id!=0x02000201u&&id!=0x02000202u&&id!=0x02000205u&&id!=0x02000206u){
+  if(!o->Verify||o->Verify(self)!=1){o->Fault|=OP_OWNERSHIP;return OP_ERR(15);}
+  return o->Original(self,command,param,args,results);
+ }
+ effective_image=args?(o->ABI==OP_ABI_LEGACY?(OP_U32)args[0]:args[0]):0;
+ if(o->Busy){o->Fault|=OP_REENTRANT;return OP_ERR(15);}
+ if(o->Count>=OP_RECORDS){o->Fault|=OP_CAPACITY;return OP_ERR(9);}
+ r=&o->Records[o->Count++];r->Command=command;r->ParamId=param;
+ if(o->Fault)return Refuse(o,r,OP_ORDER,OP_ERR(15));
+ if(!args||!results||self!=o->ExpectedThis||command!=(id|0x40000000u))
+  return Refuse(o,r,OP_BAD_ARGUMENT,OP_ERR(2));
+ r->ImageId=(OP_U32)effective_image;r->Arguments[0]=args[0];
+ if(effective_image!=1&&effective_image!=36)
+  return Refuse(o,r,OP_BAD_ARGUMENT,OP_ERR(2));
+ if(args[0]!=effective_image)return Refuse(o,r,OP_BAD_ARGUMENT,OP_ERR(2));
+ index=(effective_image==36)?0u:1u;
+ if(id==0x02000206u)return Refuse(o,r,OP_SHUTDOWN,OP_ERR(15));
+ stage=id==0x02000201u?0u:id==0x02000202u?1u:2u;
+ if(param!=(stage==0?0x82u:stage==1?3u:1u))
+  return Refuse(o,r,OP_BAD_ARGUMENT,OP_ERR(2));
+ n=param&15u;for(OP_U32 i=0;i<n;i++)r->Arguments[i]=args[i];
+ /* The explicit current-context public completion gate separates original
+  * DTB AUTH from original POST/public return. Each image has its own grants. */
+ if(index==1&&!o->DtbPublicComplete)return Refuse(o,r,OP_DTB_PUBLIC,OP_ERR(21));
+ if(o->Phase[index]!=stage || (index==1 && o->Phase[0]!=3))
+  return Refuse(o,r,OP_ORDER,OP_ERR(15));
+ base=index==0?0x9e980000ULL:0x9ea00000ULL;
+ bytes=index==0?0x80000ULL:0x4880000ULL;
+ if((stage==0 && (!args[1] || (o->ABI==OP_ABI_LEGACY && args[1]>0xffffffffULL))) ||
+    (stage==1 && (args[1]!=base || args[2]!=bytes)))
+  return Refuse(o,r,OP_BAD_ARGUMENT,OP_ERR(2));
+ if(!o->Verify||o->Verify(self)!=1)return Refuse(o,r,OP_OWNERSHIP,OP_ERR(15));
+ if(stage==2){
+  unsigned allowed;
+  OP_VERIFY payload=index?o->VerifyMainPayload:o->VerifyDtbPayload;
+  if(o->CopyAllowed[index]!=1||!payload)return Refuse(o,r,OP_COPY_ADMISSION,OP_ERR(21));
+  o->Busy=1;allowed=payload(self);o->Busy=0;
+  if(o->Fault)return Refuse(o,r,OP_REENTRANT,OP_ERR(15));
+  if(allowed!=1)return Refuse(o,r,OP_PAYLOAD_MISMATCH,OP_ERR(21));
+  if(!o->Verify||o->Verify(self)!=1)return Refuse(o,r,OP_OWNERSHIP,OP_ERR(15));
+ }
+ r->Entered=1;o->Busy=1;
+ if(stage==2)o->AuthEnteredMask|=1u<<index;
+ status=o->Original(self,command,param,args,results);
+ r->OriginalStatus=status;r->Returned=1;
+ for(OP_U32 i=0;i<4;i++)r->Results[i]=results[i];
+ o->Busy=0;
+ if(o->Fault)return Refuse(o,r,OP_REENTRANT,OP_ERR(15));
+ if(status)return Refuse(o,r,OP_TRANSPORT,(status>>63)?status:OP_ERR(7));
+ if(results[0]!=1)return Refuse(o,r,OP_RESULT_HEADER,OP_ERR(33));
+ if(results[1]!=0)return Refuse(o,r,OP_SERVICE_RESULT,OP_ERR(7));
+ o->Phase[index]=stage+1;
+ /* Only this image's separately admitted copy may follow successful MEM_SETUP.
+  * Preserve the accepted secure result if the adapter refuses the copy. */
+ if(stage==1){
+  unsigned allowed;
+  OP_VERIFY copy=index?o->AuthorizeMainCopy:o->AuthorizeDtbCopy;
+  if(!copy)return Refuse(o,r,OP_COPY_ADMISSION,OP_ERR(21));
+  o->Busy=1;allowed=copy(self);o->Busy=0;
+  if(o->Fault)return Refuse(o,r,OP_REENTRANT,OP_ERR(15));
+  if(allowed!=1)return Refuse(o,r,OP_COPY_ADMISSION,OP_ERR(21));
+  if(!o->Verify||o->Verify(self)!=1)return Refuse(o,r,OP_OWNERSHIP,OP_ERR(15));
+  o->CopyAllowed[index]=1;
+ }
+ if(stage==2)o->AuthAcceptedMask|=1u<<index;
+ r->ReturnedStatus=0;return 0;
+}

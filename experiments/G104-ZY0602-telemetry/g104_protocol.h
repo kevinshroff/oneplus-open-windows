@@ -1,0 +1,14 @@
+/* SPDX-License-Identifier: MIT */
+#ifndef G104_PROTOCOL_H
+#define G104_PROTOCOL_H
+#define G104_MAGIC 0x314c54343031474fULL
+#define G104_ABI 1u
+#define G104_IOCTL_STATUS CTL_CODE(FILE_DEVICE_UNKNOWN,0xa20,METHOD_BUFFERED,FILE_READ_ACCESS)
+#define G104_IOCTL_READ CTL_CODE(FILE_DEVICE_UNKNOWN,0xa21,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define G104_IOCTL_RESULT CTL_CODE(FILE_DEVICE_UNKNOWN,0xa22,METHOD_BUFFERED,FILE_READ_ACCESS)
+typedef struct{ULONG Size,Version;ULONGLONG Magic,Nonce;ULONG Count,Reserved;}G104_REQUEST;
+typedef struct{ULONG Size,Version;ULONGLONG Magic;ULONG KernelBuild,Processors,Irql,FirmwareBytes,FirmwareMatch,FirmwareStatus,MapCalls,Attempts,Ready,Fault;ULONGLONG InterruptTime,Frequency,Sequence;}G104_STATUS;
+typedef struct{G104_STATUS Status;ULONGLONG Nonce;ULONG NativeReads,NativeWrites,MapCalls,Guard,PolicyCommands,PolicyCompleted,PolicyFault,Reserved;G104_RESULT Result;}G104_CAPTURE;
+C_ASSERT(sizeof(G104_REQUEST)==32);C_ASSERT(sizeof(G104_STATUS)==80);
+C_ASSERT(sizeof(G104_RESULT)==279760);C_ASSERT(FIELD_OFFSET(G104_CAPTURE,Result)==120);C_ASSERT(sizeof(G104_CAPTURE)==279880);
+#endif

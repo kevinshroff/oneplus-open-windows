@@ -1,0 +1,169 @@
+--- work/zcode-G734-observe/firmware/G290Pkg/G290GpuPower.c	2026-10-31 22:46:01
++++ work/gpu-cold-start-reconcile-G736/firmware/G290Pkg/G290GpuPower.c	2026-11-01 00:20:19
+@@ -395,11 +395,18 @@
+ static VOID*mProxyClient[3];
+ static CONST CHAR8*mProxyName[3]={"/vcs/vdd_cx","/vcs/vdd_mxa","/vcs/vdd_mxc"};
+ static CONST CHAR8*mProxyClientName[3]={"Open416-GPUCC-Proxy-CX","Open416-GPUCC-Proxy-MXA","Open416-GPUCC-Proxy-MXC"};
+-static UINT32 mG734Status[16]; /* G734: OBSERVE-ONLY GX status trail [0]/[2]=GFX_PWR_CLK_STATUS, [1]=GDSCR, [3]=final */
+-#define G726_GX_DECOLLAPSE() do{mG734Status[0]=MmioRead32(0x03d7c340);\
+-   mG734Status[1]=MmioRead32(0x03d9905c);\
+-   gBS->Stall(20);mG734Status[2]=MmioRead32(0x03d7c340);}while(0)
+-static UINT32 mG727Trail[13]; /* GX rail probe trail: [0]dscr-entry [1]hwctl0 [2]hwctl1 [3..10]per-candidate [11]final [12]flags */
++/* G736: no GX collapse/HW-control writes or speculative GX rail requests.
++ * G482CoreRead(0x14340) resolves to 0x03d7e340, NOT 0x03d7c340.
++ * The broker deliberately owns GMU leaves; firmware does not read this
++ * GMU status while those leaves are off. Windows CGH samples it under lease. */
++static UINT32 mG736Gdscr[2],mG736Cfg[2],mG736Captured;
++static VOID G736CaptureGx(UINTN index) {
++ mG736Gdscr[index]=MmioRead32(0x03d9905c);
++ mG736Cfg[index]=MmioRead32(0x03d99060);
++ MemoryFence();
++ if(mG736Gdscr[index]!=MAX_UINT32&&mG736Cfg[index]!=MAX_UINT32)
++  mG736Captured|=1u<<index;
++}
+ static VOID G721DirectRootSequence(VOID); /* G721: defined below ProviderProxy */
+ static BOOLEAN G722Pll1Ready(VOID);static EFI_STATUS G722Pll1Program(VOID);
+ static EFI_STATUS ProviderProxy(G290_NPA*n)
+@@ -441,83 +448,7 @@
+   mProxy.ObservedMask|=1u<<i;
+  }
+  mProxy.Stage=6;
+- /* G729: try JSON variants through the proven QMP transport. kgsl ACD precedent
+-  * is '{class: gpu, res: acd, val: %d}' (SPACE after class-colon; val key).
+-  * Stop at the first variant whose response slot at +0xc0 gains readable text
+-  * AND GDSCR bit31 sets; record which index in mG727Trail[12] bits 8..12.
+-  * Poll-based send per qcom_aoss.c; results in mG727Trail[12] bit4/bit5. */
+- {static CONST CHAR8*msgs[]={
+-   "{class: voltage_class, res: gfx.lvl, level: 0x180}      ",
+-   "{class: voltage, res: gfx.lvl, level: 0x180}            ",
+-   "{class: gpu, res: gfx.lvl, val: 0x180}                  ",
+-   "{class: voltage_class, res: gfx.lvl, val: 0x180}        "};
+-  UINTN vi;UINT32 sentOk=0;
+-  for(vi=0;vi<4;vi++){
+-  CONST CHAR8*msg=msgs[vi];UINT32 len=0;while(msg[len])len++;len=(len+3)&~3u;
+-  if(MmioRead32(0x0c300000)==0x4d41494cu){
+-   if(MmioRead32(0x0c300030)!=0x0000ffffu){
+-    MmioWrite32(0x0c30002c,0x0000ffffu);MemoryFence();
+-    MmioWrite32(0x0040800c,0u);MemoryFence();           /* doorbell */
+-    for(UINTN i=0;i<2000;i++){UINT32 a=MmioRead32(0x0c300030);if(a==0x0000ffffu)break;gBS->Stall(100);}
+-   }
+-   UINT32 ack=MmioRead32(0x0c300030);
+-   if(ack==0x0000ffffu){
+-    CONST UINT32*w=(CONST UINT32*)msg;
+-    for(UINTN i=0;i<len/4;i++){MmioWrite32(0x0c30012c+4*i,w[i]);MemoryFence();}
+-    MmioWrite32(0x0c300128,len);MemoryFence();
+-    (VOID)MmioRead32(0x0c300128);
+-    mG727Trail[12]|=16u;
+-    MmioWrite32(0x0040800c,0u);MemoryFence();           /* doorbell */
+-    for(UINTN i=0;i<5000;i++){UINT32 l=MmioRead32(0x0c300128);if(l==0){mG727Trail[12]|=32u;sentOk=1;break;}gBS->Stall(100);}
+-   }
+-   /* after each send: 5ms settle, then check GDSCR; stop if powered */
+-   gBS->Stall(5000);
+-   G726_GX_DECOLLAPSE();
+-   {UINT32 g2=MmioRead32(0x03d9905c);
+-    if(g2!=MAX_UINT32&&(g2&(1u<<31))){mG727Trail[12]|=64u;mG727Trail[12]|=(UINT32)(vi+1)<<8;break;}}
+-   gBS->Stall(500000); /* 500ms before next variant */
+-  }
+-  (VOID)sentOk;
+-  }}
+- /* G727: GFX rail diagnosing probe. For EACH candidate NPA name that
+-  * resolves: vote 384, wait 100ms rail ramp, clear HW_CTRL + de-collapse,
+-  * read GDSCR immediately. Trail recorded in OGR7.GxDscr[1..8]. Any name
+-  * whose GDSCR bit31 sets wins (repeat vote at end to hold it). */
+- {static CONST CHAR8*gfxNames[]={"/vcs/vdd_gx","/vdd/gfx","/gpu/gfx","/vcs/vdd_gfx","/vdd/gx","/gfx/lvl","/vcs/gfx"};
+-  VOID*clients[8]={0};UINTN winner=0;
+-  mG727Trail[0]=MmioRead32(0x03d9905c);
+-  mG727Trail[1]=MmioRead32(0x03d9953c);
+-  if(mG727Trail[1]!=MAX_UINT32&&(mG727Trail[1]&(1u<<31)))
+-   {MmioWrite32(0x03d9953c,mG727Trail[1]&~(1u<<31));MemoryFence();gBS->Stall(3);}
+-  mG727Trail[2]=MmioRead32(0x03d9953c);
+-  UINTN resolved=0;
+-  for(UINTN i=0;i<7;i++){
+-   UINT32 st2=0;
+-   EFI_STATUS a=n->Available(gfxNames[i],&st2);
+-   if(a!=EFI_SUCCESS||st2){mG727Trail[3+i]=MAX_UINT32;continue;}
+-   resolved++;
+-   EFI_STATUS c=n->Create(gfxNames[i],"Open727-GFX-Probe",0x40,0,NULL,&clients[i]);
+-   if(c!=EFI_SUCCESS||!clients[i]){mG727Trail[3+i]=0xDEAD0000u+(UINT32)i;continue;}
+-   (VOID)n->Request(clients[i],G416_PROXY_VLVL);
+-   gBS->Stall(100000); /* 100ms rail ramp */
+-   G726_GX_DECOLLAPSE();
+-   mG727Trail[3+i]=MmioRead32(0x03d9905c);
+-   if(mG727Trail[3+i]!=MAX_UINT32&&(mG727Trail[3+i]&(1u<<31))){winner=1+i;mG727Trail[12]|=2u;break;}
+-  }
+-  if(resolved>1)mG727Trail[12]|=1u;
+-  if(!winner){ /* second pass: raise corner to 448 on every resolved client */
+-   for(UINTN i=0;i<7;i++){
+-    if(!clients[i])continue;
+-    (VOID)n->Request(clients[i],448u);
+-    gBS->Stall(100000);
+-    G726_GX_DECOLLAPSE();
+-    UINT32 v=MmioRead32(0x03d9905c);
+-    if(v!=MAX_UINT32&&(v&(1u<<31))){winner=1+i;mG727Trail[12]|=2u;mG727Trail[3+i]=v;break;}
+-   }}
+-  mG727Trail[11]=MmioRead32(0x03d9905c);
+-  mProxy.RetainedMask|=(winner?(8u):(0u));
+-  mProxy.ClientType|=winner?(winner<<8):(0u);
+- }
++ /* G736: speculative QMP voltage messages and GX NPA probes removed. */
+  mProxy.Stage=6;
+  for(UINTN i=0;i<3;i++) {
+   st=State(n,mProxyName[i],&state);mProxy.FinalQueryStatus[i]=st;
+@@ -583,10 +514,11 @@
+  UINT32 GpllMode,GpllLock,VoteReg;
+  UINT32 HubCmd[2],HubCfg[2],HubCxInt[2],Ahb[2];
+  UINT32 GmuCmd[2],GmuCfg[2],CxGmu[2],Cxo[2];
+- /* G727 GX rail trail: GxHwCtl[2]=0x3d9953c before/after, GxDscr[0]=entry,
+-  * [1..8]=GDSCR after each candidate vote+ramp, GxDscrFinal=last, GxFlags
+-  * bits: 1=multiple-names-resolved 2=any-rail-lift */
++ /* Keep the v1 report prefix; legacy probe fields remain zero. */
+  UINT32 GxHwCtl[2],GxDscr[9],GxDscrFinal,GxFlags;
++ /* v2 append-only observations: entry/final GPUCC registers, valid mask.
++  * GfxStatusPa is metadata only; no firmware read of that address. */
++ UINT32 GxObservedGdscr[2],GxObservedCfg[2],GxCapturedMask,GfxStatusPa;
+ }G721_ROOT_REPORT;
+ #pragma pack(pop)
+ static G721_ROOT_REPORT mR721;
+@@ -877,6 +809,7 @@
+ {
+     G290_NPA *n=NULL;EFI_STATUS s;UINT32 value;
+     s=MappingPreflight();if(s!=EFI_SUCCESS) return s;
++    G736CaptureGx(0);
+     s=RequireGxOff(0);if(s!=EFI_SUCCESS)return s;
+     s=gBS->LocateProtocol(&mNpaGuid,NULL,(VOID**)&n);
+     if(s!=EFI_SUCCESS) return s;
+@@ -990,9 +923,9 @@
+     }
+     /* Real power/clock requests have completed. Stop BEFORE GR0/CB/GMU.
+      * Actual Windows D0 and cold producer must independently requalify. */
+-    /* G726: HW_CTRL clear + final de-collapse; leave GX powered across EBS */
+-    G726_GX_DECOLLAPSE();
+-    mGx.ColdGxOff=1;
++    G736CaptureGx(1);
++    /* A GPUCC collapse request is not actual GMU GX-off qualification. */
++    mGx.ColdGxOff=0;
+     mReport.Stage=7;mReport.ReadyBeforeEbs=0;
+     mReport.PostEbsPersistenceProven=0;return EFI_SUCCESS;
+ }
+@@ -1071,7 +1004,7 @@
+     ZeroMem(&mR721,sizeof(mR721));CopyMem(&mR721.Header,&mProxy.Header,sizeof(mR721.Header));
+     mR721.Header.Signature=SIGNATURE_32('O','G','R','7');
+     mR721.Header.OemTableId=SIGNATURE_64('G','7','2','1','R','O','O','T');
+-    mR721.Header.Length=sizeof(mR721);mR721.Version=1;mR721.Status=EFI_NOT_READY;
++    mR721.Header.Length=sizeof(mR721);mR721.Version=2;mR721.Status=EFI_NOT_READY;
+     G530Init();
+     s=Prepare();mReport.Status=s;
+     G530_REPORT*lease=G530Report();lease->Header.Checksum=0;
+@@ -1111,9 +1044,9 @@
+     if(EFI_ERROR(report)) DEBUG((DEBUG_ERROR,"G400 OGPL install failure %r\n",report));
+     report=acpi->InstallAcpiTable(acpi,&mProxy,sizeof(mProxy),&key);
+     if(EFI_ERROR(report)) DEBUG((DEBUG_ERROR,"G416 OGPV install failure %r\n",report));
+-    for(UINTN t2=0;t2<9;t2++)mR721.GxDscr[t2]=mG727Trail[t2<1?0:(t2+2)];
+-    mR721.GxDscr[8]=mG727Trail[11];mR721.GxFlags=mG727Trail[12];
+-    mR721.GxHwCtl[0]=mG727Trail[1];mR721.GxHwCtl[1]=mG727Trail[2];
++    CopyMem(mR721.GxObservedGdscr,mG736Gdscr,sizeof(mG736Gdscr));
++    CopyMem(mR721.GxObservedCfg,mG736Cfg,sizeof(mG736Cfg));
++    mR721.GxCapturedMask=mG736Captured;mR721.GfxStatusPa=0x03d7e340;
+     mR721.Header.Checksum=0;mR721.Header.Checksum=CalculateCheckSum8((UINT8*)&mR721,sizeof(mR721));
+     report=acpi->InstallAcpiTable(acpi,&mR721,sizeof(mR721),&key);
+     if(EFI_ERROR(report)) DEBUG((DEBUG_ERROR,"G721 OGR7 install failure %r\n",report));

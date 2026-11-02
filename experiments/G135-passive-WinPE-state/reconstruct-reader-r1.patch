@@ -1,0 +1,9 @@
+--- a/probe/g135_decode.go
++++ b/probe/g135_decode.go
+@@ -13,2 +13 @@
+-const captureHeaderBytes = 288
+-const captureBytes = captureHeaderBytes + 0x500000
++const captureBytes = 5243168
+@@ -77 +76 @@
+-		a, c := b[captureHeaderBytes+offset:captureHeaderBytes+offset+size], b[captureHeaderBytes+offset+size:captureHeaderBytes+offset+2*size]
++		a, c := b[288+offset:352+offset+size], b[288+offset+size:352+offset+2*size]

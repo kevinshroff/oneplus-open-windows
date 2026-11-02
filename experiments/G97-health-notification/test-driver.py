@@ -1,0 +1,14 @@
+"""Execute actual G97 owner callbacks/input with real pthread scheduling."""
+from pathlib import Path
+import argparse,hashlib,json,re,subprocess
+p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--thread-sanitizer',action='store_true');a=p.parse_args();assert not a.output.exists();a.output.mkdir(parents=True);W=Path(__file__).resolve().parent;s=(W/'g97_driver.c').read_text()
+def function(name):
+ m=re.search(r'^(?:static )?(?:ULONG|ULONGLONG|VOID|void|NTSTATUS|int) '+name+r'\(',s,re.M);assert m,name;i=s.index('{',m.end())+1;d=1
+ while d:d+=(s[i]=='{')-(s[i]=='}');i+=1
+ return s[m.start():i]
+context=re.search(r'typedef struct \{.*?\}G97HID_CONTEXT;',s,re.S).group()
+names=['Counter','TimeValue','OwnerLock','OwnerUnlock','Available','StopRequested','SessionStatus','Status','G97HIDFeature','G97HIDSubmit','G97HIDStage','G97HIDPublish','RequestStop','Join','Worker','Start','G97HIDControl','G97HIDD0Entry','G97HIDD0Exit','G97HIDIoInit','G97HIDSuspend','G97HIDRestart','G97HIDSurprise','G97HIDCleanup','G97HIDFileCleanup']
+f=a.output/'model.c';f.write_text((W/'driver-model-prefix.h').read_text()+context+(W/'driver-model-services.h').read_text()+'\n'.join(function(n)for n in names)+(W/'driver-model-main.c').read_text());exe=a.output/'model';cores=['g97hid_report.c','g97_report.c','g97hid_lifecycle.c','g97_input.c'];sources=cores+['g97_driver.c','g97hid_protocol.h','g97_protocol.h','g97_hwapi.h','driver-model-prefix.h','driver-model-services.h','driver-model-main.c'];sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest();before={n:sha(W/n)for n in sources}
+sanitizer='thread'if a.thread_sanitizer else'address,undefined'
+q=subprocess.run(['clang','-std=c11','-O1','-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-unused-const-variable','-fsanitize='+sanitizer,'-pthread','-I',str(W),'-I',str(W/'private/inputs'if(W/'private/inputs').is_dir()else W/'inputs'),str(f),*[str(W/n)for n in cores],'-o',str(exe.resolve())],capture_output=True,text=True);assert not q.returncode,q.stderr
+q=subprocess.run([str(exe.resolve())],capture_output=True,text=True);assert not q.returncode and not q.stderr,(q.stdout,q.stderr);report=json.loads(q.stdout);assert all(sha(W/n)==v for n,v in before.items());report.update(sanitizer=sanitizer,source_sha256=before,native_operations=0,limits=['Kernel/WDF/VHF/firmware and hardware entry are models.','Actual callbacks use real pthread scheduling and mutex/atomic operations; native Windows lifecycle still requires separate qualification.']);(a.output/'tests.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

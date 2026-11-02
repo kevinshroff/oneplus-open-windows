@@ -1,0 +1,12 @@
+--- a/src/freedreno/drm/wddm/fd_wddm.c
++++ b/src/freedreno/drm/wddm/fd_wddm.c
+@@ -4,6 +4,9 @@
+  * same structs. "fds" are small integers handed out by fd_wddm_open() and bound to the escape
+  * callback of the D3D10 UMD device (gdikmt).
+  */
++#include <unistd.h>
++#include <sys/syscall.h>
++#include <sys/ioctl.h>
+ #include <errno.h>
+ #include <stdio.h>
+ #include <io.h>

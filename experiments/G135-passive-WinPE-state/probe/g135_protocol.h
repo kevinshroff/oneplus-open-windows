@@ -1,0 +1,17 @@
+/* SPDX-License-Identifier: MIT */
+#ifndef G135_PROTOCOL_H
+#define G135_PROTOCOL_H
+#define G135_MAGIC 0x31524d353331474fULL
+#define G135_ABI 1u
+#define G135_IOCTL_STATUS CTL_CODE(FILE_DEVICE_UNKNOWN,0xa40,METHOD_BUFFERED,FILE_READ_ACCESS)
+#define G135_IOCTL_READ CTL_CODE(FILE_DEVICE_UNKNOWN,0xa41,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
+#define G135_IOCTL_RESULT CTL_CODE(FILE_DEVICE_UNKNOWN,0xa42,METHOD_BUFFERED,FILE_READ_ACCESS)
+#define G135_PAYLOAD 0x500000u
+typedef struct{ULONG Size,Version;ULONGLONG Magic,Nonce;ULONG Count,Reserved;}G135_REQUEST;
+typedef struct{ULONG Size,Version;ULONGLONG Magic;ULONG KernelBuild,Processors,Irql,FirmwareBytes,FirmwareMatch,FirmwareStatus,MapCalls,Attempts,Ready,Fault;ULONGLONG InterruptTime,Frequency,Sequence;}G135_STATUS;
+typedef struct{ULONGLONG Address;ULONG Bytes,Offset,Host0,Host1,Kind,Status;}G135_REGION;
+typedef struct{G135_STATUS Status;ULONGLONG Nonce;ULONG Code,CompleteMask,ReadBytes,MapCalls;ULONGLONG Begin,End;ULONG RegionCount,PayloadBytes;G135_REGION Regions[5];UCHAR Payload[G135_PAYLOAD];}G135_CAPTURE;
+C_ASSERT(sizeof(G135_REQUEST)==32);C_ASSERT(sizeof(G135_STATUS)==80);
+C_ASSERT(sizeof(G135_REGION)==32);C_ASSERT(FIELD_OFFSET(G135_CAPTURE,Payload)==288);
+C_ASSERT(sizeof(G135_CAPTURE)==5243168);
+#endif

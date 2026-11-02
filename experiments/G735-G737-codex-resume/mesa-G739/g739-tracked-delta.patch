@@ -1,0 +1,336 @@
+diff --git a/src/freedreno/drm/freedreno_drmif.h b/src/freedreno/drm/freedreno_drmif.h
+index c749050..fcdd3f2 100644
+--- a/src/freedreno/drm/freedreno_drmif.h
++++ b/src/freedreno/drm/freedreno_drmif.h
+@@ -326,6 +326,11 @@ bool fd_bo_is_cached(struct fd_bo *bo);
+ void fd_bo_set_metadata(struct fd_bo *bo, void *metadata, uint32_t metadata_size);
+ int fd_bo_get_metadata(struct fd_bo *bo, void *metadata, uint32_t metadata_size);
+ 
++/* Topaz WDDM diagnostic counters shared with the D3D10 frontend. */
++void fd_bo_del_debug_stats(unsigned *v);
++void fd_bo_cache_debug_stats(unsigned *v);
++void fd_pipe_debug_fences(struct fd_pipe *pipe, uint32_t *ctl, uint32_t *last);
++
+ #ifdef __cplusplus
+ } /* end of extern "C" */
+ #endif
+diff --git a/src/gallium/auxiliary/gdikmt/gdikmt_d3dkmt.c b/src/gallium/auxiliary/gdikmt/gdikmt_d3dkmt.c
+index 4c985a3..de13f10 100644
+--- a/src/gallium/auxiliary/gdikmt/gdikmt_d3dkmt.c
++++ b/src/gallium/auxiliary/gdikmt/gdikmt_d3dkmt.c
+@@ -27,7 +27,7 @@ struct d3dkmt_callbacks {
+    PFND3DKMT_CLOSEADAPTER closeAdapter;
+ };
+ 
+-void
++static void
+ gdikmt_load_callbacks(HINSTANCE gdi32lib, struct d3dkmt_callbacks *cb)
+ {
+    cb->queryAdapterInfo = (PFND3DKMT_QUERYADAPTERINFO)GetProcAddress(
+@@ -88,7 +88,7 @@ gdikmt_device_d3dkmt(struct gdikmt_device *iws)
+    return (struct gdikmt_device_d3dkmt *)iws;
+ }
+ 
+-NTSTATUS
++static NTSTATUS
+ gdikmt_d3dkmt_queryadapterinfo(struct gdikmt_device *_device,
+                                KMTQUERYADAPTERINFOTYPE Type,
+                                VOID *pPrivateDriverData,
+@@ -106,7 +106,7 @@ gdikmt_d3dkmt_queryadapterinfo(struct gdikmt_device *_device,
+    return device->cb.queryAdapterInfo(&queryAdapterInfo);
+ }
+ 
+-NTSTATUS
++static NTSTATUS
+ gdikmt_d3dkmt_escape(struct gdikmt_device *_device, VOID *pPrivateDriverData,
+                      UINT PrivateDriverDataSize)
+ {
+@@ -122,7 +122,7 @@ gdikmt_d3dkmt_escape(struct gdikmt_device *_device, VOID *pPrivateDriverData,
+    return device->cb.escape(&escape);
+ }
+ 
+-NTSTATUS
++static NTSTATUS
+ gdikmt_d3dkmt_render(struct gdikmt_context *_ctx, struct gdikmt_render *options)
+ {
+    struct gdikmt_context_d3dkmt *ctx = gdikmt_context_d3dkmt(_ctx);
+@@ -169,7 +169,7 @@ gdikmt_d3dkmt_render(struct gdikmt_context *_ctx, struct gdikmt_render *options)
+    return Status;
+ }
+ 
+-void
++static void
+ gdikmt_d3dkmt_destroycontext(struct gdikmt_context *_ctx)
+ {
+    struct gdikmt_context_d3dkmt *ctx = gdikmt_context_d3dkmt(_ctx);
+@@ -185,7 +185,7 @@ gdikmt_d3dkmt_destroycontext(struct gdikmt_context *_ctx)
+    return;
+ }
+ 
+-NTSTATUS
++static NTSTATUS
+ gdikmt_d3dkmt_createcontext(struct gdikmt_device *_device,
+                             struct gdikmt_context **out_ctx)
+ {
+@@ -222,7 +222,7 @@ gdikmt_d3dkmt_createcontext(struct gdikmt_device *_device,
+    return Status;
+ }
+ 
+-NTSTATUS
++static NTSTATUS
+ gdikmt_d3dkmt_createallocation(struct gdikmt_device *_device,
+                                struct gdikmt_createallocation *options)
+ {
+@@ -245,7 +245,7 @@ gdikmt_d3dkmt_createallocation(struct gdikmt_device *_device,
+    return Status;
+ }
+ 
+-NTSTATUS
++static NTSTATUS
+ gdikmt_d3dkmt_lockallocation(struct gdikmt_device *_device,
+                              D3DKMT_HANDLE hAllocation,
+                              D3DDDICB_LOCKFLAGS flags, void **out_ptr)
+@@ -265,7 +265,7 @@ gdikmt_d3dkmt_lockallocation(struct gdikmt_device *_device,
+    return Status;
+ }
+ 
+-NTSTATUS
++static NTSTATUS
+ gdikmt_d3dkmt_destroyallocation(struct gdikmt_device *_device, HANDLE hResource,
+                                 D3DKMT_HANDLE hAllocation)
+ {
+@@ -287,7 +287,7 @@ gdikmt_d3dkmt_destroyallocation(struct gdikmt_device *_device, HANDLE hResource,
+    return device->cb.destroyAllocation(&destroyAllocation);
+ }
+ 
+-NTSTATUS
++static NTSTATUS
+ gdikmt_d3dddi_queryallocation(struct gdikmt_device *_device,
+                               struct gdikmt_openallocation *openAllocation)
+ {
+@@ -309,7 +309,7 @@ gdikmt_d3dddi_queryallocation(struct gdikmt_device *_device,
+    return Status;
+ }
+ 
+-NTSTATUS
++static NTSTATUS
+ gdikmt_d3dddi_openallocation(struct gdikmt_device *_device,
+                              struct gdikmt_openallocation *openAllocation)
+ {
+@@ -339,7 +339,7 @@ gdikmt_d3dddi_openallocation(struct gdikmt_device *_device,
+    return Status;
+ }
+ 
+-NTSTATUS
++static NTSTATUS
+ gdikmt_d3dkmt_present(struct gdikmt_context *_ctx, D3DKMT_HANDLE hSrcAllocation,
+                       void *winsys_drawable_handle, struct pipe_box *sub_box)
+ {
+@@ -347,7 +347,7 @@ gdikmt_d3dkmt_present(struct gdikmt_context *_ctx, D3DKMT_HANDLE hSrcAllocation,
+    return 0;
+ };
+ 
+-NTSTATUS
++static NTSTATUS
+ gdikmt_d3dkmt_setdisplaymode(struct gdikmt_device *ctx,
+                              D3DKMT_HANDLE hSrcAllocation)
+ {
+@@ -355,7 +355,7 @@ gdikmt_d3dkmt_setdisplaymode(struct gdikmt_device *ctx,
+    return 0;
+ };
+ 
+-void
++static void
+ gdikmt_d3dkmt_destroy(struct gdikmt_device *_device)
+ {
+    struct gdikmt_device_d3dkmt *device = gdikmt_device_d3dkmt(_device);
+diff --git a/src/gallium/drivers/freedreno/freedreno_context.c b/src/gallium/drivers/freedreno/freedreno_context.c
+index 0782b3e..e252acf 100644
+--- a/src/gallium/drivers/freedreno/freedreno_context.c
++++ b/src/gallium/drivers/freedreno/freedreno_context.c
+@@ -767,9 +767,9 @@ fd_context_init_tc(struct pipe_context *pctx, unsigned flags)
+ }
+ 
+ /* TopazGpu debug (d3d10umd TOPAZ_TIMING) */
+-void fd_pipe_debug_fences(struct fd_pipe *pipe, uint32_t *ctl, uint32_t *last);
+ void
+ fd_context_debug_fences(struct pipe_context *pctx, uint32_t *ctl, uint32_t *last)
+ {
++   pctx = threaded_context_unwrap_sync(pctx);
+    fd_pipe_debug_fences(fd_context(pctx)->pipe, ctl, last);
+ }
+diff --git a/src/gallium/drivers/freedreno/freedreno_context.h b/src/gallium/drivers/freedreno/freedreno_context.h
+index 4430169..38a552f 100644
+--- a/src/gallium/drivers/freedreno/freedreno_context.h
++++ b/src/gallium/drivers/freedreno/freedreno_context.h
+@@ -829,6 +829,8 @@ struct pipe_context *fd_context_init_tc(struct pipe_context *pctx,
+ 
+ void fd_context_destroy(struct pipe_context *pctx) assert_dt;
+ 
++void fd_context_debug_fences(struct pipe_context *pctx, uint32_t *ctl, uint32_t *last);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/src/gallium/drivers/freedreno/freedreno_resource.c b/src/gallium/drivers/freedreno/freedreno_resource.c
+index bafe1bc..e8c323d 100644
+--- a/src/gallium/drivers/freedreno/freedreno_resource.c
++++ b/src/gallium/drivers/freedreno/freedreno_resource.c
+@@ -1448,7 +1448,7 @@ fd_resource_create_with_modifiers(struct pipe_screen *pscreen,
+       assert(handle.type == WINSYS_HANDLE_TYPE_FD);
+       rsc = fd_resource(pscreen->resource_from_handle(
+          pscreen, tmpl, &handle, PIPE_HANDLE_USAGE_FRAMEBUFFER_WRITE));
+-      close(handle.handle);
++      close((int)(intptr_t)handle.handle);
+       if (!rsc)
+          return NULL;
+ 
+@@ -1809,6 +1809,9 @@ fd_resource_context_init(struct pipe_context *pctx)
+ void
+ fd_resource_rotate_storage(struct pipe_context *pctx, struct pipe_resource **prscs, unsigned n)
+ {
++   /* Storage rotation is a frontend entry point.  Drain the threaded context
++    * before touching driver state or invalidating bindings. */
++   pctx = threaded_context_unwrap_sync(pctx);
+    struct fd_context *ctx = fd_context(pctx);
+    struct fd_resource *first;
+    struct fd_bo *bo0;
+@@ -1817,6 +1820,7 @@ fd_resource_rotate_storage(struct pipe_context *pctx, struct pipe_resource **prs
+ 
+    if (n < 2)
+       return;
++   fd_context_access_begin(ctx);
+    for (unsigned i = 0; i < n; i++) {
+       fd_bc_invalidate_resource(fd_resource(prscs[i]), false);
+       rebind_resource(fd_resource(prscs[i]));
+@@ -1842,6 +1846,7 @@ fd_resource_rotate_storage(struct pipe_context *pctx, struct pipe_resource **prs
+       last->seqno = seqno_next_u16(&ctx->screen->rsc_seqno);
+    }
+    fd_screen_unlock(ctx->screen);
++   fd_context_access_end(ctx);
+ }
+ 
+ /* TopazGpu debug (d3d10umd TOPAZ_MAPLOG): BO pointer and batch-tracking state of a resource */
+diff --git a/src/gallium/drivers/freedreno/freedreno_resource.h b/src/gallium/drivers/freedreno/freedreno_resource.h
+index e4fb5e1..d365bde 100644
+--- a/src/gallium/drivers/freedreno/freedreno_resource.h
++++ b/src/gallium/drivers/freedreno/freedreno_resource.h
+@@ -475,6 +475,12 @@ fdl_type_from_pipe_target(enum pipe_texture_target target) {
+    }
+ }
+ 
++void fd_resource_rotate_storage(struct pipe_context *pctx, struct pipe_resource **prscs, unsigned n);
++void fd_resource_debug_state(struct pipe_resource *prsc, void **bo, unsigned *batch_mask,
++                             int *write_batch, int *busy);
++
++
++
+ ENDC;
+ 
+ #endif /* FREEDRENO_RESOURCE_H_ */
+diff --git a/src/gallium/drivers/freedreno/freedreno_screen.c b/src/gallium/drivers/freedreno/freedreno_screen.c
+index b52526b..b0c5ae4 100644
+--- a/src/gallium/drivers/freedreno/freedreno_screen.c
++++ b/src/gallium/drivers/freedreno/freedreno_screen.c
+@@ -923,7 +923,15 @@ fd_screen_bo_get_handle(struct pipe_screen *pscreen, struct fd_bo *bo,
+    whandle->stride = stride;
+ 
+    if (whandle->type == WINSYS_HANDLE_TYPE_SHARED) {
+-      return fd_bo_get_name(bo, &whandle->handle) == 0;
++      uint32_t name;
++      if (fd_bo_get_name(bo, &name) != 0)
++         return false;
++#ifdef FD_WDDM
++      whandle->handle = (HANDLE)(uintptr_t)name;
++#else
++      whandle->handle = name;
++#endif
++      return true;
+    } else if (whandle->type == WINSYS_HANDLE_TYPE_KMS) {
+       if (screen->ro) {
+          return renderonly_get_handle(scanout, whandle);
+@@ -931,14 +939,22 @@ fd_screen_bo_get_handle(struct pipe_screen *pscreen, struct fd_bo *bo,
+          uint32_t handle = fd_bo_handle(bo);
+          if (!handle)
+             return false;
++#ifdef FD_WDDM
++         whandle->handle = (HANDLE)(uintptr_t)handle;
++#else
+          whandle->handle = handle;
++#endif
+          return true;
+       }
+    } else if (whandle->type == WINSYS_HANDLE_TYPE_FD) {
+       int fd = fd_bo_dmabuf(bo);
+       if (fd < 0)
+          return false;
++#ifdef FD_WDDM
++      whandle->handle = (HANDLE)(intptr_t)fd;
++#else
+       whandle->handle = fd;
++#endif
+       return true;
+    } else {
+       return false;
+@@ -1003,13 +1019,18 @@ fd_screen_bo_from_handle(struct pipe_screen *pscreen,
+ {
+    struct fd_screen *screen = fd_screen(pscreen);
+    struct fd_bo *bo;
++   /* Topaz transports a 32-bit GEM token in the Windows HANDLE-sized field.
++    * Reject native handles instead of silently truncating their high bits. */
++   uintptr_t handle = (uintptr_t)whandle->handle;
++   if (handle > UINT32_MAX)
++      return NULL;
+ 
+    if (whandle->type == WINSYS_HANDLE_TYPE_SHARED) {
+-      bo = fd_bo_from_name(screen->dev, whandle->handle);
++      bo = fd_bo_from_name(screen->dev, (uint32_t)handle);
+    } else if (whandle->type == WINSYS_HANDLE_TYPE_KMS) {
+-      bo = fd_bo_from_handle(screen->dev, whandle->handle, 0);
++      bo = fd_bo_from_handle(screen->dev, (uint32_t)handle, 0);
+    } else if (whandle->type == WINSYS_HANDLE_TYPE_FD) {
+-      bo = fd_bo_from_dmabuf(screen->dev, whandle->handle);
++      bo = fd_bo_from_dmabuf(screen->dev, (int)handle);
+    } else {
+       DBG("Attempt to import unsupported handle type %d", whandle->type);
+       return NULL;
+diff --git a/src/gallium/targets/d3d10umd/d3d10_gdi.c b/src/gallium/targets/d3d10umd/d3d10_gdi.c
+index 168218b..03379c6 100644
+--- a/src/gallium/targets/d3d10umd/d3d10_gdi.c
++++ b/src/gallium/targets/d3d10umd/d3d10_gdi.c
+@@ -80,14 +80,14 @@ d3d10_fd_escape(void *ctx, void *data, unsigned size)
+ extern struct pipe_screen *
+ d3d10_create_screen(struct gdikmt_device* device);
+ 
+-HDC d3d10_gdi_acquire_hdc(void *winsys_drawable_handle) {
++static HDC d3d10_gdi_acquire_hdc(void *winsys_drawable_handle) {
+    D3DKMT_PRESENT *pPresentInfo = (D3DKMT_PRESENT *)winsys_drawable_handle;
+ 
+    HWND hWnd = pPresentInfo->hWindow;
+    return GetDC(hWnd);
+ }
+ 
+-void d3d10_gdi_release_hdc(void *winsys_drawable_handle, HDC hDC) {
++static void d3d10_gdi_release_hdc(void *winsys_drawable_handle, HDC hDC) {
+    D3DKMT_PRESENT *pPresentInfo = (D3DKMT_PRESENT *)winsys_drawable_handle;
+ 
+    HWND hWnd = pPresentInfo->hWindow;
+diff --git a/src/util/blake3/meson.build b/src/util/blake3/meson.build
+index 8fdabe7..6b53daa 100644
+--- a/src/util/blake3/meson.build
++++ b/src/util/blake3/meson.build
+@@ -32,13 +32,7 @@ elif cpu_family == 'x86'
+   # file, which is not well supported by Meson. Leave SIMD support out for now.
+   blake3_defs += blake3_x86_no_simd_defs
+ elif cpu_family == 'aarch64'
+-  # G717: on Windows clang uses the MSVC CRT arm64_neon.h where vreinterpretq_* are
+-  # identity macros, so blake3_neon.c's __builtin_shufflevector calls do not typecheck.
+-  if is_windows
+-    blake3_defs += ['-DBLAKE3_NO_NEON']
+-  else
+-    files_blake3 += ['blake3_neon.c']
+-  endif
++  files_blake3 += ['blake3_neon.c']
+ endif
+ 
+ blake3 = static_library(

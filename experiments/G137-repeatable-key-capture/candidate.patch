@@ -1,0 +1,871 @@
+--- a/OpenG98.inf
++++ b/OpenG98.inf
+@@ -4,7 +4,7 @@
+ Class=HIDClass
+ ClassGuid={745A17A0-74D3-11D0-B6FE-00A0C90F57DA}
+ Provider=%Provider%
+-DriverVer=10/21/2026,0.0.98.4
++DriverVer=10/21/2026,0.0.98.5
+ CatalogFile=OpenG98.cat
+ PnpLockdown=1
+ 
+--- a/compile-driver.py
++++ b/compile-driver.py
+@@ -9,11 +9,11 @@
+ base=['clang','--target=aarch64-pc-windows-msvc','-ffreestanding','-fms-extensions','-fms-compatibility','-fno-stack-protector','-O2','-std=c11','-D_ARM64_=1','-D_KERNEL_MODE','-DNTDDI_VERSION=0x0A000008','-D_WIN32_WINNT=0x0A00','-Wall','-Wextra','-Werror','-I'+str(a.binding.resolve()),'-I'+str(W)]
+ for x in includes:base+=['-isystem',str(x.resolve())]
+ sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest();objects=[]
+-for name in ['g98_driver','g98_hardware','g100_bus','g100_keys','g99_core','g98hid_report','g98hid_lifecycle','g98_input','g98_observer','g98_rsc','g98_power','g98_spi','g98_engine','g98_touch','g98_contract','g98_plan','g98_report','g98_poll','geni_fifo']:
++for name in ['g98_driver','g98_hardware','g100_bus','g100_keys','g137_capture','g99_core','g98hid_report','g98hid_lifecycle','g98_input','g98_observer','g98_rsc','g98_power','g98_spi','g98_engine','g98_touch','g98_contract','g98_plan','g98_report','g98_poll','geni_fifo']:
+  obj=a.output/(name+'.obj');cmd=base+['-c',str(W/(name+'.c')),'-o',str(obj)]
+  r=subprocess.run(cmd,capture_output=True,text=True);(a.output/(name+'-compiler.txt')).write_text(r.stdout+r.stderr)
+  assert r.returncode==0,r.stdout+r.stderr
+  b=obj.read_bytes();assert struct.unpack_from('<H',b)[0]==0xaa64;obj.write_bytes(b[:4]+b'\0'*4+b[8:])
+  objects.append({'source':name+'.c','source_sha256':sha(W/(name+'.c')),'object':obj.name,'bytes':obj.stat().st_size,'sha256':sha(obj),'argv':cmd,'compiler_output':r.stdout+r.stderr})
+-report={'objects':objects,'headers':{n:sha(W/n)for n in ['g100_bus.h','g100_keys.h','g99_core.h','g99_protocol.h','g98_protocol.h','g98_observer.h','g98_power.h','g98_spi.h','g98_engine.h','g98_touch.h','g98_contract.h','g98_trial.h','g98_report.h','g98_poll.h','geni_fifo.h','g98_hwapi.h','g98hid_protocol.h','g98hid_baseline.h','g98hid_report.h','g98hid_lifecycle.h','g98_input.h']},'binding_sha256':sha(a.binding/'g98_binding.h'),'MMIO_writes_limited_to_fixed_platform_and_validated_bounded_report_reads_and_fixed_event_clears':True,'native_access_qualified_by_this_compile':False}
++report={'objects':objects,'headers':{n:sha(W/n)for n in ['g137_capture.h','g137_protocol.h','g100_bus.h','g100_keys.h','g99_core.h','g99_protocol.h','g98_protocol.h','g98_observer.h','g98_power.h','g98_spi.h','g98_engine.h','g98_touch.h','g98_contract.h','g98_trial.h','g98_report.h','g98_poll.h','geni_fifo.h','g98_hwapi.h','g98hid_protocol.h','g98hid_baseline.h','g98hid_report.h','g98hid_lifecycle.h','g98_input.h']},'binding_sha256':sha(a.binding/'g98_binding.h'),'MMIO_writes_limited_to_fixed_platform_and_validated_bounded_report_reads_and_fixed_event_clears':True,'native_access_qualified_by_this_compile':False}
+ (a.output/'compile.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps({'ARM64_objects':[{k:x[k]for k in ['object','bytes','sha256']}for x in objects]}))
+--- a/g100_keys.c
++++ b/g100_keys.c
+@@ -12,6 +12,7 @@
+ #include "g100_bus.h"
+ #include "g100_keys.h"
+ #include "g100_protocol.h"
++#include "g137_protocol.h"
+ static int FullWindows(void)
+ {
+  UNICODE_STRING name;OBJECT_ATTRIBUTES attributes;HANDLE key;NTSTATUS status;ULONG bytes=0;
+@@ -72,22 +73,50 @@
+ }
+ int G100KeysTryControl(G100_KEYS*k,WDFREQUEST request,size_t outputBytes,size_t inputBytes,ULONG code)
+ {
+- G99_REQUEST*input,in;PVOID output;size_t needed;NTSTATUS status;ULONG_PTR information=0;
+- if(code!=G99_IOCTL_STATUS&&code!=G99_IOCTL_SAMPLE&&code!=G99_IOCTL_RESULT&&code!=G100_IOCTL_BUS)return 0;
+- if(inputBytes!=sizeof(in)){status=STATUS_INVALID_PARAMETER;goto done;}status=WdfRequestRetrieveInputBuffer(request,sizeof(in),(PVOID*)&input,NULL);if(!NT_SUCCESS(status))goto done;in=*input;
+- if(in.Size!=sizeof(in)||in.Version!=G99_ABI||in.Magic!=G99_MAGIC||in.Reserved||((code==G99_IOCTL_STATUS||code==G100_IOCTL_BUS)?in.Nonce||in.Count:!in.Nonce)||(code==G99_IOCTL_RESULT&&in.Count)||(code==G99_IOCTL_SAMPLE&&(!in.Count||in.Count>G99_MAX_SAMPLES))){status=STATUS_INVALID_PARAMETER;goto done;}
+- needed=code==G100_IOCTL_BUS?sizeof(G100_BUS_STATUS):code==G99_IOCTL_STATUS?sizeof(G99_STATUS):sizeof(G99_CAPTURE);if(outputBytes!=needed){status=STATUS_BUFFER_TOO_SMALL;goto done;}status=WdfRequestRetrieveOutputBuffer(request,needed,&output,NULL);if(!NT_SUCCESS(status))goto done;
++ G99_REQUEST*input,in;PVOID output;size_t needed,inputNeeded;NTSTATUS status;ULONG_PTR information=0;G100_BUS_STATUS bus;
++ if(code!=G99_IOCTL_STATUS&&code!=G99_IOCTL_SAMPLE&&code!=G99_IOCTL_RESULT&&code!=G100_IOCTL_BUS&&code!=G137_IOCTL_RETIRE&&code!=G137_IOCTL_STATE)return 0;
++ inputNeeded=code==G137_IOCTL_RETIRE?G137_RETIRE_BYTES:sizeof(in);
++ if(inputBytes!=inputNeeded){status=STATUS_INVALID_PARAMETER;goto done;}status=WdfRequestRetrieveInputBuffer(request,inputNeeded,(PVOID*)&input,NULL);if(!NT_SUCCESS(status))goto done;in=*input;
++ if(in.Size!=sizeof(in)||in.Version!=G99_ABI||in.Magic!=G99_MAGIC||in.Reserved||((code==G99_IOCTL_STATUS||code==G100_IOCTL_BUS||code==G137_IOCTL_STATE)?in.Nonce||in.Count:!in.Nonce)||(code!=G99_IOCTL_SAMPLE&&in.Count)||(code==G99_IOCTL_SAMPLE&&(!in.Count||in.Count>G99_MAX_SAMPLES))){status=STATUS_INVALID_PARAMETER;goto done;}
++ needed=(code==G137_IOCTL_RETIRE||code==G137_IOCTL_STATE)?sizeof(G137_STATE):code==G100_IOCTL_BUS?sizeof(G100_BUS_STATUS):code==G99_IOCTL_STATUS?sizeof(G99_STATUS):sizeof(G99_CAPTURE);if(outputBytes!=needed){status=STATUS_BUFFER_TOO_SMALL;goto done;}status=WdfRequestRetrieveOutputBuffer(request,needed,&output,NULL);if(!NT_SUCCESS(status))goto done;
+  if(code==G100_IOCTL_BUS)G100BusStatus(output);
++ else if(code==G137_IOCTL_STATE)G137CaptureState(&k->Ledger,output);
+  else if(code==G99_IOCTL_STATUS)Status(k,output);
++ else if(code==G137_IOCTL_RETIRE){
++  unsigned disposition;G99_CAPTURE*frozen=k->Frozen;
++  G100BusStatus(&bus);
++  if(!frozen||bus.Poisoned||InterlockedCompareExchange(&k->Fault,0,0)||
++     frozen->Nonce!=in.Nonce||frozen->Result.Code||frozen->NativeGuard){status=STATUS_DEVICE_NOT_READY;goto done;}
++  if(k->Ledger.Phase==G137_READY&&(!InterlockedCompareExchange(&k->Ready,0,0)||!InterlockedCompareExchange(&k->Attempts,0,0))){status=STATUS_DEVICE_NOT_READY;goto done;}
++  disposition=G137CaptureRetire(&k->Ledger,in.Nonce,frozen,(PUCHAR)input+sizeof(in),sizeof(*frozen));
++  if(!disposition){status=STATUS_INVALID_PARAMETER;goto done;}
++  if(disposition==1){
++   /* Per-slot counters reset only after exact acknowledgment; the ledger's
++    * total capture/retirement/map counts and nonce history remain monotonic.
++    * Keep Frozen intact for an idempotent acknowledgment of a lost reply.
++    */
++   InterlockedExchange(&k->Ready,0);InterlockedExchange(&k->Attempts,0);InterlockedExchange(&k->Maps,0);
++  }
++  G137CaptureState(&k->Ledger,output);
++ }
+  else if(code==G99_IOCTL_RESULT){if(!InterlockedCompareExchange(&k->Ready,0,0)||((G99_CAPTURE*)k->Frozen)->Nonce!=in.Nonce){status=STATUS_NOT_FOUND;goto done;}RtlCopyMemory(output,((G99_CAPTURE*)k->Frozen),sizeof(*((G99_CAPTURE*)k->Frozen)));}
+- else{if(InterlockedCompareExchange(&k->Attempts,1,0)){status=STATUS_QUOTA_EXCEEDED;goto done;}RtlZeroMemory(((G99_CAPTURE*)k->Frozen),sizeof(*((G99_CAPTURE*)k->Frozen)));Capture(k,((G99_CAPTURE*)k->Frozen),request,in.Nonce,in.Count);RtlCopyMemory(output,((G99_CAPTURE*)k->Frozen),sizeof(*((G99_CAPTURE*)k->Frozen)));}
++ else{
++  G100BusStatus(&bus);
++  if(bus.Poisoned||InterlockedCompareExchange(&k->Fault,0,0)||!G137CaptureCanBegin(&k->Ledger,in.Nonce)||InterlockedCompareExchange(&k->Attempts,1,0)){status=STATUS_QUOTA_EXCEEDED;goto done;}
++  if(!G137CaptureBegin(&k->Ledger,in.Nonce)){InterlockedExchange(&k->Fault,1);status=STATUS_DEVICE_NOT_READY;goto done;}
++  RtlZeroMemory(((G99_CAPTURE*)k->Frozen),sizeof(*((G99_CAPTURE*)k->Frozen)));Capture(k,((G99_CAPTURE*)k->Frozen),request,in.Nonce,in.Count);
++  if(!G137CaptureComplete(&k->Ledger,(ULONG)InterlockedCompareExchange(&k->Maps,0,0),!InterlockedCompareExchange(&k->Fault,0,0))){
++   InterlockedExchange(&k->Fault,1);((G99_CAPTURE*)k->Frozen)->Result.Code=1006;Status(k,&((G99_CAPTURE*)k->Frozen)->Status);
++  }
++  RtlCopyMemory(output,((G99_CAPTURE*)k->Frozen),sizeof(*((G99_CAPTURE*)k->Frozen)));
++ }
+  status=STATUS_SUCCESS;information=needed;
+  done:WdfRequestCompleteWithInformation(request,status,information);return 1;
+ }
+ 
+ NTSTATUS G100KeysInitialize(G100_KEYS*k,void*owner,int(*available)(void*))
+ {
+- RtlZeroMemory(k,sizeof(*k));k->Owner=owner;k->Available=available;
++ RtlZeroMemory(k,sizeof(*k));k->Owner=owner;k->Available=available;G137CaptureInit(&k->Ledger);
+  k->Frozen=ExAllocatePool2(POOL_FLAG_NON_PAGED,sizeof(G99_CAPTURE),'00GO');
+  return k->Frozen?STATUS_SUCCESS:STATUS_INSUFFICIENT_RESOURCES;
+ }
+--- a/g100_keys.h
++++ b/g100_keys.h
+@@ -1,11 +1,13 @@
+ /* SPDX-License-Identifier: MIT */
+ #ifndef G100_KEYS_H
+ #define G100_KEYS_H
++#include "g137_capture.h"
+ typedef struct {
+  void *Frozen,*Owner;
+  int (*Available)(void *);
+  volatile LONG Attempts,Ready,Fault,Maps;
+  volatile LONG64 Sequence;
++ G137_LEDGER Ledger;
+ } G100_KEYS;
+ NTSTATUS G100KeysInitialize(G100_KEYS *,void *,int (*)(void *));
+ void G100KeysFree(G100_KEYS *);
+--- /dev/null
++++ b/g137_capture.c
+@@ -0,0 +1,62 @@
++/* SPDX-License-Identifier: MIT */
++#include "g137_capture.h"
++_Static_assert(sizeof(G137_STATE)==64,"fixed G137 state ABI");
++_Static_assert(sizeof(G137_LEDGER)==296,"fixed internal ledger");
++void G137CaptureInit(G137_LEDGER *s)
++{
++ if(!s)return;
++ unsigned char *p=(unsigned char *)s;
++ for(unsigned i=0;i<sizeof(*s);i++)p[i]=0;
++}
++unsigned G137CaptureCanBegin(const G137_LEDGER *s,uint64_t nonce)
++{
++ if(!s||!nonce||s->Phase!=G137_EMPTY||s->Count>=G137_CAPTURE_SLOTS||
++    s->Retired!=s->Count||s->TotalMaps!=(uint64_t)s->Retired*5u)return 0;
++ for(unsigned i=0;i<s->Count;i++)if(s->Used[i]==nonce)return 0;
++ return 1;
++}
++unsigned G137CaptureBegin(G137_LEDGER *s,uint64_t nonce)
++{
++ if(!G137CaptureCanBegin(s,nonce))return 0;
++ s->Used[s->Count++]=nonce;s->CurrentNonce=nonce;s->SlotMaps=0;
++ s->Phase=G137_BUSY;return 1;
++}
++unsigned G137CaptureComplete(G137_LEDGER *s,uint32_t maps,unsigned success)
++{
++ if(!s)return 0;
++ if(s->Phase!=G137_BUSY||!s->Count||s->Count>G137_CAPTURE_SLOTS||
++    s->Retired!=s->Count-1||s->Used[s->Count-1]!=s->CurrentNonce||
++    maps>5||s->TotalMaps>G137_CAPTURE_SLOTS*5u-maps||(success&&maps!=5)){
++  s->Phase=G137_FAULT;return 0;
++ }
++ s->SlotMaps=maps;s->TotalMaps+=maps;s->Phase=success?G137_READY:G137_FAULT;
++ return 1;
++}
++unsigned G137CaptureRetire(G137_LEDGER *s,uint64_t nonce,const void *frozen,
++                           const void *echo,uint32_t bytes)
++{
++ if(!s||!nonce||!frozen||!echo||bytes!=G137_CAPTURE_BYTES||
++    s->Count==0||s->Count>G137_CAPTURE_SLOTS)return 0;
++ /* A lost successful response may be acknowledged again while the slot is
++  * still empty. It must match the retained last snapshot exactly. A stale
++  * acknowledgment cannot retire a newer capture, even with identical data.
++  */
++ unsigned repeated=s->Phase==G137_EMPTY&&s->Count==s->Retired&&
++                   nonce==s->LastRetiredNonce&&nonce==s->CurrentNonce;
++ if(s->Used[s->Count-1]!=s->CurrentNonce||s->SlotMaps!=5||
++    s->TotalMaps!=(uint64_t)s->Count*5u)return 0;
++ if(!repeated&&(s->Phase!=G137_READY||s->Count!=s->Retired+1||
++               nonce!=s->CurrentNonce))return 0;
++ const unsigned char *a=frozen,*b=echo;
++ for(unsigned i=0;i<bytes;i++)if(a[i]!=b[i])return 0;
++ if(repeated)return 2;
++ s->Retired++;s->LastRetiredNonce=nonce;s->Phase=G137_EMPTY;
++ return 1;
++}
++void G137CaptureState(const G137_LEDGER *s,G137_STATE *out)
++{
++ if(!s||!out)return;
++ *out=(G137_STATE){sizeof(*out),1,G137_STATE_MAGIC,s->Phase,s->Count,s->Retired,
++                  G137_CAPTURE_SLOTS,s->CurrentNonce,s->LastRetiredNonce,
++                  s->TotalMaps,s->SlotMaps,0};
++}
+--- /dev/null
++++ b/g137_capture.h
+@@ -0,0 +1,30 @@
++/* SPDX-License-Identifier: MIT */
++#ifndef G137_CAPTURE_H
++#define G137_CAPTURE_H
++#include <stdint.h>
++#define G137_CAPTURE_BYTES 139720u
++#define G137_CAPTURE_SLOTS 32u
++#define G137_STATE_MAGIC 0x3159454b37333147ULL /* G137KEY1 */
++enum {G137_EMPTY=0,G137_BUSY=1,G137_READY=2,G137_FAULT=3};
++typedef struct {
++ uint32_t Phase,Count,Retired,SlotMaps;
++ uint64_t CurrentNonce,LastRetiredNonce,TotalMaps,Used[G137_CAPTURE_SLOTS];
++} G137_LEDGER;
++typedef struct {
++ uint32_t Size,Version;uint64_t Magic;
++ uint32_t Phase,Captures,Retirements,Slots;
++ uint64_t CurrentNonce,LastRetiredNonce,TotalMaps;
++ uint32_t SlotMaps,Reserved;
++} G137_STATE;
++/* The owning WDF sequential queue serializes these calls. This core has no
++ * hardware callbacks and does not reset an observer-bus poison/fault latch.
++ * Retirement acknowledges byte-for-byte receipt, not external persistence;
++ * the project client independently saves, syncs, reopens and verifies the file.
++ */
++void G137CaptureInit(G137_LEDGER *);
++unsigned G137CaptureCanBegin(const G137_LEDGER *,uint64_t);
++unsigned G137CaptureBegin(G137_LEDGER *,uint64_t);
++unsigned G137CaptureComplete(G137_LEDGER *,uint32_t,unsigned);
++unsigned G137CaptureRetire(G137_LEDGER *,uint64_t,const void *,const void *,uint32_t);
++void G137CaptureState(const G137_LEDGER *,G137_STATE *);
++#endif
+--- /dev/null
++++ b/g137_main_windows.go
+@@ -0,0 +1,175 @@
++package main
++
++import (
++	"crypto/sha256"
++	"encoding/hex"
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strconv"
++	"strings"
++	"syscall"
++)
++
++func keyIO(h syscall.Handle, code uint32, q []byte, n int) ([]byte, error) {
++	b := make([]byte, n)
++	var got uint32
++	e := syscall.DeviceIoControl(h, code, &q[0], uint32(len(q)), &b[0], uint32(n), &got, nil)
++	if e != nil {
++		return nil, e
++	}
++	if got != uint32(n) {
++		return nil, fmt.Errorf("short result %d", got)
++	}
++	return b, nil
++}
++func main() {
++	result := map[string]any{"ok": false, "sample_submitted": false, "retirement_submitted": false}
++	defer func() {
++		if e := recover(); e != nil {
++			result["error"] = fmt.Sprint(e)
++		}
++		json.NewEncoder(os.Stdout).Encode(result)
++		if result["ok"] != true {
++			os.Exit(1)
++		}
++	}()
++	must := func(e error) {
++		if e != nil {
++			panic(e)
++		}
++	}
++	must(fullOSGuard())
++	if len(os.Args) < 2 {
++		panic("status | bus | state | sample count nonce16 path | result nonce16 path | retire nonce16 path")
++	}
++	mode := os.Args[1]
++	var nonce uint64
++	var count uint64
++	var nonceText, path string
++	var e error
++	switch mode {
++	case "status", "bus", "state":
++		if len(os.Args) != 2 {
++			panic("query arguments")
++		}
++	case "sample":
++		if len(os.Args) != 5 {
++			panic("sample arguments")
++		}
++		count, e = strconv.ParseUint(os.Args[2], 10, 32)
++		must(e)
++		if count < 1 || count > 1024 {
++			panic("sample count")
++		}
++		nonceText, path = os.Args[3], os.Args[4]
++	case "result", "retire":
++		if len(os.Args) != 4 {
++			panic("capture arguments")
++		}
++		nonceText, path = os.Args[2], os.Args[3]
++	default:
++		panic("unknown mode")
++	}
++	if nonceText != "" {
++		nonce, e = strconv.ParseUint(nonceText, 16, 64)
++		must(e)
++		if len(nonceText) != 16 || nonce == 0 || strings.ToLower(nonceText) != nonceText {
++			panic("nonce")
++		}
++		want := "G100-result-" + nonceText + ".bin"
++		recovered := "G100-result-" + nonceText + "-recovered.bin"
++		if !strings.EqualFold(filepath.Dir(path), `C:\OpenG81\payloads`) || (filepath.Base(path) != want && filepath.Base(path) != recovered) {
++			panic("exclusive project result path")
++		}
++	}
++	ptr, _ := syscall.UTF16PtrFromString(`\\.\OpenG100Keys`)
++	h, e := syscall.CreateFile(ptr, syscall.GENERIC_READ|syscall.GENERIC_WRITE, 0, nil, syscall.OPEN_EXISTING, 0, 0)
++	must(e)
++	defer syscall.CloseHandle(h)
++	if mode == "bus" {
++		b, e := keyIO(h, 0x22680c, keyRequest(0, 0), 56)
++		must(e)
++		if le.Uint32(b) != 56 || le.Uint32(b[4:]) != 1 {
++			panic("bus ABI")
++		}
++		v := map[string]any{}
++		for i, n := range []string{"ready", "poisoned", "owners", "peak_owners"} {
++			v[n] = le.Uint32(b[8+4*i:])
++		}
++		for i, n := range []string{"acquires", "releases", "timeouts", "denied"} {
++			v[n] = le.Uint64(b[24+8*i:])
++		}
++		result["bus"] = v
++		result["ok"] = true
++		return
++	}
++	stateBytes, e := keyIO(h, 0x226814, keyRequest(0, 0), 64)
++	must(e)
++	state, e := decodeCaptureState(stateBytes)
++	must(e)
++	result["capture_state_before"] = state
++	if mode == "state" {
++		result["ok"] = true
++		return
++	}
++	if mode == "retire" {
++		if state.CurrentNonce != nonce || (state.Phase != 2 && !(state.Phase == 0 && state.LastRetiredNonce == nonce)) {
++			panic("capture is not awaiting this acknowledgment")
++		}
++		b, sum, e := durableCapture(path, nonce)
++		must(e)
++		q, e := retireRequest(nonce, b)
++		must(e)
++		result["path"], result["sha256"], result["bytes"] = path, sum, len(b)
++		result["retirement_submitted"] = true
++		afterBytes, e := keyIO(h, 0x22e810, q, 64)
++		must(e)
++		after, e := decodeCaptureState(afterBytes)
++		must(e)
++		must(validateRetirement(state, after, nonce))
++		result["capture_state_after"] = after
++		result["idempotent_acknowledgment"] = state.Phase == 0
++		result["ok"] = true
++		return
++	}
++	b, e := keyIO(h, 0x226800, keyRequest(0, 0), 80)
++	must(e)
++	status, e := decodeStatus(b)
++	must(e)
++	result["status_before"] = status
++	if mode == "status" {
++		result["ok"] = true
++		return
++	}
++	if status["kernel_build"] != uint32(26300) || status["processors"] != uint32(8) || status["IRQL"] != uint32(0) || status["firmware_match"] != uint32(1) || status["firmware_bytes"] != uint32(576) {
++		panic("qualified platform required")
++	}
++	if mode == "sample" && (state.Phase != 0 || state.Captures >= state.Slots || status["attempts"] != uint32(0) || status["map_calls"] != uint32(0) || status["fault"] != uint32(0)) {
++		panic("capture slot unavailable; preserve the frozen result")
++	}
++	f, e := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
++	must(e)
++	defer f.Close()
++	code := uint32(0x226808)
++	if mode == "sample" {
++		code = 0x22e804
++		result["sample_submitted"] = true
++	}
++	b, e = keyIO(h, code, keyRequest(nonce, uint32(count)), captureBytes)
++	must(e)
++	written, e := f.Write(b)
++	must(e)
++	if written != len(b) {
++		panic("short capture file write")
++	}
++	must(f.Sync())
++	must(f.Close())
++	sum := sha256.Sum256(b)
++	result["path"], result["sha256"], result["bytes"] = path, hex.EncodeToString(sum[:]), len(b)
++	decoded, e := decodeCapture(b, nonce)
++	must(e)
++	result["result"] = decoded
++	result["ok"] = true
++}
+--- /dev/null
++++ b/g137_protocol.h
+@@ -0,0 +1,14 @@
++/* SPDX-License-Identifier: MIT */
++#ifndef G137_PROTOCOL_H
++#define G137_PROTOCOL_H
++#include "g137_capture.h"
++#define G137_IOCTL_RETIRE CTL_CODE(FILE_DEVICE_UNKNOWN,0xa04,METHOD_BUFFERED,FILE_READ_ACCESS|FILE_WRITE_ACCESS)
++#define G137_IOCTL_STATE CTL_CODE(FILE_DEVICE_UNKNOWN,0xa05,METHOD_BUFFERED,FILE_READ_ACCESS)
++C_ASSERT(sizeof(G99_CAPTURE)==G137_CAPTURE_BYTES);
++C_ASSERT(sizeof(G137_STATE)==64);
++/* RETIRE input: original32-byte G99_REQUEST (Count/Reserved zero), followed
++ * by the complete frozen139720-byte capture. Its output is G137_STATE64.
++ * STATE input is the original zero-nonce/count32-byte request, output64.
++ */
++#define G137_RETIRE_BYTES (sizeof(G99_REQUEST)+sizeof(G99_CAPTURE))
++#endif
+--- /dev/null
++++ b/g137_state.go
+@@ -0,0 +1,136 @@
++package main
++
++import (
++	"bytes"
++	"crypto/sha256"
++	"encoding/hex"
++	"fmt"
++	"io"
++	"os"
++)
++
++type captureState struct {
++	Phase            uint32 `json:"phase"`
++	Captures         uint32 `json:"captures"`
++	Retirements      uint32 `json:"retirements"`
++	Slots            uint32 `json:"slots"`
++	CurrentNonce     uint64 `json:"current_nonce"`
++	LastRetiredNonce uint64 `json:"last_retired_nonce"`
++	TotalMaps        uint64 `json:"lifetime_maps"`
++	SlotMaps         uint32 `json:"last_slot_maps"`
++}
++
++func decodeCaptureState(b []byte) (captureState, error) {
++	var s captureState
++	if len(b) != 64 || le.Uint32(b) != 64 || le.Uint32(b[4:]) != 1 || string(b[8:16]) != "G137KEY1" || le.Uint32(b[60:]) != 0 {
++		return s, fmt.Errorf("G137 state ABI")
++	}
++	s = captureState{le.Uint32(b[16:]), le.Uint32(b[20:]), le.Uint32(b[24:]), le.Uint32(b[28:]), le.Uint64(b[32:]), le.Uint64(b[40:]), le.Uint64(b[48:]), le.Uint32(b[56:])}
++	if s.Phase > 3 || s.Slots != 32 || s.Captures > 32 || s.Retirements > s.Captures || s.SlotMaps > 5 || s.TotalMaps > 160 {
++		return s, fmt.Errorf("G137 state bounds")
++	}
++	if s.Captures == 0 && (s.TotalMaps != 0 || s.SlotMaps != 0) {
++		return s, fmt.Errorf("G137 maps before first capture")
++	}
++	if (s.Captures == 0 && s.CurrentNonce != 0) || (s.Captures != 0 && s.CurrentNonce == 0) || (s.Retirements == 0 && s.LastRetiredNonce != 0) || (s.Retirements != 0 && s.LastRetiredNonce == 0) {
++		return s, fmt.Errorf("G137 nonce history")
++	}
++	if s.Phase == 0 && (s.Captures != s.Retirements || s.TotalMaps != uint64(s.Captures)*5 || (s.Captures != 0 && (s.SlotMaps != 5 || s.CurrentNonce != s.LastRetiredNonce))) {
++		return s, fmt.Errorf("G137 empty-slot history")
++	}
++	if s.Phase == 1 && (s.Captures != s.Retirements+1 || s.SlotMaps != 0 || s.TotalMaps != uint64(s.Retirements)*5) {
++		return s, fmt.Errorf("G137 in-flight history")
++	}
++	if s.Phase == 2 && (s.Captures != s.Retirements+1 || s.SlotMaps != 5 || s.TotalMaps != uint64(s.Captures)*5) {
++		return s, fmt.Errorf("G137 ready-slot history")
++	}
++	return s, nil
++}
++func keyRequest(nonce uint64, count uint32) []byte {
++	q := make([]byte, 32)
++	le.PutUint32(q, 32)
++	le.PutUint32(q[4:], 1)
++	copy(q[8:], "OG99KEY1")
++	le.PutUint64(q[16:], nonce)
++	le.PutUint32(q[24:], count)
++	return q
++}
++func retireRequest(nonce uint64, b []byte) ([]byte, error) {
++	v, e := decodeCapture(b, nonce)
++	if e != nil {
++		return nil, e
++	}
++	if v["operation_code"] != uint32(0) {
++		return nil, fmt.Errorf("failed/uncertain capture is retained until reboot")
++	}
++	q := make([]byte, 32+captureBytes)
++	copy(q, keyRequest(nonce, 0))
++	copy(q[32:], b)
++	return q, nil
++}
++func boundedCapture(f *os.File) ([]byte, error) {
++	stat, e := f.Stat()
++	if e != nil {
++		return nil, e
++	}
++	if !stat.Mode().IsRegular() || stat.Size() != captureBytes {
++		return nil, fmt.Errorf("exact regular capture file required")
++	}
++	b := make([]byte, captureBytes)
++	if _, e = io.ReadFull(f, b); e != nil {
++		return nil, e
++	}
++	var extra [1]byte
++	n, e := f.Read(extra[:])
++	if n != 0 || e != io.EOF {
++		return nil, fmt.Errorf("capture changed length")
++	}
++	return b, nil
++}
++func durableCapture(path string, nonce uint64) ([]byte, string, error) {
++	// Flush the existing file, close, reopen and compare bounded bytes before ACK.
++	f, e := os.OpenFile(path, os.O_RDWR, 0)
++	if e != nil {
++		return nil, "", e
++	}
++	b, e := boundedCapture(f)
++	if e == nil {
++		_, e = retireRequest(nonce, b)
++	}
++	if e == nil {
++		e = f.Sync()
++	}
++	closed := f.Close()
++	if e != nil {
++		return nil, "", e
++	}
++	if closed != nil {
++		return nil, "", closed
++	}
++	f, e = os.Open(path)
++	if e != nil {
++		return nil, "", e
++	}
++	again, e := boundedCapture(f)
++	closed = f.Close()
++	if e != nil {
++		return nil, "", e
++	}
++	if closed != nil {
++		return nil, "", closed
++	}
++	if !bytes.Equal(b, again) {
++		return nil, "", fmt.Errorf("persisted capture differs after reopen")
++	}
++	sum := sha256.Sum256(b)
++	return b, hex.EncodeToString(sum[:]), nil
++}
++func validateRetirement(before, after captureState, nonce uint64) error {
++	if nonce == 0 || before.CurrentNonce != nonce || (before.Phase != 2 && !(before.Phase == 0 && before.LastRetiredNonce == nonce)) {
++		return fmt.Errorf("capture is not awaiting this acknowledgment")
++	}
++	if after.Phase != 0 || after.Captures != before.Captures || after.Retirements != before.Captures || after.CurrentNonce != nonce || after.LastRetiredNonce != nonce || after.TotalMaps != before.TotalMaps || after.SlotMaps != 5 {
++		return fmt.Errorf("retirement response does not match requested capture")
++	}
++	return nil
++}
+--- /dev/null
++++ b/g137_state_test.go
+@@ -0,0 +1,133 @@
++package main
++
++import (
++	"bytes"
++	"crypto/sha256"
++	"encoding/hex"
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++const modelNonce = uint64(0x1020304050607080)
++
++func fixture(t *testing.T, suffix string) []byte {
++	t.Helper()
++	b, e := os.ReadFile("testdata/model-capture.bin" + suffix)
++	if e != nil {
++		t.Fatal(e)
++	}
++	return b
++}
++func TestActualCStateAndAcknowledgment(t *testing.T) {
++	ready, e := decodeCaptureState(fixture(t, ".state-ready"))
++	if e != nil {
++		t.Fatal(e)
++	}
++	retired, e := decodeCaptureState(fixture(t, ".state-retired"))
++	if e != nil {
++		t.Fatal(e)
++	}
++	fault, e := decodeCaptureState(fixture(t, ".state-fault"))
++	if e != nil {
++		t.Fatal(e)
++	}
++	if ready.Phase != 2 || ready.Captures != 1 || retired.Phase != 0 || retired.Retirements != 1 || fault.Phase != 3 || fault.Captures != 2 || fault.TotalMaps != 7 {
++		t.Fatal("actual C state layout")
++	}
++	if e = validateRetirement(ready, retired, modelNonce); e != nil {
++		t.Fatal(e)
++	}
++	if e = validateRetirement(retired, retired, modelNonce); e != nil {
++		t.Fatal("lost-reply acknowledgment", e)
++	}
++	if e = validateRetirement(fault, retired, modelNonce); e == nil {
++		t.Fatal("fault acknowledged")
++	}
++	b := fixture(t, "")
++	q, e := retireRequest(modelNonce, b)
++	if e != nil {
++		t.Fatal(e)
++	}
++	if len(q) != 32+captureBytes || le.Uint32(q) != 32 || le.Uint32(q[4:]) != 1 || string(q[8:16]) != "OG99KEY1" || le.Uint64(q[16:]) != modelNonce || le.Uint64(q[24:]) != 0 || !bytes.Equal(q[32:], b) {
++		t.Fatal("exact wire acknowledgment")
++	}
++}
++func TestMalformedState(t *testing.T) {
++	tests := map[string]func([]byte){
++		"size": func(b []byte) { b[0]-- }, "version": func(b []byte) { b[4]++ }, "magic": func(b []byte) { b[8] ^= 1 }, "reserved": func(b []byte) { b[60] = 1 },
++		"phase": func(b []byte) { le.PutUint32(b[16:], 4) }, "slots": func(b []byte) { le.PutUint32(b[28:], 33) }, "captures": func(b []byte) { le.PutUint32(b[20:], 33) },
++		"retired": func(b []byte) { le.PutUint32(b[24:], 2) }, "slot-maps": func(b []byte) { le.PutUint32(b[56:], 6) }, "total-maps": func(b []byte) { le.PutUint64(b[48:], 161) },
++		"nonce": func(b []byte) { le.PutUint64(b[32:], 0) }, "premature-retired-nonce": func(b []byte) { le.PutUint64(b[40:], modelNonce) },
++		"empty-unretired": func(b []byte) { le.PutUint32(b[16:], 0) }, "ready-maps": func(b []byte) { le.PutUint64(b[48:], 4) }, "busy-maps": func(b []byte) { le.PutUint32(b[16:], 1) },
++	}
++	for name, change := range tests {
++		t.Run(name, func(t *testing.T) {
++			b := fixture(t, ".state-ready")
++			change(b)
++			if _, e := decodeCaptureState(b); e == nil {
++				t.Fatal("accepted invalid state")
++			}
++		})
++	}
++	for _, size := range []int{0, 1, 16, 63} {
++		t.Run("truncated-"+string(rune('A'+size)), func(t *testing.T) {
++			if _, e := decodeCaptureState(fixture(t, ".state-ready")[:size]); e == nil {
++				t.Fatal("truncation")
++			}
++		})
++	}
++}
++func TestWrongRetirementResponse(t *testing.T) {
++	ready, _ := decodeCaptureState(fixture(t, ".state-ready"))
++	retired, _ := decodeCaptureState(fixture(t, ".state-retired"))
++	tests := map[string]func(*captureState){"phase": func(s *captureState) { s.Phase = 2 }, "count": func(s *captureState) { s.Captures++ }, "retired": func(s *captureState) { s.Retirements-- }, "current": func(s *captureState) { s.CurrentNonce++ }, "last": func(s *captureState) { s.LastRetiredNonce++ }, "maps": func(s *captureState) { s.TotalMaps++ }, "slot": func(s *captureState) { s.SlotMaps-- }}
++	for name, change := range tests {
++		t.Run(name, func(t *testing.T) {
++			s := retired
++			change(&s)
++			if e := validateRetirement(ready, s, modelNonce); e == nil {
++				t.Fatal("accepted contradiction")
++			}
++		})
++	}
++	if e := validateRetirement(ready, retired, modelNonce+1); e == nil {
++		t.Fatal("wrong nonce")
++	}
++}
++func TestDurableCapture(t *testing.T) {
++	dir := t.TempDir()
++	path := filepath.Join(dir, "capture.bin")
++	b := fixture(t, "")
++	if e := os.WriteFile(path, b, 0600); e != nil {
++		t.Fatal(e)
++	}
++	got, sum, e := durableCapture(path, modelNonce)
++	if e != nil {
++		t.Fatal(e)
++	}
++	hash := sha256.Sum256(b)
++	if !bytes.Equal(got, b) || sum != hex.EncodeToString(hash[:]) {
++		t.Fatal("save/reopen hash")
++	}
++	for name, data := range map[string][]byte{"truncated": b[:len(b)-1], "extra": append(append([]byte(nil), b...), 0), "wrong-nonce": func() []byte { c := append([]byte(nil), b...); c[80] ^= 1; return c }(), "failed-capture": func() []byte { c := append([]byte(nil), b...); le.PutUint32(c[108:], 1006); return c }()} {
++		t.Run(name, func(t *testing.T) {
++			p := filepath.Join(dir, name+".bin")
++			if e := os.WriteFile(p, data, 0600); e != nil {
++				t.Fatal(e)
++			}
++			if _, _, e := durableCapture(p, modelNonce); e == nil {
++				t.Fatal("invalid durable file accepted")
++			}
++		})
++	}
++	if _, _, e := durableCapture(filepath.Join(dir, "missing.bin"), modelNonce); e == nil {
++		t.Fatal("missing capture created")
++	}
++	if _, e := os.Stat(filepath.Join(dir, "missing.bin")); !os.IsNotExist(e) {
++		t.Fatal("retirement created file")
++	}
++	if _, _, e := durableCapture(dir, modelNonce); e == nil {
++		t.Fatal("directory accepted")
++	}
++}
+--- a/g99_decode.go
++++ b/g99_decode.go
+@@ -6,7 +6,7 @@
+ func decodeCapture(b []byte,nonce uint64)(map[string]any,error){
+  if len(b)!=captureBytes{return nil,errors.New("G99 capture size")};status,e:=decodeStatus(b[:80]);if e!=nil{return nil,e};if le.Uint64(b[80:])!=nonce{return nil,errors.New("nonce mismatch")};u:=func(at int)uint32{return le.Uint32(b[104+at:])};q:=func(at int)uint64{return le.Uint64(b[104+at:])};requested:=le.Uint32(b[88:]);nr,nw,ng:=le.Uint32(b[92:]),le.Uint32(b[96:]),le.Uint32(b[100:]);code,reads,writes,commands,traces,count:=u(4),u(12),u(16),u(20),u(28),u(32)
+  if u(0)!=139616||requested<1||requested>1024||reads>65000||nr>80000||nr<reads||writes>3078||commands>writes||nw>commands||ng>4||traces>3078||count>requested||u(24)>commands*12||u(40)>1||u(44)>1{return nil,errors.New("capture bounds")}
+- if code>15&&code!=1004&&code!=1005{return nil,errors.New("unknown operation code")};transitions:=[]map[string]any{};var previous []byte;var last uint64
++ if code>15&&code!=1004&&code!=1005&&code!=1006{return nil,errors.New("unknown operation code")};transitions:=[]map[string]any{};var previous []byte;var last uint64
+  for i:=0;i<int(count);i++{at:=104+112+16*i;tick:=le.Uint64(b[at:]);if tick<q(48)||(i>0&&tick<last){return nil,errors.New("sample clock order")};raw:=b[at+8:at+11];if previous==nil||!bytes.Equal(raw,previous){transitions=append(transitions,map[string]any{"at_us":tick-q(48),"PON_PBS":uint32(raw[0]),"PON_HLOS":uint32(raw[1]),"GPIO6":uint32(raw[2])});previous=append([]byte(nil),raw...)};last=tick}
+  for i:=0;i<int(traces);i++{at:=104+112+16384+40*i;target,offset,length,flags:=le.Uint32(b[at:]),le.Uint32(b[at+4:]),le.Uint32(b[at+8:]),le.Uint32(b[at+12:]);valid:=offset==0&&length==8||target>0&&offset==0x10&&length==1||target==3&&offset==0x40&&length==8;if target>3||!valid||flags>63||le.Uint32(b[at+36:])!=0{return nil,errors.New("trace bounds")};if code==0&&(flags!=63||le.Uint32(b[at+24:])&0xf!=1){return nil,errors.New("successful command not complete")}}
+  ids:=[]string{};for i:=0;i<4;i++{ids=append(ids,hex.EncodeToString(b[168+8*i:176+8*i]))};before,after:=b[200:208],b[208:216]
+--- a/test-abi.py
++++ b/test-abi.py
+@@ -15,9 +15,12 @@
+ #define FILE_READ_ACCESS 1
+ #define FILE_WRITE_ACCESS 2
+ #include "g99_protocol.h"
+-int main(int argc,char**argv){assert(argc==2);G99_CAPTURE*c=calloc(1,sizeof(*c));Model m={0};assert(c);Run(&m,4,&c->Result);assert(!c->Result.Code);c->Status.Size=80;c->Status.Version=1;c->Status.Magic=G99_MAGIC;c->Status.KernelBuild=26300;c->Status.Processors=8;c->Status.FirmwareBytes=576;c->Status.FirmwareMatch=1;c->Status.MapCalls=5;c->Status.Attempts=c->Status.Ready=1;c->Status.Frequency=19200000;c->Nonce=0x1020304050607080ULL;c->Requested=4;c->NativeReads=m.Reads+4*m.Writes;c->NativeWrites=m.Writes;FILE*f=fopen(argv[1],"wb");assert(f&&fwrite(c,sizeof(*c),1,f)==1&&!fclose(f));printf("{\"capture\":%zu,\"core\":%zu,\"core_offset\":%zu,\"sample_offset\":%zu,\"trace_offset\":%zu}\n",sizeof(*c),sizeof(c->Result),offsetof(G99_CAPTURE,Result),offsetof(G99_RESULT,Samples),offsetof(G99_RESULT,Trace));free(c);return 0;}
++#include "g137_capture.h"
++int main(int argc,char**argv){assert(argc==2);G99_CAPTURE*c=calloc(1,sizeof(*c));Model m={0};assert(c);Run(&m,4,&c->Result);assert(!c->Result.Code);c->Status.Size=80;c->Status.Version=1;c->Status.Magic=G99_MAGIC;c->Status.KernelBuild=26300;c->Status.Processors=8;c->Status.FirmwareBytes=576;c->Status.FirmwareMatch=1;c->Status.MapCalls=5;c->Status.Attempts=c->Status.Ready=1;c->Status.Frequency=19200000;c->Nonce=0x1020304050607080ULL;c->Requested=4;c->NativeReads=m.Reads+4*m.Writes;c->NativeWrites=m.Writes;FILE*f=fopen(argv[1],"wb");assert(f&&fwrite(c,sizeof(*c),1,f)==1&&!fclose(f));G137_LEDGER ledger;G137_STATE state;char name[4096];G137CaptureInit(&ledger);assert(G137CaptureBegin(&ledger,c->Nonce));assert(G137CaptureComplete(&ledger,5,1));
++ for(unsigned i=0;i<3;i++){if(i==1)assert(G137CaptureRetire(&ledger,c->Nonce,c,c,sizeof(*c))==1);if(i==2){assert(G137CaptureBegin(&ledger,c->Nonce+1));assert(G137CaptureComplete(&ledger,2,0));}G137CaptureState(&ledger,&state);int n=snprintf(name,sizeof(name),"%s.state-%s",argv[1],i==0?"ready":i==1?"retired":"fault");assert(n>0&&(size_t)n<sizeof(name));f=fopen(name,"wb");assert(f&&fwrite(&state,sizeof(state),1,f)==1&&!fclose(f));}
++printf("{\"capture\":%zu,\"core\":%zu,\"core_offset\":%zu,\"sample_offset\":%zu,\"trace_offset\":%zu}\n",sizeof(*c),sizeof(c->Result),offsetof(G99_CAPTURE,Result),offsetof(G99_RESULT,Samples),offsetof(G99_RESULT,Trace));free(c);return 0;}
+ '''
+-f=O/'fixture.c';f.write_text(c);exe=O/'fixture';q=subprocess.run(['clang','-std=c11','-O1','-Wall','-Wextra','-Werror','-I',str(w),str(f),str(w/'g99_core.c'),'-o',str(exe)],capture_output=True,text=True);assert not q.returncode,q.stderr
++f=O/'fixture.c';f.write_text(c);exe=O/'fixture';q=subprocess.run(['clang','-std=c11','-O1','-Wall','-Wextra','-Werror','-I',str(w),str(f),str(w/'g99_core.c'),str(w/'g137_capture.c'),'-o',str(exe)],capture_output=True,text=True);assert not q.returncode,q.stderr
+ fixture=O/'model-capture.bin';q=subprocess.run([str(exe),str(fixture)],capture_output=True,text=True);assert not q.returncode,q.stderr;layout=json.loads(q.stdout)
+ g=r'''package main
+ import("os";"fmt")
+@@ -27,4 +30,4 @@
+  fmt.Printf("{\"passed\":true,\"cases\":%d,\"actual_C_layout_and_Go_decoder\":true,\"hardware_explicitly_modeled\":true,\"native_operations\":0}\n",cases)}
+ '''
+ f=O/'main.go';f.write_text(g);d=O/'g99_decode.go';d.write_bytes((w/'g99_decode.go').read_bytes());exe=O/'decoder';q=subprocess.run(['go','build','-o',str(exe),str(f),str(d)],capture_output=True,text=True);assert not q.returncode,q.stderr
+-q=subprocess.run([str(exe),str(fixture)],capture_output=True,text=True);assert not q.returncode and not q.stderr,(q.stdout,q.stderr);v=json.loads(q.stdout);v.update(layout=layout,source_sha256={n:hashlib.sha256((w/n).read_bytes()).hexdigest()for n in ['g99_core.h','g99_core.c','g99_protocol.h','g99_decode.go','test-core.c']});(O/'tests.json').write_text(json.dumps(v,indent=2));print(json.dumps(v))
++q=subprocess.run([str(exe),str(fixture)],capture_output=True,text=True);assert not q.returncode and not q.stderr,(q.stdout,q.stderr);v=json.loads(q.stdout);v.update(layout=layout,source_sha256={n:hashlib.sha256((w/n).read_bytes()).hexdigest()for n in ['g99_core.h','g99_core.c','g99_protocol.h','g99_decode.go','test-core.c','g137_capture.c','g137_capture.h']});(O/'tests.json').write_text(json.dumps(v,indent=2));print(json.dumps(v))
+--- a/test-dispatch.py
++++ b/test-dispatch.py
+@@ -9,7 +9,7 @@
+ #include <stdio.h>
+ #include <string.h>
+ #include "g99_core.h"
+-typedef uint32_t ULONG;typedef uint64_t ULONGLONG;typedef int32_t LONG,NTSTATUS;typedef int64_t LONG64;typedef uint64_t ULONG_PTR;typedef void*PVOID;typedef void*WDFREQUEST;typedef void*WDFQUEUE;
++typedef uint32_t ULONG;typedef uint64_t ULONGLONG;typedef int32_t LONG,NTSTATUS;typedef int64_t LONG64;typedef uint64_t ULONG_PTR;typedef void*PVOID;typedef unsigned char*PUCHAR;typedef void*WDFREQUEST;typedef void*WDFQUEUE;
+ #define VOID void
+ #define C_ASSERT(x) _Static_assert(x,#x)
+ #define FIELD_OFFSET(t,f) offsetof(t,f)
+@@ -25,6 +25,7 @@
+ #define STATUS_BUFFER_TOO_SMALL (-3)
+ #define STATUS_NOT_FOUND (-4)
+ #define STATUS_QUOTA_EXCEEDED (-5)
++#define STATUS_DEVICE_NOT_READY (-6)
+ #define UNREFERENCED_PARAMETER(x) ((void)x)
+ #define RtlCopyMemory memcpy
+ #define RtlZeroMemory(p,n) memset(p,0,n)
+@@ -32,18 +33,20 @@
+ #include "g100_keys.h"
+ #include "g100_bus.h"
+ #include "g100_protocol.h"
+-static G99_CAPTURE Frozen,Response;static G100_KEYS Keys;static unsigned Calls,StatusCalls,Cases;
++#include "g137_protocol.h"
++static G99_CAPTURE Frozen,Response;static G100_KEYS Keys;static unsigned Calls,StatusCalls,Cases,CaptureFault,BusPoison;
+ typedef struct{void*In,*Out;NTSTATUS InStatus,OutStatus,Completed;ULONG_PTR Information;}Request;
+ static LONG InterlockedCompareExchange(volatile LONG*p,LONG v,LONG want){return __sync_val_compare_and_swap(p,want,v);}
+-static NTSTATUS WdfRequestRetrieveInputBuffer(WDFREQUEST p,size_t n,void**out,void*z){Request*r=p;(void)z;assert(n==32);if(!r->InStatus)*out=r->In;return r->InStatus;}
+-static NTSTATUS WdfRequestRetrieveOutputBuffer(WDFREQUEST p,size_t n,void**out,void*z){Request*r=p;(void)z;assert(n==56||n==80||n==sizeof(G99_CAPTURE));if(!r->OutStatus)*out=r->Out;return r->OutStatus;}
++static LONG InterlockedExchange(volatile LONG*p,LONG v){return __sync_lock_test_and_set(p,v);}
++static NTSTATUS WdfRequestRetrieveInputBuffer(WDFREQUEST p,size_t n,void**out,void*z){Request*r=p;(void)z;assert(n==32||n==G137_RETIRE_BYTES);if(!r->InStatus)*out=r->In;return r->InStatus;}
++static NTSTATUS WdfRequestRetrieveOutputBuffer(WDFREQUEST p,size_t n,void**out,void*z){Request*r=p;(void)z;assert(n==56||n==64||n==80||n==sizeof(G99_CAPTURE));if(!r->OutStatus)*out=r->Out;return r->OutStatus;}
+ static void WdfRequestCompleteWithInformation(WDFREQUEST p,NTSTATUS s,ULONG_PTR n){Request*r=p;r->Completed=s;r->Information=n;}
+-void G100BusStatus(G100_BUS_STATUS*p){memset(p,0,sizeof(*p));p->Size=56;}
++void G100BusStatus(G100_BUS_STATUS*p){memset(p,0,sizeof(*p));p->Size=56;p->Ready=1;p->Poisoned=BusPoison;}
+ static void Status(G100_KEYS*k,G99_STATUS*p){(void)k;memset(p,0,sizeof(*p));p->Size=80;StatusCalls++;}
+-static void Capture(G100_KEYS*k,G99_CAPTURE*p,WDFREQUEST r,ULONGLONG nonce,ULONG n){assert(p==&Frozen&&r&&nonce&&n>0&&n<=1024);Calls++;p->Nonce=nonce;p->Requested=n;k->Ready=1;}
++static void Capture(G100_KEYS*k,G99_CAPTURE*p,WDFREQUEST r,ULONGLONG nonce,ULONG n){assert(p==&Frozen&&r&&nonce&&n>0&&n<=1024);Calls++;p->Nonce=nonce;p->Requested=n;k->Maps=5;k->Ready=1;if(CaptureFault){k->Fault=1;p->Result.Code=77;}}
+ '''
+ main=r'''
+-static void Reset(void){memset(&Frozen,0,sizeof(Frozen));memset(&Response,0,sizeof(Response));memset(&Keys,0,sizeof(Keys));Keys.Frozen=&Frozen;Calls=StatusCalls=0;}
++static void Reset(void){memset(&Frozen,0,sizeof(Frozen));memset(&Response,0,sizeof(Response));memset(&Keys,0,sizeof(Keys));Keys.Frozen=&Frozen;Calls=StatusCalls=CaptureFault=BusPoison=0;}
+ int main(void){const ULONG codes[4]={G99_IOCTL_STATUS,G99_IOCTL_SAMPLE,G99_IOCTL_RESULT,G100_IOCTL_BUS};
+  for(unsigned at=0;at<4;at++)for(unsigned bad=0;bad<13;bad++){Reset();G99_REQUEST q={32,1,G99_MAGIC,(at==1||at==2)?123:0,at==1?1:0,0};size_t in=32,out=at==3?56:at?sizeof(Response):80;ULONG code=codes[at];if(bad==0)code=0;if(bad==1)q.Size--;if(bad==2)q.Version++;if(bad==3)q.Magic^=1;if(bad==4)q.Reserved=1;if(bad==5)in--;if(bad==6)in++;if(bad==7)out--;if(bad==8)out++;if(bad==9){if(at==0||at==3)q.Nonce=1;else q.Nonce=0;}if(bad==10){if(at==1)q.Count=0;else q.Count=1;}Request r={&q,&Response,0,0,0,0};if(bad==11)r.InStatus=-11;if(bad==12)r.OutStatus=-12;G99Control(0,&r,out,in,code);assert(r.Completed<0&&!r.Information&&!Calls&&!StatusCalls&&!Keys.Attempts);Cases++;}
+  Reset();G99_REQUEST q={32,1,G99_MAGIC,123,1025,0};Request r={&q,&Response,0,0,0,0};G99Control(0,&r,sizeof(Response),32,G99_IOCTL_SAMPLE);assert(r.Completed<0&&!Calls);Cases++;
+@@ -53,7 +56,37 @@
+  r=(Request){&q,&Response,0,0,0,0};G99Control(0,&r,sizeof(Response),32,G99_IOCTL_SAMPLE);assert(r.Completed==STATUS_QUOTA_EXCEEDED&&Calls==1);Cases++;
+  q.Count=0;q.Nonce=124;r=(Request){&q,&Response,0,0,0,0};G99Control(0,&r,sizeof(Response),32,G99_IOCTL_RESULT);assert(r.Completed==STATUS_NOT_FOUND&&Calls==1);Cases++;
+  q.Nonce=123;r=(Request){&q,&Response,0,0,0,0};G99Control(0,&r,sizeof(Response),32,G99_IOCTL_RESULT);assert(!r.Completed&&Calls==1&&Response.Nonce==123&&!memcmp(&Frozen,&Response,sizeof(Frozen)));Cases++;
++
++ typedef struct{G99_REQUEST Header;G99_CAPTURE Capture;}Ack;
++ static Ack ack;static G137_STATE state;static unsigned char shared[sizeof(Ack)];
++ for(unsigned at=0;at<2;at++)for(unsigned bad=0;bad<13;bad++){
++  Reset();q=(G99_REQUEST){32,1,G99_MAGIC,at?123:0,0,0};ack.Header=q;memset(&ack.Capture,0,sizeof(ack.Capture));
++  size_t in=at?sizeof(ack):32,out=64;ULONG code=at?G137_IOCTL_RETIRE:G137_IOCTL_STATE;
++  if(bad==0)q.Size--;if(bad==1)q.Version++;if(bad==2)q.Magic^=1;if(bad==3)q.Reserved=1;
++  if(bad==4)in--;if(bad==5)in++;if(bad==6)out--;if(bad==7)out++;
++  if(bad==8)q.Nonce=at?0:1;if(bad==9)q.Count=1;ack.Header=q;
++  r=(Request){&ack,&state,0,0,0,0};if(bad==10)r.InStatus=-11;if(bad==11)r.OutStatus=-12;
++  if(bad==12){if(at)BusPoison=1;else q.Count=1;ack.Header=q;}
++  G99Control(0,&r,out,in,code);assert(r.Completed<0&&!r.Information&&!Calls&&!StatusCalls&&!Keys.Attempts&&!Keys.Ledger.Count);Cases++;
++ }
++ Reset();q=(G99_REQUEST){32,1,G99_MAGIC,0,0,0};r=(Request){&q,&state,0,0,0,0};G99Control(0,&r,64,32,G137_IOCTL_STATE);assert(!r.Completed&&state.Size==64&&!state.Phase&&!state.Captures&&!Calls&&!StatusCalls);Cases++;
++ Reset();q=(G99_REQUEST){32,1,G99_MAGIC,123,1,0};r=(Request){&q,&Response,0,0,0,0};G99Control(0,&r,sizeof(Response),32,G99_IOCTL_SAMPLE);assert(!r.Completed&&Keys.Ledger.Phase==G137_READY);ack.Header=(G99_REQUEST){32,1,G99_MAGIC,123,0,0};ack.Capture=Frozen;
++ for(unsigned bad=0;bad<8;bad++){
++  Ack save=ack;G137_LEDGER before=Keys.Ledger;
++  if(bad<4)((unsigned char*)&ack.Capture)[bad==0?0:bad==1?80:bad==2?104:sizeof(Frozen)-1]^=1;
++  if(bad==4)ack.Header.Nonce=124;if(bad==5)BusPoison=1;if(bad==6)Keys.Fault=1;
++  r=(Request){&ack,&state,0,bad==7?-12:0,0,0};G99Control(0,&r,64,sizeof(ack),G137_IOCTL_RETIRE);
++  assert(r.Completed<0&&!r.Information&&Keys.Attempts==1&&Keys.Ready==1&&Keys.Maps==5&&!memcmp(&before,&Keys.Ledger,sizeof(before)));ack=save;BusPoison=0;Keys.Fault=0;Cases++;
++ }
++ r=(Request){&ack,&state,0,0,0,0};G99Control(0,&r,64,sizeof(ack),G137_IOCTL_RETIRE);assert(!r.Completed&&r.Information==64&&state.Phase==G137_EMPTY&&state.Captures==1&&state.Retirements==1&&state.TotalMaps==5&&!Keys.Attempts&&!Keys.Ready&&!Keys.Maps&&Calls==1&&!memcmp(&Frozen,&ack.Capture,sizeof(Frozen)));Cases++;
++ G137_LEDGER stable=Keys.Ledger;r=(Request){&ack,&state,0,0,0,0};G99Control(0,&r,64,sizeof(ack),G137_IOCTL_RETIRE);assert(!r.Completed&&!memcmp(&stable,&Keys.Ledger,sizeof(stable))&&Calls==1);Cases++;
++ q=(G99_REQUEST){32,1,G99_MAGIC,123,1,0};r=(Request){&q,&Response,0,0,0,0};G99Control(0,&r,sizeof(Response),32,G99_IOCTL_SAMPLE);assert(r.Completed<0&&!Keys.Attempts&&Calls==1);Cases++;
++ q.Nonce=124;r=(Request){&q,&Response,0,0,0,0};G99Control(0,&r,sizeof(Response),32,G99_IOCTL_SAMPLE);assert(!r.Completed&&Keys.Ledger.Count==2&&Keys.Ledger.TotalMaps==10&&Calls==2);Cases++;
++ r=(Request){&ack,&state,0,0,0,0};G99Control(0,&r,64,sizeof(ack),G137_IOCTL_RETIRE);assert(r.Completed<0&&Keys.Ready==1&&Keys.Ledger.Phase==G137_READY&&Keys.Ledger.Retired==1);Cases++;
++ ack.Header.Nonce=124;ack.Capture=Frozen;memcpy(shared,&ack,sizeof(ack));r=(Request){shared,shared,0,0,0,0};G99Control(0,&r,64,sizeof(ack),G137_IOCTL_RETIRE);assert(!r.Completed&&((G137_STATE*)shared)->Retirements==2&&!Keys.Ready&&!memcmp(&ack.Capture,&Frozen,sizeof(Frozen)));Cases++;
++ Reset();CaptureFault=1;q=(G99_REQUEST){32,1,G99_MAGIC,123,1,0};r=(Request){&q,&Response,0,0,0,0};G99Control(0,&r,sizeof(Response),32,G99_IOCTL_SAMPLE);assert(!r.Completed&&Keys.Fault&&Keys.Ledger.Phase==G137_FAULT);ack.Header=(G99_REQUEST){32,1,G99_MAGIC,123,0,0};ack.Capture=Frozen;r=(Request){&ack,&state,0,0,0,0};G99Control(0,&r,64,sizeof(ack),G137_IOCTL_RETIRE);assert(r.Completed<0&&Keys.Ready==1&&Keys.Attempts==1&&!Keys.Ledger.Retired);Cases++;
++ Reset();BusPoison=1;q=(G99_REQUEST){32,1,G99_MAGIC,123,1,0};r=(Request){&q,&Response,0,0,0,0};G99Control(0,&r,sizeof(Response),32,G99_IOCTL_SAMPLE);assert(r.Completed<0&&!Calls&&!Keys.Attempts&&!Keys.Ledger.Count);Cases++;
+  printf("{\"passed\":true,\"cases\":%u,\"actual_dispatch_function\":true,\"overlapping_buffer_verified\":true,\"one_shot_and_nonce_verified\":true,\"WDF_and_capture_modeled\":true,\"native_operations\":0}\n",Cases);return 0;}
+ '''
+-f=a.output/'model.c';f.write_text(pre+fn+'\nstatic void G99Control(WDFQUEUE q,WDFREQUEST r,size_t o,size_t i,ULONG code){(void)q;if(!G100KeysTryControl(&Keys,r,o,i,code))WdfRequestCompleteWithInformation(r,STATUS_INVALID_DEVICE_REQUEST,0);}\n'+main);exe=a.output/'test';q=subprocess.run(['clang','-std=c11','-O1','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I',str(w),str(f),'-o',str(exe)],capture_output=True,text=True);assert not q.returncode,q.stderr
+-q=subprocess.run([str(exe.resolve())],capture_output=True,text=True);assert not q.returncode and not q.stderr,(q.stdout,q.stderr);v=json.loads(q.stdout);v['source_sha256']={n:hashlib.sha256((w/n).read_bytes()).hexdigest()for n in ['g100_keys.c','g99_protocol.h','g99_core.h']};(a.output/'tests.json').write_text(json.dumps(v,indent=2));print(json.dumps(v))
++f=a.output/'model.c';f.write_text(pre+fn+'\nstatic void G99Control(WDFQUEUE q,WDFREQUEST r,size_t o,size_t i,ULONG code){(void)q;if(!G100KeysTryControl(&Keys,r,o,i,code))WdfRequestCompleteWithInformation(r,STATUS_INVALID_DEVICE_REQUEST,0);}\n'+main);exe=a.output/'test';q=subprocess.run(['clang','-std=c11','-O1','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I',str(w),str(f),str(w/'g137_capture.c'),'-o',str(exe)],capture_output=True,text=True);assert not q.returncode,q.stderr
++q=subprocess.run([str(exe.resolve())],capture_output=True,text=True);assert not q.returncode and not q.stderr,(q.stdout,q.stderr);v=json.loads(q.stdout);v['source_sha256']={n:hashlib.sha256((w/n).read_bytes()).hexdigest()for n in ['g100_keys.c','g100_keys.h','g137_capture.c','g137_capture.h','g137_protocol.h','g99_protocol.h','g99_core.h']};(a.output/'tests.json').write_text(json.dumps(v,indent=2));print(json.dumps(v))
+--- /dev/null
++++ b/test-retirement.c
+@@ -0,0 +1,58 @@
++/* SPDX-License-Identifier: MIT */
++#include "g137_capture.h"
++#include <assert.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++static unsigned Cases;
++static G137_LEDGER L;
++static unsigned char *Frozen,*Echo;
++static void Reset(void){G137CaptureInit(&L);for(unsigned i=0;i<G137_CAPTURE_BYTES;i++)Frozen[i]=(unsigned char)(i*37u+11u);memcpy(Echo,Frozen,G137_CAPTURE_BYTES);}
++static void Ready(uint64_t nonce){assert(G137CaptureBegin(&L,nonce));assert(G137CaptureComplete(&L,5,1));assert(L.Phase==G137_READY);}
++int main(void)
++{
++ Frozen=malloc(G137_CAPTURE_BYTES);Echo=malloc(G137_CAPTURE_BYTES);assert(Frozen&&Echo);
++ Reset();G137_STATE out;memset(&out,0xcc,sizeof(out));G137CaptureState(&L,&out);
++ assert(out.Size==64&&out.Version==1&&out.Magic==G137_STATE_MAGIC&&!out.Phase&&!out.Captures&&!out.Retirements&&!out.Reserved&&out.Slots==32);Cases++;
++ assert(!G137CaptureBegin(&L,0)&&!G137CaptureBegin(NULL,1)&&!G137CaptureCanBegin(NULL,1));Cases++;
++ assert(!G137CaptureRetire(&L,1,Frozen,Echo,G137_CAPTURE_BYTES));Cases++;
++ Ready(1);assert(!G137CaptureBegin(&L,2));Cases++;
++ for(unsigned n=0;n<24;n++){
++  unsigned at=n<8?n:n<16?G137_CAPTURE_BYTES-1-(n-8):(n-16)*4093+97;
++  Echo[at]^=1;G137_LEDGER before=L;assert(!G137CaptureRetire(&L,1,Frozen,Echo,G137_CAPTURE_BYTES));assert(!memcmp(&L,&before,sizeof(L)));Echo[at]^=1;Cases++;
++ }
++ for(unsigned n=0;n<6;n++){
++  const uint32_t sizes[]={0,1,G137_CAPTURE_BYTES-1,G137_CAPTURE_BYTES+1,0xffffffffu,64};
++  assert(!G137CaptureRetire(&L,1,Frozen,Echo,sizes[n]));assert(L.Phase==G137_READY&&!L.Retired);Cases++;
++ }
++ assert(!G137CaptureRetire(&L,0,Frozen,Echo,G137_CAPTURE_BYTES)&&!G137CaptureRetire(&L,2,Frozen,Echo,G137_CAPTURE_BYTES));Cases++;
++ assert(!G137CaptureRetire(&L,1,NULL,Echo,G137_CAPTURE_BYTES)&&!G137CaptureRetire(&L,1,Frozen,NULL,G137_CAPTURE_BYTES));Cases++;
++ assert(G137CaptureRetire(&L,1,Frozen,Echo,G137_CAPTURE_BYTES)==1&&L.Phase==G137_EMPTY&&L.Retired==1&&L.TotalMaps==5);Cases++;
++ G137_LEDGER before=L;assert(G137CaptureRetire(&L,1,Frozen,Echo,G137_CAPTURE_BYTES)==2&&!memcmp(&before,&L,sizeof(L)));Cases++;
++ Echo[123]^=1;assert(!G137CaptureRetire(&L,1,Frozen,Echo,G137_CAPTURE_BYTES));Echo[123]^=1;Cases++;
++ assert(!G137CaptureBegin(&L,1));Cases++;
++ assert(G137CaptureBegin(&L,2));assert(!G137CaptureRetire(&L,1,Frozen,Echo,G137_CAPTURE_BYTES));Cases++;
++ assert(G137CaptureComplete(&L,5,1));assert(!G137CaptureRetire(&L,1,Frozen,Echo,G137_CAPTURE_BYTES));Cases++;
++ assert(G137CaptureRetire(&L,2,Frozen,Echo,G137_CAPTURE_BYTES)==1);Cases++;
++ Reset();
++ for(uint64_t n=1;n<=G137_CAPTURE_SLOTS;n++){
++  Ready(n);assert(G137CaptureRetire(&L,n,Frozen,Echo,G137_CAPTURE_BYTES)==1);assert(L.Count==n&&L.Retired==n&&L.TotalMaps==n*5);Cases++;
++ }
++ assert(!G137CaptureBegin(&L,33)&&L.Phase==G137_EMPTY&&L.Count==32);Cases++;
++ for(unsigned maps=0;maps<=5;maps++){
++  Reset();assert(G137CaptureBegin(&L,3));assert(G137CaptureComplete(&L,maps,0));assert(L.Phase==G137_FAULT);before=L;
++  assert(!G137CaptureRetire(&L,3,Frozen,Echo,G137_CAPTURE_BYTES)&&!G137CaptureBegin(&L,4)&&!memcmp(&before,&L,sizeof(L)));Cases++;
++ }
++ for(unsigned maps=0;maps<5;maps++){
++  Reset();assert(G137CaptureBegin(&L,1));assert(!G137CaptureComplete(&L,maps,1)&&L.Phase==G137_FAULT);Cases++;
++ }
++ Reset();assert(!G137CaptureComplete(&L,5,1)&&L.Phase==G137_FAULT);Cases++;
++ Reset();assert(G137CaptureBegin(&L,1));assert(!G137CaptureComplete(&L,6,0)&&L.Phase==G137_FAULT);Cases++;
++ Reset();L.TotalMaps=5;assert(!G137CaptureBegin(&L,1));Cases++;
++ Reset();Ready(9);L.Used[0]=8;assert(!G137CaptureRetire(&L,9,Frozen,Echo,G137_CAPTURE_BYTES));Cases++;
++ Reset();Ready(9);L.TotalMaps=6;assert(!G137CaptureRetire(&L,9,Frozen,Echo,G137_CAPTURE_BYTES));Cases++;
++ Reset();assert(G137CaptureBegin(&L,1));L.Used[0]=2;assert(!G137CaptureComplete(&L,5,1)&&L.Phase==G137_FAULT);Cases++;
++ G137CaptureInit(NULL);G137CaptureState(NULL,&out);G137CaptureState(&L,NULL);assert(!G137CaptureComplete(NULL,0,0));Cases++;
++ free(Frozen);free(Echo);
++ printf("{\"passed\":true,\"cases\":%u,\"actual_portable_lifecycle_C\":true,\"native_operations\":0}\n",Cases);return 0;
++}
+--- /dev/null
++++ b/test-retirement.py
+@@ -0,0 +1,8 @@
++from pathlib import Path
++import argparse,hashlib,json,subprocess
++parser=argparse.ArgumentParser();parser.add_argument('--output',type=Path,required=True);args=parser.parse_args()
++w=Path(__file__).resolve().parent;o=args.output.resolve();assert not o.exists();o.mkdir(parents=True)
++exe=o/'retirement';command=['clang','-std=c11','-O1','-g','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I'+str(w),str(w/'test-retirement.c'),str(w/'g137_capture.c'),'-o',str(exe)]
++result=subprocess.run(command,capture_output=True,text=True);(o/'compiler.txt').write_text(result.stdout+result.stderr);assert result.returncode==0,result.stderr
++result=subprocess.run([str(exe)],capture_output=True,text=True);(o/'test-output.txt').write_text(result.stdout+result.stderr);assert result.returncode==0 and not result.stderr,(result.returncode,result.stdout,result.stderr)
++report=json.loads(result.stdout);report['ASan_UBSan']=True;report['sources']={name:hashlib.sha256((w/name).read_bytes()).hexdigest()for name in ['g137_capture.c','g137_capture.h','test-retirement.c']};(o/'tests.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))

@@ -1,0 +1,17 @@
+--- G711/firmware_windows.go
++++ G742/metadata_windows.go
+@@ -293,6 +293,14 @@
+ 				require(hr == 0 && got == n, "Full fixed RAM read required")
+ 				return b
+ 			}
++			// G742: twelve fixed eight-byte reads inside source-qualified pool, actual46 only.
++			if *mode == "inspect-transfer" {
++				metadata := make([]byte, 0, 0x60)
++				for off := uint64(0x98); off < 0xf8; off += 8 {
++					metadata = append(metadata, readRAM(x0+off, 8)...)
++				}
++				emit(map[string]any{"phase": "g742_pool_98_F7", "address": fmt.Sprintf("%016x", x0+0x98), "requested": 0x60, "actual_bytes": len(metadata), "hresult": 0, "raw_hex": hex.EncodeToString(metadata), "SDK_slot": 6, "pointer_dereferences_added": 0})
++			}
+ 			fields := []struct {
+ 				name   string
+ 				offset uint64

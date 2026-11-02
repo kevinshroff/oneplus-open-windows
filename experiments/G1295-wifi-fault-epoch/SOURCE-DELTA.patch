@@ -1,0 +1,63 @@
+--- G1278/main_windows.go
++++ G1295/main_windows.go
+@@ -46,10 +46,13 @@
+ }
+ 
+ type proof struct {
++	Phase                     string            `json:"phase"`
++	ActionLedgerFile          string            `json:"action_ledger_file"`
++	RootNormalBoot            bool              `json:"root_qualifies_actual_fresh_normal_boot"`
+ 	BARQualified              bool              `json:"root_qualifies_current_endpoint_BAR0_resource"`
+ 	BARBase                   string            `json:"BAR0_resource_base"`
+ 	BARBytes                  uint64            `json:"BAR0_resource_bytes"`
+-	NoDiagnosticSinceBoundary bool              `json:"root_attests_no_root_selected_force_native_diagnostic_reset_or_error_clear_since_failure"`
++	NoDiagnosticSinceBoundary bool              `json:"root_attests_no_root_selected_force_native_diagnostic_reset_or_error_clear_in_selected_interval"`
+ 	Schema                    string            `json:"schema"`
+ 	BootID                    uint32            `json:"boot_id"`
+ 	Session                   string            `json:"phone_session"`
+@@ -93,18 +96,15 @@
+ 	dec := json.NewDecoder(bytes.NewReader(raw))
+ 	dec.DisallowUnknownFields()
+ 	require(dec.Decode(&p) == nil, "Proof schema")
+-	require(p.Schema == "G1278-root-current-unforced-fault/1" && p.BootID >= 161 && p.OwnedBreak && p.CurrentTables && p.PhysicalAccess, "Current root resource/access/hold admission required")
+-	require(p.Image == "9906bfa350a000d9588e39f624e4630f0f788d23fa58b9d1b79a933deda9c980", "Selected retained firmware identity")
++	require(p.Schema == "G1295-root-phase-fault-epoch/1" && p.BootID > 161 && p.OwnedBreak && p.CurrentTables && p.PhysicalAccess, "Current root resource/access/hold admission required")
++	require(regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(p.Image) && p.RootNormalBoot && p.Session != "00000000000000000000000000000000", "Actual fresh normal image/session proof; Boot161 cannot be reused")
+ 	re32 := regexp.MustCompile(`^[0-9a-f]{32}$`)
+ 	re64 := regexp.MustCompile(`^[0-9a-f]{64}$`)
+ 	require(re32.MatchString(p.Session) && re32.MatchString(p.Nonce), "Fresh actual session/nonce")
+ 	created, e := time.Parse(time.RFC3339Nano, p.Created)
+ 	age := time.Since(created)
+ 	require(e == nil && age >= 0 && age < 5*time.Minute, "Proof older than five minutes or future timestamp")
+-	require(len(p.Evidence) == 5, "Actual context/current tables/loaded module evidence hashes required")
+-	for _, k := range []string{"context", "current_tables", "loaded_owner", "endpoint_BAR0_resource", "failed_scan_log"} {
+-		require(re64.MatchString(p.Evidence[k]), "Missing actual evidence hash "+k)
+-	}
++	ledger := admitPhase(p, re64, created)
+ 	require(p.BARQualified && p.NoDiagnosticSinceBoundary && p.BARBase == "0000000063e00000" && p.BARBytes >= 0x140 && p.BARBytes <= 0x1000000, "Fresh allocated endpoint BAR0 resource/unforced-history proof required")
+ 	nt, pc, ob := hex64(p.NT), hex64(p.PC), hex64(p.OwnerBase)
+ 	require(nt >= 0xffff000000000000 && ob >= 0xffff000000000000 && nt&0xfff == 0 && ob&0xfff == 0 && p.OwnerSize > 0, "Kernel/owner identity")
+@@ -113,6 +113,7 @@
+ 	defer f.Close()
+ 	emit := func(v map[string]any) {
+ 		v["boot_id"] = p.BootID
++		v["observation_phase"] = p.Phase
+ 		v["phone_session"] = p.Session
+ 		v["root_nonce"] = p.Nonce
+ 		v["utc"] = time.Now().UTC().Format(time.RFC3339Nano)
+@@ -130,6 +131,7 @@
+ 		}
+ 	}()
+ 	emit(map[string]any{"phase": "begin", "proof_sha256": *ph, "boot_session_resource_identity": "root_attested_hash_bound; not inferred from SCM", "target_writes": 0, "interrupt_resume_commands": 0})
++	consumePhase(p, ledger, emit)
+ 	runtime.LockOSThread()
+ 	defer runtime.UnlockOSThread()
+ 	dll, e := syscall.LoadDLL(`C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\dbgeng.dll`)
+@@ -263,5 +265,5 @@
+ 	after := clocks()
+ 	identity()
+ 	require(equalWords(before, after), "Active safety guard changed; unqualified")
+-	emit(map[string]any{"phase": "complete_held", "BAR0_resource_base": p.BARBase, "MHI_status_raw": status, "MHI_status_after": statusAfter, "MHI_state_bits": (status >> 8) & 0xff, "MHI_SYSERR": (status >> 2) & 1, "MHI_READY": status & 1, "EE_raw": ee, "EE_after": eeAfter, "BHI_status_raw": bhiStatus, "BHI_status_top2": bhiStatus >> 30, "BHI_error_code_raw": errorCode, "BHI_error_debug_raw": []uint32{error1, error2, error3}, "status_EE_stable": status == statusAfter && ee == eeAfter, "error_values_do_not_prove_fault_epoch_or_cause": true, "gpio83_input_changed": (before[19]^after[19])&1 != 0, "target_writes": 0, "interrupt_resume_commands": 0, "root_may_review_and_resume": true})
+-}
++	emit(map[string]any{"phase": "complete_held", "BAR0_resource_base": p.BARBase, "MHI_status_raw": status, "MHI_status_after": statusAfter, "MHI_state_bits": (status >> 8) & 0xff, "MHI_SYSERR": (status >> 2) & 1, "MHI_READY": status & 1, "EE_raw": ee, "EE_after": eeAfter, "BHI_status_raw": bhiStatus, "BHI_status_top2": bhiStatus >> 30, "BHI_error_code_raw": errorCode, "BHI_error_debug_raw": []uint32{error1, error2, error3}, "status_EE_stable": status == statusAfter && ee == eeAfter, "error_values_do_not_prove_fault_epoch_or_cause": true, "comparison_bounds": "PRE_HOST_INIT vs POST_STALL bounds assignment interval only; neither phase proves executed assertion", "gpio83_input_changed": (before[19]^after[19])&1 != 0, "target_writes": 0, "interrupt_resume_commands": 0, "root_may_review_and_resume": true})
++}

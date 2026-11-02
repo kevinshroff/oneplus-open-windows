@@ -1,0 +1,227 @@
+--- G1224/source/aperture_policy.h
++++ G1287/source/aperture_policy.h
+@@ -0,0 +1,13 @@
++#pragma once
++/* Portable actual production classification; raw frame is never modified. */
++typedef struct {unsigned long long X[8],Entries,Returns,Interrupted;} OAS_SCM_FRAME;
++enum {OAS_SCM_UNKNOWN=0,OAS_SCM_TRANSPORT_COMPLETE=1,OAS_SCM_ERROR=2};
++static inline int OasScmFrameValid(const OAS_SCM_FRAME*f){return f&&f->Returns&&f->Entries==f->Returns&&f->Interrupted==f->Returns-1;}
++static inline unsigned OasScmTransport(const OAS_SCM_FRAME*f){
++ if(!OasScmFrameValid(f))return OAS_SCM_UNKNOWN;
++ if(f->X[0]==0)return OAS_SCM_TRANSPORT_COMPLETE;
++ unsigned int lo=(unsigned int)f->X[0];unsigned long long hi=f->X[0]>>32;
++ return (lo&0x80000000u)&&(hi==0||hi==0xffffffffULL)?OAS_SCM_ERROR:OAS_SCM_UNKNOWN;
++}
++/* Once any call was issued, failure (including postcheck) cannot use unpublished cleanup. */
++static inline int OasSetupRetains(unsigned attempted,int success){return attempted&&!success;}
+--- G1224/source/native_bootstrap.c
++++ G1287/source/native_bootstrap.c
+@@ -32,8 +32,15 @@
+ }
+ NTSTATUS OasActivate(OAS_BOOTSTRAP*a){if(!a||a->State!=OAS_OPEN||!a->Native.Base)return STATUS_INVALID_DEVICE_STATE;NTSTATUS st=Begin(a);if(st!=STATUS_SUCCESS){a->State=OAS_RETAINED;(void)CghNativeRetainFailure(a->Hold,st);return a->Status=st;}
+  OSMA_REQUEST q=Q(a);if(Aggregate(a,&a->Native.Proof,NEED,5,q.Bank,q.Asid,q.Slot))st=STATUS_DEVICE_NOT_READY;
++ /* Setup runs inside this actual cold namespace before any table programming. */
++ if(st==STATUS_SUCCESS&&a->Setup.Run){st=a->Setup.Run(a->Setup.Context,a);a->Setup.Status=st;
++  if(st==STATUS_SUCCESS&&(!a->Setup.Attempted||!a->Setup.Completed))st=STATUS_INVALID_DEVICE_STATE;
++  if(st==STATUS_SUCCESS&&Aggregate(a,&a->Native.Proof,NEED,5,q.Bank,q.Asid,q.Slot))st=STATUS_DEVICE_NOT_READY;
++  if(OasSetupRetains(a->Setup.Attempted,st==STATUS_SUCCESS))a->State=OAS_RETAINED;
++ }
+  if(st==STATUS_SUCCESS){st=a->Bank->Api.PinProgramming(a->Bank->Api.Interface.Context,&a->Bank->Native,&q);if(st==STATUS_SUCCESS){a->State=OAS_ATTEMPTING;st=OsmaActivateOwnedBinding(&a->Native);if(st==STATUS_SUCCESS)a->State=OAS_ACTIVE;else a->State=OAS_RETAINED;}}
+- st=End(a,st);if(st!=STATUS_SUCCESS&&a->Bank->Native.ProgramPinned){a->State=OAS_RETAINED;(void)CghNativeRetainFailure(a->Hold,st);}return a->Status=st;
++ if(OasSetupRetains(a->Setup.Attempted,st==STATUS_SUCCESS))a->State=OAS_RETAINED;
++ st=End(a,st);if(st!=STATUS_SUCCESS&&(a->Bank->Native.ProgramPinned||a->Setup.Attempted)){a->State=OAS_RETAINED;(void)CghNativeRetainFailure(a->Hold,st);}return a->Status=st;
+ }
+ NTSTATUS OasAbortUnpublished(OAS_BOOTSTRAP*a){
+  if(!a||KeGetCurrentIrql()!=PASSIVE_LEVEL)return STATUS_INVALID_PARAMETER;
+@@ -48,9 +55,9 @@
+ retain:a->State=OAS_RETAINED;KeReleaseMutex(&a->Operation,FALSE);(void)CghNativeRetainFailure(a->Hold,st);return a->Status=st;
+ }
+ 
+-NTSTATUS OasColdActivateFromInactive(G321_INACTIVE_RUNTIME*r,CGH_NATIVE*h,OPEN_LOCAL_BANK_CLIENT*b,PVOID*fault,OAS_BOOTSTRAP**out){
++NTSTATUS OasColdActivateFromInactiveSetup(G321_INACTIVE_RUNTIME*r,CGH_NATIVE*h,OPEN_LOCAL_BANK_CLIENT*b,PVOID*fault,OAS_BOOTSTRAP**out,const OAS_COLD_SETUP*setup){
+  if(!out||!h||!b||b->Hold!=h||b->Native.Hold!=h||!fault||!*fault)return STATUS_INVALID_PARAMETER;*out=NULL;
+- NTSTATUS st=OasTakeAndOpen(r,h,b,fault,out);if(st==STATUS_SUCCESS){st=OasActivate(*out);if(st==STATUS_SUCCESS)return st;}
++ NTSTATUS st=OasTakeAndOpen(r,h,b,fault,out);if(st==STATUS_SUCCESS){if(setup)(*out)->Setup=*setup;st=OasActivate(*out);if(st==STATUS_SUCCESS)return st;}
+  if(*out){if((*out)->State!=OAS_RETAINED){NTSTATUS close=OasAbortUnpublished(*out);if(close==STATUS_SUCCESS)*out=NULL;else (void)CghNativeRetainFailure(h,close);}else (void)CghNativeRetainFailure(h,st);return st;}
+  /* No context/ownership move occurred; unwind the genuine still-owned cold
+   * objects in reverse order. A failed step retains remaining caller objects. */
+@@ -83,3 +90,5 @@
+ NTSTATUS OasLeaveFirmwareScope(OAS_BOOTSTRAP*a,NTSTATUS result){if(!a||a->OperationThread!=PsGetCurrentThread())return STATUS_INVALID_DEVICE_STATE;NTSTATUS final=result;if(final==STATUS_SUCCESS)final=OasCurrentRuntime(a);if(final==STATUS_SUCCESS)final=OasMakeNcVisible(a->Tables);NTSTATUS st=End(a,final);if(st!=STATUS_SUCCESS){a->State=OAS_RETAINED;(void)CghNativeRetainFailure(a->Hold,st);}return a->Status=st;}
+ 
+ NTSTATUS OasEnterRunningScope(OAS_BOOTSTRAP*a){if(!a||a->State!=OAS_ACTIVE||!a->ColdConsumed||!a->Hold->BootCommitted)return STATUS_INVALID_DEVICE_STATE;NTSTATUS st=Begin(a);if(st==STATUS_SUCCESS){st=OasCurrentRuntime(a);if(st!=STATUS_SUCCESS)st=End(a,st);}if(st!=STATUS_SUCCESS){a->State=OAS_RETAINED;(void)CghNativeRetainFailure(a->Hold,st);}return a->Status=st;}
++
++NTSTATUS OasColdActivateFromInactive(G321_INACTIVE_RUNTIME*r,CGH_NATIVE*h,OPEN_LOCAL_BANK_CLIENT*b,PVOID*fault,OAS_BOOTSTRAP**out){return OasColdActivateFromInactiveSetup(r,h,b,fault,out,NULL);}
+--- G1224/source/native_bootstrap.h
++++ G1287/source/native_bootstrap.h
+@@ -1,12 +1,22 @@
+ #pragma once
+ #include "local_bank_interface.h"
+ #include "nc_visibility.h"
++#include "aperture_policy.h"
++struct _OAS_BOOTSTRAP;
++typedef struct {
++ PVOID Context;NTSTATUS(*Run)(PVOID,struct _OAS_BOOTSTRAP*);
++ BOOLEAN Attempted,Completed;ULONG Transport;NTSTATUS Status;
++ BOOLEAN DispatchKnown;ULONGLONG DispatchStatus;
++ ULONGLONG OwnerGeneration,RunId,Generation,Serial,GpuId,GpuGeneration,GpuSerial;
++ OAS_SCM_FRAME Frame;
++}OAS_COLD_SETUP;
+ enum oas_state {OAS_CREATED,OAS_OPEN,OAS_ATTEMPTING,OAS_ACTIVE,OAS_RETAINED,OAS_CLOSED};
+-typedef struct {
++typedef struct _OAS_BOOTSTRAP {
+  KMUTEX Operation;PETHREAD OperationThread;CGH_NATIVE*Hold;OPEN_LOCAL_BANK_CLIENT*Bank;PVOID Fault;
+  OSMA_TABLE_BINDING*Tables;OSMA_NATIVE_IO Native;OPEN_NS_SCOPE Scope;
+  BOOLEAN ColdConsumed;
+  ULONGLONG ProviderGeneration,AllocationGeneration;ULONG BankIndex,Slot;enum oas_state State;NTSTATUS Status;
++ OAS_COLD_SETUP Setup;
+ }OAS_BOOTSTRAP;
+ /* Moves actual inactive ledger; moves *FaultToken into this owned binding.
+  * Bank/Hold storage and callback code remain pinned by the real caller. Every
+@@ -34,3 +44,5 @@
+ 
+ /* Real same-thread running command scope; never a stopped witness. */
+ NTSTATUS OasEnterRunningScope(OAS_BOOTSTRAP*);
++
++NTSTATUS OasColdActivateFromInactiveSetup(G321_INACTIVE_RUNTIME*,CGH_NATIVE*,OPEN_LOCAL_BANK_CLIENT*,PVOID*,OAS_BOOTSTRAP**,const OAS_COLD_SETUP*);
+--- G1224/source/owner/bootstrap.c
++++ G1287/source/owner/bootstrap.c
+@@ -23,6 +23,30 @@
+  return st;
+ }
+ static NTSTATUS Recheck(OGO_CONTEXT*p){return InterlockedCompareExchange(&p->Revoked,0,0)||!p->Started||!p->D0||p->Removing||p->StopPending||p->RemovePending?STATUS_DEVICE_NOT_READY:STATUS_SUCCESS;}
++void G1287SmcSetCp0(OAS_SCM_FRAME*);
++C_ASSERT(sizeof(OAS_SCM_FRAME)==88);
++C_ASSERT(FIELD_OFFSET(OAS_SCM_FRAME,Entries)==64);
++static NTSTATUS ApertureColdSetup(PVOID x,OAS_BOOTSTRAP*a){
++ OGO_CONTEXT*p=x;if(!p||!a)return STATUS_INVALID_DEVICE_STATE;OAS_COLD_SETUP*s=&a->Setup;OGU_TOKEN*t=&p->GpuUser;
++ if(!p||p->Active!=a||!p->CpInit||!OgoApertureRequested()||p->Gmu||p->Cp||a->State!=OAS_OPEN||a->ColdConsumed||p->Hold.BootCommitted||s->Attempted||s->Completed||Recheck(p)!=STATUS_SUCCESS||p->OperationThread!=PsGetCurrentThread()||a->OperationThread!=p->OperationThread||!a->Scope.Token)return STATUS_INVALID_DEVICE_STATE;
++ if(!t->Referenced||!t->Qualified||t->Sid||t->Bank||t->Asid||t->Slot!=1||t->Id!=s->GpuId||t->Generation!=s->GpuGeneration||t->Serial!=s->GpuSerial||p->Generation!=s->OwnerGeneration||p->RunId!=s->RunId||p->Hold.Generation!=s->Generation||p->Hold.Serial!=s->Serial||p->Hold.Hold.state!=CGH_RESET_QUIESCENT||!p->Hold.Hold.reset_mode)return STATUS_INVALID_DEVICE_STATE;
++ if(!OgoConsumeAperture())return STATUS_INVALID_DEVICE_STATE;
++ /* Consume generation-bound once authority BEFORE potentially unfinished monitor entry. */
++ s->Attempted=TRUE;s->Status=STATUS_DEVICE_NOT_READY;
++ DbgPrintEx(DPFLTR_IHVVIDEO_ID,DPFLTR_INFO_LEVEL,"G1287 aperture begin run%llx gen%llx serial%llx gpu%llx; NORMAL64 only\n",p->RunId,s->Generation,s->Serial,s->GpuId);
++ G1287SmcSetCp0(&s->Frame);s->Transport=OasScmTransport(&s->Frame);
++ DbgPrintEx(DPFLTR_IHVVIDEO_ID,DPFLTR_INFO_LEVEL,"G1287 aperture returned run%llx x0%llx x1%llx entries%llu returns%llu interrupts%llu transport%u\n",p->RunId,s->Frame.X[0],s->Frame.X[1],s->Frame.Entries,s->Frame.Returns,s->Frame.Interrupted,s->Transport);
++ /* Retained normal dispatcher SXTW(handlerW0)->task+30->frame[0].
++  * Handler zero completes; support failure16 remains raw x0=16, NOT INFO's x1 boolean.
++  * Other states retain; no busy/WAITQ replay or guessed service completion. */
++ s->DispatchKnown=(BOOLEAN)(OasScmFrameValid(&s->Frame)&&(s->Frame.X[0]==0||s->Frame.X[0]==16));s->DispatchStatus=s->Frame.X[0];
++ if(s->Transport==OAS_SCM_TRANSPORT_COMPLETE&&s->DispatchKnown&&s->DispatchStatus==0){
++  s->Completed=TRUE; /* setter completion is distinct from owner/post-hardware currentness */
++  if(Recheck(p)!=STATUS_SUCCESS||p->Active!=a||p->Generation!=s->OwnerGeneration||p->RunId!=s->RunId||p->OperationThread!=PsGetCurrentThread()||a->OperationThread!=p->OperationThread||!a->Scope.Token||p->Hold.Generation!=s->Generation||p->Hold.Serial!=s->Serial||!t->Referenced||!t->Qualified||t->Id!=s->GpuId||t->Generation!=s->GpuGeneration||t->Serial!=s->GpuSerial||t->Sid||t->Bank||t->Asid||t->Slot!=1)return s->Status=STATUS_DEVICE_NOT_READY;
++  return s->Status=STATUS_SUCCESS;
++ }
++ return s->Status=s->Transport==OAS_SCM_ERROR?STATUS_UNSUCCESSFUL:STATUS_NOT_SUPPORTED;
++}
+ NTSTATUS OgoBootstrap(OGO_CONTEXT*p){NTSTATUS st=Recheck(p);p->OperationThread=PsGetCurrentThread();p->GmuStatus=STATUS_NOT_SUPPORTED;
+  if(st!=STATUS_SUCCESS)goto fail;
+  p->Ram=ExAllocatePool2(POOL_FLAG_NON_PAGED,sizeof(*p->Ram),OGO_TAG);if(!p->Ram){st=STATUS_INSUFFICIENT_RESOURCES;goto fail;}G321InactiveInitialize(p->Ram);p->Serial=1;
+@@ -38,7 +62,13 @@
+  if(p->CpInit){st=p->Bank.Api.ReserveGpuUser(p->Bank.Api.Interface.Context,&p->Bank.Native,&p->GpuUser);if(st!=STATUS_SUCCESS)goto fail;}
+  st=p->Bank.Api.ConnectFault(p->Bank.Api.Interface.Context,&p->Bank.Native,&p->Fault);if(st!=STATUS_SUCCESS)goto fail;p->Phase=OGO_IRQ;
+  st=Recheck(p);if(st!=STATUS_SUCCESS)goto fail;
+- st=OasColdActivateFromInactive(p->Ram,&p->Hold,&p->Bank,&p->Fault,&p->Active);if(st!=STATUS_SUCCESS)goto fail;
++ OAS_COLD_SETUP setup;RtlZeroMemory(&setup,sizeof(setup));
++ if(OgoApertureRequested()){
++  if(!p->CpInit||!p->GpuUser.Referenced||!p->GpuUser.Qualified){st=STATUS_INVALID_DEVICE_STATE;goto fail;}
++  st=p->Bank.Api.CheckGpuUser(p->Bank.Api.Interface.Context,&p->Bank.Native,&p->GpuUser,NULL);if(st!=STATUS_SUCCESS)goto fail;
++  setup.Context=p;setup.Run=ApertureColdSetup;setup.OwnerGeneration=p->Generation;setup.RunId=p->RunId;setup.Generation=p->Hold.Generation;setup.Serial=p->Hold.Serial;setup.GpuId=p->GpuUser.Id;setup.GpuGeneration=p->GpuUser.Generation;setup.GpuSerial=p->GpuUser.Serial;
++ }
++ st=OasColdActivateFromInactiveSetup(p->Ram,&p->Hold,&p->Bank,&p->Fault,&p->Active,setup.Run?&setup:NULL);if(st!=STATUS_SUCCESS)goto fail;
+  p->Phase=OGO_TRANSLATION;
+  st=OgoRunGmu(p);p->GmuStatus=st;if(st!=STATUS_SUCCESS)goto fail;
+  p->Phase=10;if(p->CpInit){st=OgoRunCpFence1(p);if(st!=STATUS_SUCCESS)goto fail;p->Phase=11;}(void)RetireRam(p);p->Status=STATUS_SUCCESS;return STATUS_SUCCESS;
+--- G1224/source/owner/gpu_owner.h
++++ G1287/source/owner/gpu_owner.h
+@@ -30,3 +30,5 @@
+ 
+ BOOLEAN OgoCpRequested(VOID);
+ NTSTATUS OgoRunCpFence1(OGO_CONTEXT*);NTSTATUS OgoCpCurrent(OGO_CONTEXT*);NTSTATUS OgoActivateGpu0(OGO_CONTEXT*);
++
++BOOLEAN OgoApertureRequested(VOID);BOOLEAN OgoConsumeAperture(VOID);
+--- G1224/source/owner/owner_entry.c
++++ G1287/source/owner/owner_entry.c
+@@ -4,7 +4,7 @@
+ #include "open_parent_consumer.h"
+ typedef struct{OGO_CONTEXT*P;}EXT;
+ typedef struct{OGO_CONTEXT*P;PIRP Irp;PIO_WORKITEM Work;BOOLEAN Start,Bootstrap;DEVICE_POWER_STATE Requested;}JOB;
+-static volatile LONG Added;static volatile LONG64 Sequence;static BOOLEAN Enabled,CpEnabled;static OGO_CONTEXT*volatile Retained;
++static volatile LONG Added;static volatile LONG64 Sequence;static BOOLEAN Enabled,CpEnabled,ApertureEnabled;static volatile LONG ApertureConsumed;static OGO_CONTEXT*volatile Retained;
+ static VOID Lock(OGO_CONTEXT*p){KeWaitForSingleObject(&p->Lock,Executive,KernelMode,FALSE,NULL);}static VOID OwnerUnlock(OGO_CONTEXT*p){KeReleaseMutex(&p->Lock,FALSE);}
+ static NTSTATUS Finish(OGO_CONTEXT*p,PIRP i,NTSTATUS st){i->IoStatus.Status=st;i->IoStatus.Information=0;IoReleaseRemoveLock(&p->Remove,i);IoCompleteRequest(i,IO_NO_INCREMENT);return st;}
+ static NTSTATUS Completed(PDEVICE_OBJECT d,PIRP i,PVOID c){UNREFERENCED_PARAMETER(d);if(i->PendingReturned)IoMarkIrpPending(i);IoReleaseRemoveLock(&((OGO_CONTEXT*)c)->Remove,i);return STATUS_CONTINUE_COMPLETION;}
+@@ -89,6 +89,8 @@
+ static NTSTATUS Add(PDRIVER_OBJECT driver,PDEVICE_OBJECT pdo){if(!OpenExactHardwareId(pdo,L"ACPI\\OPEN0515")||InterlockedCompareExchange(&Added,1,0))return STATUS_DEVICE_CONFIGURATION_ERROR;PDEVICE_OBJECT fdo;NTSTATUS st=IoCreateDevice(driver,sizeof(EXT),NULL,FILE_DEVICE_UNKNOWN,FILE_DEVICE_SECURE_OPEN,FALSE,&fdo);if(st!=STATUS_SUCCESS)return st;OGO_CONTEXT*p=ExAllocatePool2(POOL_FLAG_NON_PAGED,sizeof(*p),OGO_TAG);if(!p){IoDeleteDevice(fdo);return STATUS_INSUFFICIENT_RESOURCES;}RtlZeroMemory(p,sizeof(*p));p->Pdo=pdo;p->Fdo=fdo;ObReferenceObject(pdo);p->Enabled=Enabled;p->CpInit=CpEnabled;p->CpDdrType=0;p->InputStatus=p->Status=p->CleanupStatus=STATUS_DEVICE_NOT_READY;p->GmuStatus=STATUS_NOT_SUPPORTED;KeInitializeMutex(&p->Lock,0);KeInitializeMutex(&p->RamLock,0);KeInitializeEvent(&p->Revoke,NotificationEvent,FALSE);KeInitializeEvent(&p->OperationDone,NotificationEvent,TRUE);IoInitializeRemoveLock(&p->Remove,OGO_TAG,0,0);((EXT*)fdo->DeviceExtension)->P=p;p->Lower=IoAttachDeviceToDeviceStack(fdo,pdo);if(!p->Lower){ObDereferenceObject(pdo);ExFreePoolWithTag(p,OGO_TAG);IoDeleteDevice(fdo);return STATUS_NO_SUCH_DEVICE;}fdo->Flags|=DO_POWER_PAGABLE;fdo->Flags&=~DO_DEVICE_INITIALIZING;return STATUS_SUCCESS;}
+ static NTSTATUS ReadOption(HANDLE key,PCWSTR option,PULONG out){UNICODE_STRING name;RtlInitUnicodeString(&name,option);UCHAR buffer[FIELD_OFFSET(KEY_VALUE_PARTIAL_INFORMATION,Data)+sizeof(ULONG)];ULONG bytes=0;NTSTATUS st=ZwQueryValueKey(key,&name,KeyValuePartialInformation,buffer,sizeof(buffer),&bytes);if(st==STATUS_OBJECT_NAME_NOT_FOUND){*out=0;return STATUS_SUCCESS;}if(st!=STATUS_SUCCESS)return st;PKEY_VALUE_PARTIAL_INFORMATION v=(PKEY_VALUE_PARTIAL_INFORMATION)buffer;if(v->Type!=REG_DWORD||v->DataLength!=sizeof(ULONG)||bytes!=sizeof(buffer))return STATUS_DEVICE_CONFIGURATION_ERROR;RtlCopyMemory(out,v->Data,sizeof(*out));return STATUS_SUCCESS;}
+ BOOLEAN OgoCpRequested(VOID){return CpEnabled;}
+-static NTSTATUS ReadEnable(PUNICODE_STRING path){OBJECT_ATTRIBUTES oa;HANDLE key=NULL;InitializeObjectAttributes(&oa,path,OBJ_CASE_INSENSITIVE|OBJ_KERNEL_HANDLE,NULL,NULL);NTSTATUS st=ZwOpenKey(&key,KEY_QUERY_VALUE,&oa);if(st!=STATUS_SUCCESS)return st;ULONG boot=0,cp=0;st=ReadOption(key,L"BootstrapOnce",&boot);if(st==STATUS_SUCCESS)st=ReadOption(key,L"CpInitFenceOnce",&cp);ZwClose(key);if(st!=STATUS_SUCCESS)return st;if(boot>1||cp>1||(cp&&!boot))return STATUS_DEVICE_CONFIGURATION_ERROR;Enabled=(BOOLEAN)boot;CpEnabled=(BOOLEAN)cp;return STATUS_SUCCESS;}
++BOOLEAN OgoApertureRequested(VOID){return ApertureEnabled;}
++BOOLEAN OgoConsumeAperture(VOID){return ApertureEnabled&&InterlockedCompareExchange(&ApertureConsumed,1,0)==0;}
++static NTSTATUS ReadEnable(PUNICODE_STRING path){OBJECT_ATTRIBUTES oa;HANDLE key=NULL;InitializeObjectAttributes(&oa,path,OBJ_CASE_INSENSITIVE|OBJ_KERNEL_HANDLE,NULL,NULL);NTSTATUS st=ZwOpenKey(&key,KEY_QUERY_VALUE,&oa);if(st!=STATUS_SUCCESS)return st;ULONG boot=0,cp=0,aperture=0;st=ReadOption(key,L"BootstrapOnce",&boot);if(st==STATUS_SUCCESS)st=ReadOption(key,L"CpInitFenceOnce",&cp);if(st==STATUS_SUCCESS)st=ReadOption(key,L"ScmApertureOnce",&aperture);ZwClose(key);if(st!=STATUS_SUCCESS)return st;if(boot>1||cp>1||aperture>1||(cp&&!boot)||(aperture&&(!boot||!cp)))return STATUS_DEVICE_CONFIGURATION_ERROR;Enabled=(BOOLEAN)boot;CpEnabled=(BOOLEAN)cp;ApertureEnabled=(BOOLEAN)aperture;return STATUS_SUCCESS;}
+ 
+ NTSTATUS DriverEntry(PDRIVER_OBJECT driver,PUNICODE_STRING path){NTSTATUS st=ReadEnable(path);if(st!=STATUS_SUCCESS)return st;LogOpen();LogPrint("OpenGpuStart explicit once bootstrap enabled%u; no graphics/READY claims\n",Enabled);for(ULONG n=0;n<=IRP_MJ_MAXIMUM_FUNCTION;n++)driver->MajorFunction[n]=Forward;driver->MajorFunction[IRP_MJ_PNP]=Pnp;driver->MajorFunction[IRP_MJ_POWER]=Power;driver->MajorFunction[IRP_MJ_DEVICE_CONTROL]=Denied;driver->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL]=Denied;driver->DriverExtension->AddDevice=Add;driver->DriverUnload=NULL;return STATUS_SUCCESS;}
+--- G1224/source/owner/scm_set_cp0.S
++++ G1287/source/owner/scm_set_cp0.S
+@@ -0,0 +1,62 @@
++/* Fixed NORMAL64 CP0 aperture setter, four VALUE arguments only.
++ * No FAST/HVC/legacy/buffer fallback. Preserve raw returned x0..x7 and x6 continuation.
++ * A positive state other than exact INTERRUPTED1 returns to sticky-retain policy. */
++.text
++.p2align 2
++.globl G1287SmcSetCp0
++.def G1287SmcSetCp0; .scl 2; .type 32; .endef
++.seh_proc G1287SmcSetCp0
++G1287SmcSetCp0:
++ stp x19,x20,[sp,#-32]!
++ .seh_save_regp_x x19,32
++ stp x29,x30,[sp,#16]
++ .seh_save_fplr 16
++ add x29,sp,#16
++ .seh_add_fp 16
++ .seh_endprologue
++ mov x19,x0
++ movz x0,#0x0c1b
++ movk x0,#0x4200,lsl #16
++ mov x1,#4
++ movz x2,#0
++ movk x2,#0xffff,lsl #16
++ mov w3,#0xffffffff
++ mov w4,#0xffffffff
++ mov w5,#0xffffffff
++ mov x6,xzr
++ mov x7,xzr
++.Lenter:
++ ldr x9,[x19,#64]
++ cmn x9,#1
++ b.eq .Lissue
++ add x9,x9,#1
++ str x9,[x19,#64]
++.Lissue:
++ smc #0
++ stp x0,x1,[x19]
++ stp x2,x3,[x19,#16]
++ stp x4,x5,[x19,#32]
++ stp x6,x7,[x19,#48]
++ ldr x9,[x19,#72]
++ cmn x9,#1
++ b.eq .Lclassify
++ add x9,x9,#1
++ str x9,[x19,#72]
++.Lclassify:
++ cmp x0,#1
++ b.ne .Lreturn
++ ldr x9,[x19,#80]
++ cmn x9,#1
++ b.eq .Lenter
++ add x9,x9,#1
++ str x9,[x19,#80]
++ b .Lenter
++.Lreturn:
++ .seh_startepilogue
++ ldp x29,x30,[sp,#16]
++ .seh_save_fplr 16
++ ldp x19,x20,[sp],#32
++ .seh_save_regp_x x19,32
++ .seh_endepilogue
++ ret
++ .seh_endproc

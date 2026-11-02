@@ -1,0 +1,3 @@
+from pathlib import Path
+import argparse,hashlib,json,subprocess
+p=argparse.ArgumentParser();p.add_argument('--fixture',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();W=Path(__file__).resolve().parent;assert not a.output.exists();a.output.mkdir(parents=True);q=subprocess.run(['go','run',str(W/'g63_decode.go'),str(W/'g63_decode_cases.go'),str(a.fixture)],capture_output=True,text=True);assert not q.returncode,(q.stdout,q.stderr);v=json.loads(q.stdout);assert v['passed'];v.update(decoder_sha256=hashlib.sha256((W/'g63_decode.go').read_bytes()).hexdigest(),C_fixture_sha256=hashlib.sha256(a.fixture.read_bytes()).hexdigest());(a.output/'tests.json').write_text(json.dumps(v,indent=2)+'\n');print(json.dumps(v))

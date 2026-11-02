@@ -1,0 +1,55 @@
+; EXPLICIT ROOT-SELECTED CP fence1 first-load opt-in; code default remains GMU-only when CpInitFenceOnce absent/0.
+[Version]
+Signature="$WINDOWS NT$"
+Class=System
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider=%Provider%
+DriverVer=10/29/2026,1.0.0.1287
+CatalogFile=OpenGpuStartOnce-G1287.cat
+PnpLockdown=1
+[Manufacturer]
+%Provider%=Open,NTarm64.10.0
+[Open.NTarm64.10.0]
+%Description%=Device,ACPI\OPEN0515
+[DestinationDirs]
+DriverCopy=12
+InputCopy=12,OpenGpuInputs
+[SourceDisksNames]
+1=%Disk%,,,
+[SourceDisksFiles]
+OpenGpuStart.sys=1
+fdt.bin=1
+smem-first.bin=1
+smem-second.bin=1
+cmddb.bin=1
+gmu.bin=1
+rsc.bin=1
+sqe.bin=1
+[Device.NT]
+CopyFiles=DriverCopy,InputCopy
+[DriverCopy]
+OpenGpuStart.sys
+[InputCopy]
+fdt.bin
+smem-first.bin
+smem-second.bin
+cmddb.bin
+gmu.bin
+rsc.bin
+sqe.bin
+[Device.NT.Services]
+AddService=OpenGpuStart,0x00000002,Service
+[Service]
+DisplayName=%Description%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%12%\OpenGpuStart.sys
+AddReg=ExplicitOptIn
+[ExplicitOptIn]
+HKR,,BootstrapOnce,0x00010001,1
+HKR,,CpInitFenceOnce,0x00010001,1
+[Strings]
+Provider="Open source-owned bring-up"
+Description="Open A740 real START/D0 translation bootstrap owner"
+Disk="Open GPU source composition"

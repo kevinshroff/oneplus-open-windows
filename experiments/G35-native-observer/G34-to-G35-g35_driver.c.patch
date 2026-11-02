@@ -1,0 +1,82 @@
+--- a/g35_driver.c
++++ b/g35_driver.c
+@@ -2 +2 @@
+- * Temporary source-built KMDF diagnostic. Fixed qualified reads only.
++ * Temporary source-built KMDF diagnostic. Fixed qualified register/PMIC reads.
+@@ -8,0 +9 @@
++#include "g35_observer.h"
+@@ -15,0 +17,2 @@
++static volatile LONG G35ObserverAttempts;
++static volatile LONG G35ObserverFault;
+@@ -57,0 +61,63 @@
++typedef struct {PVOID Maps[6];} G35_OBS_CONTEXT;
++static const ULONG G35ObserverPages[6]={0xc400000,0xc402000,0xc42d000,0xc440000,0xc441000,0xc445000};
++static PULONG G35ObserverAddress(G35_OBS_CONTEXT *ctx,ULONG at,BOOLEAN write)
++{
++ ULONG i;
++ if((at&3)!=0)return NULL;
++ if(write&&at!=0xc440ea0&&at!=0xc441220&&at!=0xc4456e0)return NULL;
++ for(i=0;i<6;i++)if(ctx->Maps[i]&&at>=G35ObserverPages[i]&&at-G35ObserverPages[i]<=0xffc){
++  if(write&&i<3)return NULL;
++  return(PULONG)((PUCHAR)ctx->Maps[i]+at-G35ObserverPages[i]);
++ }
++ return NULL;
++}
++static int G35ObserverRead(void *context,uint32_t at,uint32_t *value)
++{
++ PULONG reg=G35ObserverAddress((G35_OBS_CONTEXT*)context,at,FALSE);
++ if(!reg)return 0;*value=READ_REGISTER_ULONG(reg);return 1;
++}
++static int G35ObserverWrite(void *context,uint32_t at,uint32_t value)
++{
++ PULONG reg=G35ObserverAddress((G35_OBS_CONTEXT*)context,at,TRUE);
++ if(!reg||!((value==0x08000007)||(value==0x08000080)||(value==0x08000407)))return 0;
++ WRITE_REGISTER_ULONG(reg,value);return 1;
++}
++static void G35ObserverWait(void *context){UNREFERENCED_PARAMETER(context);KeStallExecutionProcessor(1);}
++static VOID G35CapturePmic(G35_PMIC *out)
++{
++ G35_OBS_CONTEXT context;G35_OBS_IO io;G35_SNAPSHOT before,after;
++ LARGE_INTEGER begin,end,frequency;LONG previous;ULONG i;NTSTATUS status;
++ RtlZeroMemory(out,sizeof(*out));RtlZeroMemory(&context,sizeof(context));
++ G35Status(&out->Status);begin=KeQueryPerformanceCounter(&frequency);
++ out->CounterFrequency=(ULONGLONG)frequency.QuadPart;
++ previous=InterlockedCompareExchange(&G35ObserverAttempts,0,0);out->Attempt=(ULONG)previous;
++ if(InterlockedCompareExchange(&G35ObserverFault,0,0)){out->Observer.Code=1001;goto done;}
++ if(previous>=2){out->Observer.Code=1002;goto done;}
++ if(InterlockedCompareExchange(&G35ObserverAttempts,previous+1,previous)!=previous){out->Observer.Code=1003;goto done;}
++ out->Attempt=(ULONG)previous+1;
++ if(!out->Status.FirmwareMatch||out->Status.Processors!=8||out->Status.CurrentIrql!=PASSIVE_LEVEL){out->Observer.Code=1004;goto done;}
++ status=G35Snapshot(&before);
++ if(!NT_SUCCESS(status)||RtlCompareMemory(before.Values,G35ExpectedValues,sizeof(before.Values))!=sizeof(before.Values)){
++  out->Observer.Code=1005;goto done;
++ }
++ for(i=0;i<6;i++){
++  PHYSICAL_ADDRESS at;at.QuadPart=G35ObserverPages[i];InterlockedIncrement(&G35MapCalls);
++  context.Maps[i]=MmMapIoSpaceEx(at,0x1000,(i<3?PAGE_READONLY:PAGE_READWRITE)|PAGE_NOCACHE);
++  if(!context.Maps[i]){out->Observer.Code=1006;goto done;}
++ }
++ io.Context=&context;io.Read=G35ObserverRead;io.Write=G35ObserverWrite;io.WaitMicrosecond=G35ObserverWait;
++ G35Observe(&io,&out->Observer);
++ done:
++ for(i=6;i>0;i--)if(context.Maps[i-1])MmUnmapIoSpace(context.Maps[i-1],0x1000);
++ if(out->Attempt==(ULONG)previous+1){
++  if(out->Observer.Code==0){
++   status=G35Snapshot(&after);
++   if(NT_SUCCESS(status)&&RtlCompareMemory(before.Values,after.Values,sizeof(before.Values))==sizeof(before.Values))out->FixedRegistersUnchanged=1;
++   else out->Observer.Code=1007;
++  }
++  if(out->Observer.Code!=0)InterlockedExchange(&G35ObserverFault,1);
++ }
++ out->Status.MapCalls=(ULONG)InterlockedCompareExchange(&G35MapCalls,0,0);
++ end=KeQueryPerformanceCounter(NULL);out->ElapsedTicks=(ULONGLONG)(end.QuadPart-begin.QuadPart);
++}
++
+@@ -62 +128 @@
+- if(Code!=G35_IOCTL_STATUS&&Code!=G35_IOCTL_SNAPSHOT){status=STATUS_INVALID_DEVICE_REQUEST;goto complete;}
++ if(Code!=G35_IOCTL_STATUS&&Code!=G35_IOCTL_SNAPSHOT&&Code!=G35_IOCTL_PMIC){status=STATUS_INVALID_DEVICE_REQUEST;goto complete;}
+@@ -67 +133 @@
+- needed=Code==G35_IOCTL_STATUS?sizeof(G35_STATUS):sizeof(G35_SNAPSHOT);
++ needed=Code==G35_IOCTL_STATUS?sizeof(G35_STATUS):Code==G35_IOCTL_SNAPSHOT?sizeof(G35_SNAPSHOT):sizeof(G35_PMIC);
+@@ -70,0 +137 @@
++ else if(Code==G35_IOCTL_PMIC){G35CapturePmic((G35_PMIC*)output);status=STATUS_SUCCESS;}
