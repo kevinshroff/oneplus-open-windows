@@ -1,6 +1,10 @@
 # Windows 11 ARM64 on OnePlus Open
 
-Native Windows on the **OnePlus Open**, built around Qualcomm **Snapdragon 8 Gen 2 / SM8550** and **Adreno 740**. Full Windows 11 and WinPE have booted on the phone, with the inner display, internal storage and native touch demonstrated. Bringing up this foldable requires device-specific UEFI/ACPI, interrupt, DMA/MMU, power and driver integration; there is no complete Windows board-support package to drop onto it. The project reuses Windows ARM64 CPU/storage/USB stacks and OEM firmware, develops custom input and platform glue, and adapts credited Linux, UniXNU/NativeAdreno, Project Mu/Project-Aloha and Mesa/Topaz work—see [credits](docs/CREDITS.md).
+Native Windows on the **OnePlus Open**, built around Qualcomm **Snapdragon 8 Gen 2 / SM8550** and **Adreno 740**. Full Windows 11 and WinPE have booted on the phone, with the inner display, internal storage and native touch demonstrated. Bringing up this foldable required device-specific UEFI/ACPI, interrupt, DMA/MMU, power and driver integration.
+
+The project reuses Windows ARM64 CPU/storage/USB stacks and OEM firmware, develops custom input and platform glue, and adapts credited Linux, UniXNU/NativeAdreno, Project Mu/Project-Aloha and Mesa/Topaz work—see [credits](docs/CREDITS.md).
+
+![Windows 11 desktop running natively on the unfolded OnePlus Open](docs/media/oneplus-open-windows-desktop.jpg)
 
 > [!IMPORTANT]
 > **Research source snapshot. GPU acceleration and reliable Wi-Fi networking are unfinished.** Development is paused. Captured firmware, Windows binaries, signing certificates, credentials and private operator infrastructure are excluded; this repository does not provide a ready-to-flash installation bundle.
@@ -8,38 +12,40 @@ Native Windows on the **OnePlus Open**, built around Qualcomm **Snapdragon 8 Gen
 **Demonstrated:** Windows desktop • inner framebuffer • native touchscreen • internal-storage boot • USB debugging/control • black cover framebuffer.  
 **Still unfinished:** WDDM acceleration • Wi-Fi networking • Bluetooth/audio/cameras • everyday battery/charging • complete buttons, folding and suspend/resume.
 
-## At a glance
+## Status
 
-Checkpoint counts refer to the explicit [subfeature checklists](docs/STATUS.md). Remaining work is uneven; these are not percentages of development time.
+| Area | Status | Notes |
+|---|---|---|
+| UEFI / ACPI | **WORKS ✅** | Boots WinPE and full Windows 11. |
+| CPU | **WORKS ✅** | Native ARM64 execution; all eight logical processors available. |
+| RAM | **WORKS ✅** | Working Windows memory and native allocations. |
+| UFS / installation | **WORKS ✅** | Windows installed on and booting from internal storage. |
+| Inner display | **WORKS ✅** | Usable Windows desktop with scaling; currently framebuffer rendering. |
+| Touch | **WORKS ✅** | Native touchscreen input; sustained everyday use demonstrated. |
+| USB debugging / control | **WORKS ✅** | Kernel debugging and remote control over USB. |
+| Cover display / folding | **PARTIAL 🟡** | Cover image can be cleared to black; panel switching and folding remain unfinished. |
+| Physical buttons | **IN PROGRESS 🛠️** | Hardware reader implemented; power-button behavior awaits a physical test. |
+| GPU / WDDM acceleration | **IN PROGRESS 🛠️** | GMU firmware and HFI working; first GPU command completion is the current blocker. |
+| Wi-Fi | **IN PROGRESS 🛠️** | Firmware loads and initial exchanges work; response/credit stalls block usable networking. |
+| USB peripherals | **NOT WORKING ❌** | External keyboard / host-mode support remains unfinished. |
+| Crash recovery | **PARTIAL 🟡** | Recovery tools work; automatic reconnection is not reliable after every crash. |
+| Battery reporting | **IN PROGRESS 🛠️** | Raw sensor readings acquired; Windows battery reporting remains unfinished. |
+| Charging | **IN PROGRESS 🛠️** | Charging current measured in bounded WinPE tests; normal Windows charging remains unfinished. |
+| Power management | **PARTIAL 🟡** | Usable while awake; suspend/resume and power-saving integration remain unfinished. |
+| Audio | **NOT WORKING ❌** | Speakers and microphone remain unfinished. |
+| Bluetooth | **NOT WORKING ❌** | Windows radio integration remains unfinished. |
+| Motion / light / proximity sensors | **NOT WORKING ❌** | Windows sensor integration remains unfinished. |
+| Cameras | **NOT WORKING ❌** | Sensor/ISP and Windows camera integration remain unfinished. |
+| Cellular | **NOT WORKING ❌** | Modem/SIM and mobile-network integration remain unfinished. |
+| GNSS | **NOT WORKING ❌** | Windows location integration remains unfinished. |
+| NFC | **NOT WORKING ❌** | Windows NFC integration remains unfinished. |
+| TPM / production boot security | **NOT WORKING ❌** | Windows TPM and production Secure Boot integration remain unfinished. |
 
-| Area | Checkpoints | Demonstrated / next boundary |
-|---|---:|---|
-| UEFI / ACPI | **4/6** | OEM boot-chain integration; Custom DXE/ACPI resources. **Next:** Portable public build/reconstruction workflow. |
-| CPU | **2/4** | Windows ARM64 execution; Eight logical processors enumerated. **Next:** Platform DVFS/performance qualification. |
-| RAM | **2/4** | Usable Windows memory map; Native allocations used by the working system. **Next:** Full-capacity/stress qualification. |
-| UFS / installation | **3/5** | 4 KiB-sector filesystem integration; Windows-compatible partition typing. **Next:** Reproducible installation/servicing workflow. |
-| Inner display | **2/5** | Windows framebuffer desktop; Usable desktop scaling. **Next:** Accelerated presentation. |
-| Cover display / folding | **1/4** | Cover framebuffer cleared and verified black. **Next:** Electrical panel-off. |
-| Touch | **3/5** | Controller transport and report decoding; Native HID/VHF input. **Next:** Complete fold/panel/stylus/palm coverage. |
-| Physical buttons | **1/3** | Integrated cached hardware reader. **Next:** Physical power-button display-off test. |
-| GPU / WDDM | **3/8** | Kernel resource/ownership foundations; GMU firmware and HFI acknowledgements. **Next:** First CP command/fence completion. |
-| Wi-Fi | **3/6** | PCIe enumeration and register access; Firmware load and initial exchanges. **Next:** Sustained firmware responses/credits. |
-| USB | **3/6** | USB device/debug enumeration; Kernel-debug and control data transport. **Next:** External host keyboard/HID support. |
-| Debugging / recovery | **4/6** | Kernel debugging; Authenticated remote-control workflow. **Next:** Reliable reconnection after every crash. |
-| Battery reporting | **1/4** | Raw physical sensor acquisition demonstrated. **Next:** Installed Windows battery-class frontend. |
-| Charging | **1/4** | Bounded WinPE tests measured charging current. **Next:** Sustained normal-Windows charging. |
-| Power management | **1/5** | Working awake profile for development. **Next:** System suspend/resume. |
-| Audio | **0/3** | No end-to-end Windows function demonstrated. **Next:** Windows audio-device integration. |
-| Bluetooth | **0/3** | No end-to-end Windows function demonstrated. **Next:** Windows radio integration. |
-| Motion / light / proximity sensors | **0/3** | No end-to-end Windows function demonstrated. **Next:** Windows sensor integration. |
-| Cameras | **0/3** | No end-to-end Windows function demonstrated. **Next:** Sensor/ISP initialization. |
-| Cellular | **0/3** | No end-to-end Windows function demonstrated. **Next:** Modem/SIM service integration. |
-| GNSS | **0/2** | No end-to-end Windows function demonstrated. **Next:** Windows location integration. |
-| NFC | **0/2** | No end-to-end Windows function demonstrated. **Next:** Windows NFC integration. |
-| TPM / production boot security | **0/3** | No end-to-end Windows function demonstrated. **Next:** Working Windows TPM integration. |
 
 <details>
-<summary><strong>Expand every subfeature checkpoint</strong></summary>
+<summary><strong>Detailed development checkpoints</strong></summary>
+
+These [subfeature checklists](docs/STATUS.md) track implementation and future refinements alongside the usable features above.
 
 ## UEFI / ACPI — 4/6 complete
 
@@ -209,6 +215,12 @@ Checkpoint counts refer to the explicit [subfeature checklists](docs/STATUS.md).
 
 
 </details>
+
+## See it in action
+
+Windows 11 running natively on the OnePlus Open.
+
+https://github.com/user-attachments/assets/2b834bc3-bc92-4345-a5e6-32ab159f1ff7
 
 ## The next useful work
 
