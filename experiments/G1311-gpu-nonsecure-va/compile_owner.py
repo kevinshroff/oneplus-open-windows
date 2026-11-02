@@ -17,6 +17,7 @@ p.add_argument('--system-include',required=True,type=Path,action='append',
 p.add_argument('--layout',required=True,choices=['baseline','nonsecure64'])
 p.add_argument('--out',type=Path,required=True,help='Fresh external output directory')
 p.add_argument('--secvid-zero-stores',action='store_true',help='G1318 isolated four-zero-store option; default off')
+p.add_argument('--gpu-mmio-writecombine',action='store_true',help='G1322 GPU bank CPU mapping request only; default off')
 a=p.parse_args()
 out=a.out.resolve()
 if out==REPO or REPO in out.parents:p.error('output must be outside the public repository')
@@ -33,6 +34,7 @@ args=[a.cc,'--target=aarch64-pc-windows-msvc','-ffreestanding','-fms-extensions'
       '-Wall','-Wextra','-Werror','-D_NO_CRT_STDIO_INLINE',
       '-DOGO_GPU_NONSECURE64_VA='+str(int(a.layout=='nonsecure64'))]
 if a.secvid_zero_stores:args+=['-DOGO_GPU_SECVID_ZERO_STORES=1']
+if a.gpu_mmio_writecombine:args+=['-DOGO_GPU_MMIO_WRITECOMBINE=1']
 for x in includes:args+=['-I'+str(x)]
 for x in a.system_include:args+=['-isystem',str(x.resolve())]
 compiler_version=subprocess.run([a.cc,'--version'],check=True,text=True,capture_output=True).stdout.splitlines()[0]
@@ -63,7 +65,7 @@ libraries=policy['libraries']
 # Every public closure file is pinned: headers can affect more than the changed TU.
 pins={str(x.relative_to(REPO)):sha(x.read_bytes()) for folder in ('source','reference')
       for x in sorted((B/folder).rglob('*')) if x.is_file()}
-report=dict(schema='g1311-public-owner-coff/1',layout=a.layout,secvid_zero_stores=a.secvid_zero_stores,objects=rows,
+report=dict(schema='g1311-public-owner-coff/1',layout=a.layout,secvid_zero_stores=a.secvid_zero_stores,gpu_mmio_writecombine=a.gpu_mmio_writecombine,objects=rows,
             source_pins=pins,link_policy_sha256=sha((W/'OWNER-LINK.json').read_bytes()),inventory_sha256=sha((W/'OWNER-SOURCES.json').read_bytes()),
             c_flags=args[1:args.index('-I'+str(includes[0]))],
             system_header_roots_count=len(a.system_include),

@@ -11,6 +11,7 @@ a=p.parse_args();build=a.build_dir.resolve();dest=a.out.resolve()
 if REPO==dest or REPO in dest.parents:p.error('artifact must remain outside public repository')
 report=json.loads((build/'OWNER-COMPILE.json').read_text())
 if report['layout']!='nonsecure64' or report.get('secvid_zero_stores') is not True or len(report['objects'])!=35:raise RuntimeError('exact G1318 build required')
+if report.get('gpu_mmio_writecombine',False) is not False:raise RuntimeError('G1322 mapping variant is not G1318')
 if '-DOGO_GPU_SECVID_ZERO_STORES=1' not in report['c_flags'] or '-DOGO_GPU_NONSECURE64_VA=1' not in report['c_flags']:raise RuntimeError('wrong compile flags')
 files={}
 for row in report['objects']:

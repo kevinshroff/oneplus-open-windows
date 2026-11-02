@@ -3,6 +3,7 @@
 #include "g482_resources.h"
 #include "g290_power_report.h"
 #include "g323_clock_policy.h"
+#include "g482_mmio_policy.h"
 #include <intrin.h>
 static const ULONGLONG Base[G482_BANKS]={0x03d00000,0x03d50000,0x03d68000,0x03d9a000,0x0b280000};
 static const ULONG Bytes[G482_BANKS]={0x40000,0x10000,0x28000,0x5000,0x10000};
@@ -31,10 +32,17 @@ NTSTATUS G482Bind(G482_BINDING*b,PDEVICE_OBJECT pdo,PCM_RESOURCE_LIST resources)
   * can reach mapping; no PA supplied separately by a caller is admitted. */
  for(ULONG i=0;i<G482_BANKS;i++){
   PHYSICAL_ADDRESS pa;pa.QuadPart=(LONGLONG)Base[i];
-  b->Cpu[i]=MmMapIoSpaceEx(pa,Bytes[i],PAGE_NOCACHE|PAGE_READWRITE);
+  b->Cpu[i]=MmMapIoSpaceEx(pa,Bytes[i],G482_MAP_PROTECTION(i));
   if(!b->Cpu[i]){s=STATUS_INSUFFICIENT_RESOURCES;goto rollback;}
   b->MappedMask|=1u<<i;
  }
+#if OGO_GPU_MMIO_WRITECOMBINE
+ /* All five CPU views exist, but no target IO or DMA starts here. This early
+  * marker supports a short, image-qualified PTE observation before use. */
+ DbgPrintEx(DPFLTR_IHVVIDEO_ID,DPFLTR_INFO_LEVEL,
+  "G1322 GPU_MAP bank0 va%p bytes%lx requested%lx beforeTargetIo1\n",
+  b->Cpu[G482_GPU],Bytes[G482_GPU],(ULONG)G482_MAP_PROTECTION(G482_GPU));
+#endif
  b->Pdo=pdo;ObReferenceObject(pdo);b->Bound=TRUE;s=STATUS_SUCCESS;goto done;
 rollback:
  /* No IO/owner can use a partially constructed binding. Unmap only the
