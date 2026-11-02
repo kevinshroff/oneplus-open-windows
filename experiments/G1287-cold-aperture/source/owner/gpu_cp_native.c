@@ -28,6 +28,9 @@ static NTSTATUS FirstUseFrame(OGO_CONTEXT*p){
  if(!q->held||q->released||q->poisoned||!q->freq_acked||!q->oob_may_be_held||q->status!=G190_OK||q->backend!=&p->Gmu->Core||q->generation!=c->Run.Generation||q->epoch!=p->Gmu->Core.epoch||q->stop_serial!=c->Run.StopSerial)return STATUS_INVALID_DEVICE_STATE;
  return OgoCpCurrent(p);
 }
+#if OGO_GPU_PRE_RELEASE_WITNESS
+#include "g1325_witness_native.inc"
+#endif
 /* Finite active init trace: never emits from stage5 fence polling. */
 static BOOLEAN CpTraceInit(OGO_CONTEXT*p){return p&&p->Cp&&p->Cp->Run.RunAttempted&&p->Cp->Run.Core.stage>=1&&p->Cp->Run.Core.stage<=4&&KeGetCurrentIrql()==PASSIVE_LEVEL;}
 static void CpIoBegin(OGO_CONTEXT*p,ULONG off,ULONG op,ULONG value){if(CpTraceInit(p))DbgPrintEx(DPFLTR_IHVVIDEO_ID,DPFLTR_INFO_LEVEL,"G1126 CP begin run%llx stage%u op%u off%x value%08x\n",p->RunId,p->Cp->Run.Core.stage,op,off,value);}
@@ -52,6 +55,9 @@ static NTSTATUS GpuWrite(PVOID x,ULONG off,ULONG value){OGO_CONTEXT*p=x;G982_CP*
   const ULONG want[]={0,(ULONG)c->Run.Layout.Iova[2],(ULONG)(c->Run.Layout.Iova[2]>>32),(ULONG)c->Run.Layout.Iova[0],(ULONG)(c->Run.Layout.Iova[0]>>32),0x20c};
   if(c->Run.Core.sqe.iova!=c->Run.Layout.Iova[2]||c->Run.Core.ring.iova!=c->Run.Layout.Iova[0])return CpIoEnd(p,off,1,value,STATUS_INVALID_DEVICE_STATE,FALSE,FALSE);
   for(unsigned i=0;i<RTL_NUMBER_OF(regs);i++){ULONG got;s=GpuRead(p,regs[i],&got);if(s!=STATUS_SUCCESS)return CpIoEnd(p,off,1,value,s,FALSE,FALSE);if(got!=want[i])return CpIoEnd(p,off,1,value,STATUS_DEVICE_DATA_ERROR,FALSE,FALSE);}
+#if OGO_GPU_PRE_RELEASE_WITNESS
+  return CpIoEnd(p,off,1,value,G1325StopBeforeRelease(p),FALSE,FALSE);
+#endif
  }
  if(off==0x2020)SqePoint(p,"PRE_AHB_CURRENT_BEGIN",STATUS_SUCCESS,0,FALSE);
  s=Ahb(p,&drop);if(off==0x2020)SqePoint(p,"PRE_AHB_CURRENT_END",s,s==STATUS_SUCCESS?drop:0,(BOOLEAN)(s==STATUS_SUCCESS));if(s!=STATUS_SUCCESS)return CpIoEnd(p,off,1,value,s,FALSE,FALSE);if(drop)return CpIoEnd(p,off,1,value,STATUS_DEVICE_NOT_READY,FALSE,FALSE);
