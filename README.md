@@ -4,7 +4,7 @@ Native Windows on the **OnePlus Open**, built around Qualcomm **Snapdragon 8 Gen
 
 The project reuses Windows ARM64 CPU/storage/USB stacks and OEM firmware, develops custom input and platform glue, and adapts credited Linux, UniXNU/NativeAdreno, Project Mu/Project-Aloha and Mesa/Topaz work—see [credits](docs/CREDITS.md).
 
-![Windows 11 desktop running natively on the unfolded OnePlus Open](docs/media/oneplus-open-windows-desktop.jpg)
+<img src="docs/media/oneplus-open-windows-desktop.jpg" alt="Windows 11 desktop running natively on the unfolded OnePlus Open" width="240">
 
 > [!IMPORTANT]
 > **Research source snapshot. GPU acceleration and reliable Wi-Fi networking are unfinished.** Development is paused. Captured firmware, Windows binaries, signing certificates, credentials and private operator infrastructure are excluded; this repository does not provide a ready-to-flash installation bundle.
