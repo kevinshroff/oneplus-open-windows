@@ -14,6 +14,7 @@ if report['layout']!='nonsecure64' or report.get('secvid_zero_stores') is not Tr
 if report.get('pre_release_witness') is not True or '-DOGO_GPU_PRE_RELEASE_WITNESS=1' not in report['c_flags']:raise RuntimeError('intentional pre-release stop required')
 if report.get('gpu_mmio_writecombine') is not False or '-DOGO_GPU_MMIO_WRITECOMBINE=1' in report['c_flags']:raise RuntimeError('G1325 uses the prior non-WC mapping baseline')
 if '-DOGO_GPU_SECVID_ZERO_STORES=1' not in report['c_flags'] or '-DOGO_GPU_NONSECURE64_VA=1' not in report['c_flags']:raise RuntimeError('wrong baseline flags')
+if report.get('sqe_low_iova',False) is not False or '-DOGO_GPU_SQE_LOW_IOVA=1' in report.get('c_flags',[]):raise RuntimeError('G1334 low SQE is not this profile')
 files={}
 for row in report['objects']:
  name=row['object'];b=(build/name).read_bytes()

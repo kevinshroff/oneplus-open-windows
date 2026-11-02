@@ -8,14 +8,14 @@
   "Python_model_test_groups": 7,
   "Python_tests_pass": true,
   "native_execution_claimed": true,
-  "live_phase_result_claimed": false,
+  "live_phase_result_claimed": true,
   "binary_retained_or_published": false,
   "source_files": {
     ".gitignore": "0d0dc418a47155c428f4027577c4b1de3e1751da4feef1b12671347bd99e7ba5",
     "Cleanup-Timeout.ps1.in": "cd0291147746b44665ee9932b7829bdf34efee8e31db53c9ceffbe5b691d69e7",
     "LOADED-RECEIPT.template.json": "c917c012fa2ec3a97f810fd97cf899c91557822ec4f5f04a122a0b6d09df1834",
     "Observer.ps1.in": "8c162a3812adde783b81ed90cc3f5af5686462cbf19a5f6f498034c436a2f92e",
-    "README.md": "c6e3220663063ac11c991525ddae6e85afc94f0a508170c05815f690a60acd2c",
+    "README.md": "27a4fdec2278ede2dd0f187fab721e08f33ea534f5ebc690159ebc50b35da946",
     "RESOURCE-ORIGIN.md": "ee812726f825ad150371e2dead714fd1a58d14f30fb2e70abc4d4da99e1a979b",
     "Register-Observer.ps1": "a8280f53790790434f9609c2cba1d5e526c4616a5c4b7c6a52f34f4cbf772f5b",
     "analyze.py": "4eaa1346edd28ec56c363c865b26cadd4bdb33ee127fe312697a3aa82c1672b8",
@@ -27,13 +27,14 @@
     "proof.go": "1337e9126c0fb6631ddb1f8dfe19bba1f8cc0d4a87b9e235d2bc669233bb5fb6",
     "reader_test.go": "38aa806db1de3a5dd920bdf384453bc3d31634c0c48bfb456483be9291709ebe",
     "support.go": "67d9bf5d3168aaad5d1c21bff4d0a53da499e4870e6ef1a9b0bcbc0d7a8dea12",
-    "test_workflow.py": "c9b3906180e700e6c64e28da67cf432b19f5e4c1a49ba84b96240b4bd13f1be1"
+    "test_workflow.py": "c9b3906180e700e6c64e28da67cf432b19f5e4c1a49ba84b96240b4bd13f1be1",
+    "BOOT167-RESULT.md": "4d7afc3c301891419af0f817b83d623636c292b206f8dcbfd958cd6521ecff4f"
   },
   "observer_source_version": 2,
   "changed_PS_native_qualification_claimed": true,
   "quote_free_generated_commands_regression_pass": true,
-  "native_execution_scope": "HOST_ONLY_NATIVE_ARGV_AND_SYNTAX_DEFAULT_INERT",
-  "native_reader_execution_claimed": false,
+  "native_execution_scope": "Host-only argv/syntax qualification and actual read-only Boot167 PRE/POST; PRE pause budget exceeded",
+  "native_reader_execution_claimed": true,
   "changed_PS_native_qualification_scope": "AST_PARSE_AND_DEFAULT_INERT_SYNTAX_CARRIERS_ONLY",
   "host_only_native_qualification": {
     "scope": "HOST_ONLY_NATIVE_ARGV_AND_SYNTAX_DEFAULT_INERT",
@@ -72,5 +73,6 @@
     "tested_private_generator_SHA256": "c745499296912d8d2efab391fa05ea6269c7e3e54ef3494b41c4c4af0fc8f6b0",
     "argv_verifier_source_SHA256": "d58540b94ee778a302427e19eba13921e4f6fd4a7dadfe52ff47030ec6e97423",
     "host_recipe_source_SHA256": "9eba7af34b5227e3ef2caad8cf7c78715ea10956b45d6b3e0d4a2333092e2127"
-  }
+  },
+  "live_phase_result_scope": "Actual source-qualified PRE/POST observations with pause-perturbed PRE; no unperturbed, causal or firmware-failure claim"
 }

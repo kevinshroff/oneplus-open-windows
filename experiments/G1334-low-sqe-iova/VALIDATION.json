@@ -1,0 +1,31 @@
+{
+  "schema": "g1334-offline-validation/1",
+  "ASan_UBSan": true,
+  "layout_map_combinations": 4,
+  "CP_model_cases_per_combination": 21,
+  "invalid_selector_cases": 4,
+  "coff": {
+    "default_off_comparison": "G1325/coff-default-off",
+    "default_off_matches": 35,
+    "objects": 35,
+    "low_changed_objects": [
+      "43_gpu_cp_native.obj"
+    ],
+    "native_evidence": false,
+    "linked": false,
+    "g1325_witness_default_off_matches": 35
+  },
+  "native_packet": {
+    "zip_sha256": "ef179380b201c6a7a05ffeea640bba801e58dbf8a9b727fc961d333d4c71427c",
+    "manifest_sha256": "5394280b294b916a11e1e29f52d4318a31c7d9fcc4d382a30f72d94be0e1d59a",
+    "members": 270,
+    "owner_objects": 35,
+    "native_link_performed": false,
+    "signing_performed": false,
+    "hardware_qualified": false
+  },
+  "hardware_qualified": false,
+  "linked": false,
+  "signed": false,
+  "loaded": false
+}
