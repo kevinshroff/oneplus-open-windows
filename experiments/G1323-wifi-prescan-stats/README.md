@@ -1,6 +1,6 @@
 # Pre-scan statistics liveness discriminator
 
-This is a diagnostic experiment, not a Wi-Fi fix. The inert helper adds one supported Windows statistics query after the original driver's initialization and before the sole explicit scan. No result from this experiment is claimed here. Reliable networking, association, DHCP and traffic remain unproved.
+This is a diagnostic experiment, not a Wi-Fi fix. The inert helper adds one supported Windows statistics query after the original driver's initialization and before the sole explicit scan. The observed trial below did not establish the intended liveness discriminator. Reliable networking, association, DHCP and traffic remain unproved.
 
 ## Question
 
@@ -57,3 +57,13 @@ Then distinguish these outcomes:
 | Only API success, sender completion, local cancellation or scan notification | Firmware progress remains unestablished. |
 
 The extra command also changes timing and queue contents. A changed outcome cannot uniquely blame the power/listen sequence or certify the unperturbed baseline. Preserve exact observations before choosing a corrective experiment. No credit injection, pool expansion, cache/LDAR patch or firmware replacement follows from this experiment alone.
+
+## Observed trial
+
+The four-unit native C# compile and native PowerShell parse passed. One original initialization and one explicit scan returned successfully; zero networks were cached and no association was achieved. The extra statistics query opened its WLAN handle successfully, then returned native error 1 in 0.4776 ms with zero returned bytes. The exact rejection layer is unknown; this is not a firmware failure result.
+
+The qualified CPU host log was unwrapped, with stable copy metadata, 7,164 ASCII-coherent records and no parser gaps. It contains exactly two automatic WDI_GET_STATISTICS/WMI_REQUEST_STATS 16001 sequences, the same count as the preceding legacy baseline. Neither is the new probe: the last precedes it by approximately 1.619 seconds after measured phone-clock alignment. All 45 same-record inline SystemTime anchors agree on the header timestamp's seven-hour offset; raw header timestamps were not directly compared with native API UTC timestamps. No additional WDI statistics or 16001 submission appears for the probe.
+
+The baseline failure recurred: last WMI payload UPDATE_STATS, the same three vdev2 power/listen commands with returned credits, then START_SCAN consumes endpoint2 credit 1→0 and receives sender completion 0. No subsequent WMI payload or returned credit appears. HT/VHT capability builds remain length 0 and no SET_IE submission is retained.
+
+The additional diagnostic is therefore **uninformative**: it did not establish a fresh firmware request, so it cannot distinguish liveness before scan preparation. It neither proves nor disproves firmware failure. Repeating this API or substituting cached adapter counters would not answer the missing question. No further alternative API operation was performed.

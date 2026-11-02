@@ -58,5 +58,6 @@ REA evidence:
 - Page installation: `ev_e1d327fbf14edcb955c537c50ca655eefe84071640ac3a2c43981435cd16528c`.
 
 Evidence was exported and each native session closed. Captured addresses,
-machine details, kernel slices and decompiler text remain private. A fresh normal
-Windows GPU PTE and MAIR observation is still required for the mapping trial.
+machine details, kernel slices and decompiler text remain private. The later normal Windows trial qualified the GPU window endpoint PTEs and
+current saved MAIR before target IO; see the [actual result](README.md#actual-trial-result).
+That direct observation is separate from the compiled policy analysis above.

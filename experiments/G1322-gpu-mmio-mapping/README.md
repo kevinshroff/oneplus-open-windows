@@ -1,6 +1,6 @@
 # G1322: GPU register-window CPU mapping discriminator
 
-**Prepared; hardware result pending.** G1318's four SECVID zero stores returned
+**Hardware trial complete; SQE-start failure persists.** G1318's four SECVID zero stores returned
 successfully but did not fix SQE start. This variant retains that tested baseline
 and changes only the requested CPU mapping for the actual assigned GPU register
 bank: `PAGE_READWRITE | PAGE_WRITECOMBINE`. The other four register banks retain
@@ -57,3 +57,24 @@ The wrapper fixes the nonsecure64 VA, four zero stores and GPU mapping option.
 The G1311 builder also exposes the named default-off mapping option. External
 libraries and signing material are not distributed. Preserve one hardware owner
 and the existing retain-on-uncertainty rules; no WDDM readiness or fence is implied.
+
+## Actual trial result
+
+The native-linked, reviewed and signed owner loaded in a fresh normal Windows
+boot. Its exact early hardware execution stop qualified the loaded PE/instruction
+before target IO. The actual first and last GPU-window leaf descriptors had
+AttrIndx 3, with MAIR byte `44` (Normal noncacheable), the expected physical
+endpoints and kernel read/write access. The adjacent register bank retained
+AttrIndx 1 / byte `00` (Device-nGnRnE). All five views existed; binding completion
+was still pending. No page-table or MAIR override was applied. These are direct
+endpoint-page observations; the interior page containing offset `0x2020` was
+not separately inspected. The single mapping request covers the whole window.
+
+After removing the owned stop and restoring the module-load output policy, the
+same activation resumed. It reached `STORE_CALL_BEGIN stage3`, then physical
+Qualcomm 900E; no returned-call marker or first GPU fence appeared. Thus this
+request variant did not remove the recurring fatal boundary. It does not prove
+store retirement, an exact fault PC or exclusion of every memory-type issue.
+No CP retry, graphics readiness or WDDM acceleration was claimed. Do not repeat
+the unchanged variant. Native source/build/signing proofs and the private
+endpoint observations remain distinct from that negative hardware result.
