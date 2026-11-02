@@ -66,4 +66,17 @@ The next transport experiment needs an observed discriminator between target non
 
 ## Validation performed here
 
-The corrected three-file Go closure cross-compiled successfully with Go1.27.3 to Windows/AMD64. Seven synthetic artifact tests cover same/changed tuples, refused PRE, tampered result binding, mixed images, truncated/unstable outcomes and inert templates. Native host inert execution, actual proof admission and all target behavior remain untested. No networking improvement is claimed.
+The corrected three-file Go closure cross-compiled successfully with Go1.27.3 to Windows/AMD64. Seven synthetic artifact tests cover same/changed tuples, refused PRE, tampered result binding, mixed images, truncated/unstable outcomes and inert templates. Native host inert execution subsequently passed with exit0 and no debugger connection or target read. Actual proof admission and target reads remain pending. No networking improvement is claimed.
+
+## Optional offline CE2 history decoding
+
+If the root operator independently captures the exact original driver's512×40-byte CE2 history and retains matching metadata, decode the private file locally:
+
+```sh
+python3 experiments/G1312-wifi-resume/parse_ce_history.py \
+  --ring PRIVATE-CE2-HISTORY.bin --cursor ACTUAL-DECIMAL-CURSOR --tail 32
+```
+
+The parser accepts exactly20480bytes and a cursor0..511. It emits counts over nonzero physical slots and at most the selected1..512 tail rows, with software index, event, raw time,16-byte descriptor, descriptor length bits31:16, and context. It never connects to a debugger or reads target memory. Keep captures and output private; output contains raw descriptor/context values.
+
+Cursor denotes the last **reserved** record, not next-free. Its row is marked possibly incomplete; no other row is independently certified complete. Tail order follows reservation slots, not time. Cursor0 does not establish a wrap or empty state; all-zero input is reported only as a byte property. Event0x30 records the zero-length receive branch, but the logger re-reads the descriptor later, so a nonzero length in that record is allowed. This parser does not establish capture qualification, interrupt liveness or causation. The suite now includes six synthetic CE-history tests plus the seven pair/template tests, all passing.

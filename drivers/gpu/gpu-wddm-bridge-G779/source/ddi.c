@@ -861,9 +861,15 @@ static NTSTATUS APIENTRY TgSubmitCommand(const HANDLE hAdapter, const DXGKARG_SU
         LogPrint("SubmitCommand: fence %u flags %x dma %u priv %u (irql %u)\n", A->SubmissionFenceId, A->Flags.Value,
                  A->DmaBufferSubmissionEndOffset - A->DmaBufferSubmissionStartOffset, bytes, KeGetCurrentIrql());
     }
+    /* A rejected queue item has executed no work. Never fabricate completion.
+     * Legacy SubmitCommand errors are fatal to Dxgkrnl (0x119); before opening
+     * StartDevice, replace this fallible allocation with reserved queue storage.
+     * This error path preserves failure rather than reporting discarded work. */
+    /* Preserve publication before EngSubmit wakes the completion worker. */
     a->LastSubmittedFence = A->SubmissionFenceId;
-    if (!NT_SUCCESS(EngSubmit(cmds, bytes, A->SubmissionFenceId))) {
-        CompleteFence(a, A->SubmissionFenceId);          /* engine gone: complete without work */
+    NTSTATUS status = EngSubmit(cmds, bytes, A->SubmissionFenceId);
+    if (!NT_SUCCESS(status)) {
+        return status;
     }
     return STATUS_SUCCESS;
 }
