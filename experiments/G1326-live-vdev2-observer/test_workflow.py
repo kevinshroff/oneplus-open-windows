@@ -17,12 +17,26 @@ class Tests(unittest.TestCase):
  def test_finite_control_source(self):
   c=g.commands(self.receipt());self.assertEqual(c['arm'].count('ba0 e 4'),1);self.assertNotIn('g;',c['arm'])
   for k,x in c.items():
-   self.assertNotIn('$><',x);self.assertNotIn('bp /',x);self.assertNotIn(' t;',x);self.assertNotIn('r pc',x)
-  self.assertIn('\\n',c['CLASSIFY_BODY']);self.assertNotIn('\\\\n',c['CLASSIFY_BODY'])
+   self.assertNotIn('$><',x);self.assertNotIn('bp /',x);self.assertNotIn(' t;',x);self.assertNotIn('r pc=',x)
+  self.assertIn('.echo WIFILIVE_HIT; r pc;',c['CLASSIFY_BODY'])
+  self.assertNotIn('.printf',c['CLASSIFY_BODY'])
+  for value in c.values():self.assertNotIn(chr(34),value)
   self.assertNotIn('g;',c['CLASSIFY_BODY']);self.assertEqual(c['CLEAN_COMMAND'].count('bc 0'),1);self.assertNotIn('ba0',c['CLEAN_COMMAND'])
   self.assertIn('nt!DbgBreakPoint',c['TIMEOUT_CLEAR_INTERRUPT']);self.assertIn('0x68f1bb22',c['TIMEOUT_CLEAR_INTERRUPT']);self.assertEqual(c['TIMEOUT_CLEAR_INTERRUPT'].count('bc 0'),1)
   r=self.receipt();r['loaded_boundary_16bytes']='00'*16
   with self.assertRaises(ValueError):g.commands(r)
+ def test_quote_free_classifier_parser(self):
+  import re
+  source=(HERE/'Observer.ps1.in').read_text()
+  pattern=re.search(r"\$v=\[regex\]::Matches\(\$block,'([^']+)'\)",source).group(1)
+  # Synthetic textual formatting fixture; not new runtime evidence.
+  block='WIFILIVE_HIT\r\npc=fffff800002ea630\r\nWIFILIVE_REQUEST\r\nfffff800`12345000  00000109\r\nWIFILIVE_VDEV\r\nfffff800`56789000  02                                               .\r\nWIFILIVE_VALUES_END\r\n'
+  hits=re.findall(pattern,block);self.assertEqual(hits,[('fffff800002ea630','00000109','02')])
+  for malformed in (block.replace('00000109','????????'),block.replace('02                                               .','02 03  ..'),block.replace('WIFILIVE_REQUEST','WIFILIVE_REFUSED_HIT'),block.replace('pc=','x0='),'.echo '+block,block.replace('WIFILIVE_VALUES_END','Syntax error')):
+   self.assertEqual(re.findall(pattern,malformed),[])
+  self.assertEqual(len(re.findall(pattern,block+block)),2) # PowerShell requires exactly one match.
+  for name in ('Observer.ps1.in','Cleanup-Timeout.ps1.in'):
+   self.assertIn('Embedded double quote forbidden for legacy native argv',(HERE/name).read_text())
  def test_templates_do_not_invent_entry_or_grants(self):
   for phase in g.PHASES:
    proof,ledger=g.template(phase)

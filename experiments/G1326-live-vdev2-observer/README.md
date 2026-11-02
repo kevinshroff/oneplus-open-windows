@@ -74,7 +74,7 @@ go test -race proof.go phase.go guard.go support.go ce.go reader_test.go
 python3 test_workflow.py
 ```
 
-The publication's six Go and six Python test groups pass. The Windows crossbuild also passes. These are CPU/model/parser checks, not new native read or networking results.
+The publication's six Go and seven Python test groups pass. The Windows crossbuild also passes. These are CPU/model/parser checks, not new native read or networking results.
 
 `generate.py --syntax-preview --out NEW_DIRECTORY` produces neutral, explicitly non-operational parse carriers. Their default invocations are inert and explicit execution always throws before runtime work. Actual host generation requires a fresh loaded receipt and its exact hash; generated approval flags remain false. Independently parse and review the exact generated source and default-inert binary before any later selection. No runtime permission is granted here.
 
@@ -92,3 +92,11 @@ Actual subsequent WMI receive activity and returned endpoint2 credit before the 
 | Empty RAM shadows without a hardware quartet | Still unresolved; no target-nonproduction inference. |
 
 The hardware quartet is read only when the existing selector is naturally `0x40000037` and current mapping checks pass. Another selector yields an explicit refusal without a write. The experiment does not promise a decisive split in every attempt. No cache/LDAR patch, credit injection, pool expansion or firmware replacement follows from this source alone.
+
+## Source version 2: legacy native argument transport
+
+The first Boot166 observer attempt resumed its owned pre-FW load hold and then reached the first source-entry hardware stop. Windows PowerShell 5 stripped the embedded double quotes in the classifier's `.printf` argument to the native capture helper. The debugger received a truncated command ending at `.printf WIFILIVE_HIT` and returned a syntax error. No PRE capture completed, so this attempt provides no paired live baseline. The owned stop required root cleanup; an observer failure is not evidence of target nonproduction or firmware failure.
+
+Source version 2 uses quote-free `.echo` markers, `r pc`, `dd @x1 L1` and `db @x2+0x9aa8 L1`. The parser requires one complete, ordered, anchored PC/DWORD/byte block. Existing boot, exact PC/event/slot, entry opcode and kernel-pointer guards remain before those reads; request/vdev admission remains unchanged. Generation rejects every command string containing a double quote, and observer/timeout-cleanup helpers enforce the same invariant immediately before native invocation. This avoids dependence on embedded-quote preservation in legacy native argument transport. It does not change stop ownership, cleanup, hit limits or resume policy.
+
+Regression checks exercise every generated command argument and the exact parser expression from the PowerShell template, including malformed, duplicate, refused and echoed blocks. These are offline checks. The changed PowerShell requires fresh native parse/default-inert qualification and any future runtime use requires a new exclusive packet with actual evidence; earlier native qualification applies to earlier source hashes. No retry or new boot is authorized by this correction.

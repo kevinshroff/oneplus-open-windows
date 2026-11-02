@@ -1,4 +1,4 @@
-# HOST LOCAL ONLY. Default inert; no connector/phone job or debugger callback.
+# HOST LOCAL ONLY. Source version 2: quote-free G717 command transport. Default inert; no connector/phone job or debugger callback.
 param([switch]$ExecuteReviewedObserver,[string]$Review,[string]$ReviewSha256)
 $ErrorActionPreference='Stop';$global:ProgressPreference='SilentlyContinue'
 if(!$ExecuteReviewedObserver){'INERT: no debugger connection, marker, or read';return}
@@ -24,6 +24,7 @@ $log=if($m.Groups[1].Success){$m.Groups[1].Value}else{$m.Groups[2].Value}
 Need ([StringComparer]::OrdinalIgnoreCase.Equals([IO.Path]::GetFullPath($log),[IO.Path]::GetFullPath([string]$j.actual_debugger_log))) 'Debugger log identity mismatch'
 function Status { $text=[string](& $a status|Out-String);Need ($LASTEXITCODE -eq 0) 'Native status failed';$hits=[regex]::Matches($text,'(?m)^EXECUTION_STATUS=0x([0-9a-fA-F]{8})\s*$');Need ($hits.Count -eq 1) 'One current status required';return [Convert]::ToUInt32($hits[0].Groups[1].Value,16) }
 function Capture([string]$command,[string]$begin,[string]$end){
+ Need (!$command.Contains([string][char]34)) 'Embedded double quote forbidden for legacy native argv'
  Need ((Status) -eq 6) 'Preexisting held6 required; observer never interrupts'
  & $e capture $command|Out-Null;Need ($LASTEXITCODE -eq 0) 'Native held capture failed'
  $tail=[string](Get-Content -LiteralPath $log -Tail 180|Out-String)
@@ -37,7 +38,7 @@ $arm=Get-Content $armMarker -Raw|ConvertFrom-Json
 Need ($arm.schema -ceq 'wifi-live-vdev2-host-once/1' -and $arm.boot_id -eq __BOOT__ -and $arm.phase -ceq 'ARM_LIVE_VDEV2' -and $arm.phone_session -ceq $j.phone_session -and $arm.image_sha256 -ceq $j.image_sha256) 'Wrong actual ARM marker'
 $intent=Join-Path $d 'WiFi-LiveVdev2-Boot-__BOOT__-LOCAL-OBSERVER.once.json'
 WriteNewJson $intent ([ordered]@{schema='wifi-live-vdev2-local-intent/1';BootId=__BOOT__;review_sha256=$ReviewSha256;arm_marker_sha256=$j.arm_marker_sha256;created_utc=[DateTimeOffset]::UtcNow.ToString('o');maximum_owned_hits=2;interrupt_calls=0;phone_API_calls=0})
-$clock=[Diagnostics.Stopwatch]::StartNew();$events=@();$lastGoLower=$null;$result=[ordered]@{schema='wifi-live-vdev2-local-result/1';BootId=__BOOT__;module_base='__BASE__';review_sha256=$ReviewSha256;selected_capture_completed=$false;selected_capture_exit=$null;resumed=$false;owned_slot_removed=$false;pause_qualified=$false;timing_neutrality_proved=$false;events=@();failure=$null;cleanup_failure=$null;interrupt_calls=0;phone_API_calls=0;callbacks=0;rearms=0;steps=0}
+$clock=[Diagnostics.Stopwatch]::StartNew();$events=@();$lastGoLower=$null;$result=[ordered]@{schema='wifi-live-vdev2-local-result/1';observer_source_version=2;BootId=__BOOT__;module_base='__BASE__';review_sha256=$ReviewSha256;selected_capture_completed=$false;selected_capture_exit=$null;resumed=$false;owned_slot_removed=$false;pause_qualified=$false;timing_neutrality_proved=$false;events=@();failure=$null;cleanup_failure=$null;interrupt_calls=0;phone_API_calls=0;callbacks=0;rearms=0;steps=0}
 $selected=$false;$knownOwned=$false;$initialDone=$false
 try {
  # This initial hold is BEFORE DriverEntry/FW initialization; its existing duration is not a live-phase measurement.
@@ -54,7 +55,8 @@ try {
   $begin='__PREFIX___HIT_'+$hit+'_BEGIN';$end='__PREFIX___HIT_'+$hit+'_END'
   $cmd='__CLASSIFY_BODY__'.Replace('HITBEGIN',$begin).Replace('HITEND',$end)
   $block=Capture $cmd $begin $end
-  $v=[regex]::Matches($block,'(?m)^WIFILIVE_HIT pc=([0-9a-fA-F`]+) request=([0-9a-fA-F]{8}) vdev=([0-9a-fA-F]{2})\r?$')
+  # Exact ordered one-register/one-DWORD/one-byte output, never an echoed command.
+  $v=[regex]::Matches($block,'(?m)^WIFILIVE_HIT\r?\n[ \t]*pc=([0-9a-fA-F`]{16,17})[ \t]*\r?\nWIFILIVE_REQUEST\r?\n[0-9a-fA-F`]{16,17}[ \t]+([0-9a-fA-F]{8})[ \t]*\r?\nWIFILIVE_VDEV\r?\n[0-9a-fA-F`]{16,17}[ \t]+([0-9a-fA-F]{2})[ \t]+[^\r\n]\r?\nWIFILIVE_VALUES_END\r?$')
   Need ($v.Count -eq 1) 'Actual hit failed source/PC/owned-slot/argument guards; remain held'
   Need (($v[0].Groups[1].Value.Replace('`','').ToLowerInvariant()) -ceq '__PC__') 'Foreign event PC'
   $request=[Convert]::ToUInt32($v[0].Groups[2].Value,16);$vdev=[Convert]::ToUInt32($v[0].Groups[3].Value,16)
