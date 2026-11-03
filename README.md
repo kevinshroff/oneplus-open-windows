@@ -226,7 +226,7 @@ https://github.com/user-attachments/assets/2b834bc3-bc92-4345-a5e6-32ab159f1ff7
 ## The next useful work
 
 - **Adreno 740:** obtain the first native command-processor completion. GMU/HFI, the secure-aperture call and the [G1348 hardware translation witness](experiments/G1348/HARDWARE-RESULT.md) work. Proceed to a conditional first command/fence; WDDM and userspace rendering follow.
-- **Wi-Fi:** resolve the firmware response/credit stall before another association attempt. The latest bounded connection test still obtained no DHCP address; transport evidence is being compared across scan-priority variants.
+- **Wi-Fi:** resolve the firmware response/credit stall before another association attempt. The priority2 variant retained the same response/credit stall. The next discriminator is the effective cache attributes of the DMA ring/common buffers.
 - **Reproducibility:** turn the source closures and upstream pins into portable local builds using independently obtained platform inputs.
 
 See the [agent handoff](docs/AGENT_HANDOFF.md) for the latest experiment, failed hypotheses, precise next discriminators and preservation rules. The [source map](docs/SOURCE_MAP.md) separates current components from historical experiments. Read [build and publication boundaries](docs/BUILDING.md) before using any tooling.

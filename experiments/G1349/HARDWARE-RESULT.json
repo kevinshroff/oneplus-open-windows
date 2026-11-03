@@ -1,0 +1,102 @@
+{
+  "schema": "G1349-sanitized-hardware-result/1",
+  "experiment": "Conditional scan priority1\u21922 on preserved G1346 baseline",
+  "boot_sequence": 177,
+  "signed_driver_sha256": "bd36bb6c8877c138153ade9b444fe63d18f337f4d2bc8abfd1246708f997dda3",
+  "initializer": {
+    "calls": 1,
+    "returned_success": true,
+    "NeedReboot": false,
+    "pre_post_18_runtime_files_match": true,
+    "service_running": true,
+    "future_Start": 4
+  },
+  "cache_and_connect": {
+    "cache_queries": 1,
+    "cache_entries": 3,
+    "distinct_SSID_byte_sequences": 1,
+    "duplicate_profile_entries_present": true,
+    "exact_reviewed_pair_present": true,
+    "selected_quality": 46,
+    "selected_connectable": true,
+    "selected_notConnectableReason": 0,
+    "selected_BSSID_count": 1,
+    "cache_after_init_call_ms": 15010,
+    "connect_requests": 1,
+    "connect_submission_exit": 0,
+    "init_to_connect_ms": 17451,
+    "DHCP_ready": false,
+    "DHCP_elapsed_ms": 25032,
+    "DHCP_polls": 22,
+    "later_link_local_IPv4_only": true,
+    "later_default_routes": 0,
+    "event_filter_query_failed": true,
+    "event_query_does_not_prove_absence": true
+  },
+  "capture": {
+    "decoded_records": 9421,
+    "parser_gaps": 0,
+    "ASCII_incoherent_records": 0,
+    "seven_files_and_metadata_pairs_verified": true,
+    "priority_code_words_matched": 7,
+    "CPU_serialized_priority_captured": false,
+    "device_visible_payload_proven": false,
+    "CPU_ring_reader_only": true,
+    "additional_firmware_getters": 0
+  },
+  "transport": {
+    "initial_credits": 1,
+    "unit_credit_returns": 100,
+    "unit_credit_debits": 101,
+    "final_credits": 0,
+    "paired_CPU_queue_depth": 54,
+    "paired_CPU_credit": 0,
+    "paired_CPU_values_stable": true,
+    "WMI_RX_records": 62,
+    "last_WMI_RX_record": 6931,
+    "last_WMI_RX_event": "WMI_UPDATE_STATS_EVENTID",
+    "last_credit_return_record": 6996,
+    "final_admitted_scan_id": 40965,
+    "final_debit_record": 7021,
+    "same_buffer_HTC_completion_record": 7026,
+    "HTC_completion_rc": 0,
+    "last_return_to_final_debit_seconds": 1.9700941,
+    "later_firmware_WMI_RX": 0,
+    "later_credit_returns": 0,
+    "CPU_logging_after_final_debit_seconds": 617.5412958
+  },
+  "scan_lifecycle": {
+    "scan40964": {
+      "firmware_STARTED_record": 6780,
+      "firmware_foreign_channel_events": 11,
+      "firmware_COMPLETED_record": 6835,
+      "completion_reason": 0
+    },
+    "scan40965": {
+      "constructor_log_priority": 2,
+      "firmware_STARTED_observed": false,
+      "firmware_COMPLETED_observed": false,
+      "later_local_cancel_record": 7051,
+      "local_cancel_reason": 1,
+      "STOP_queued_at_zero_credit": true
+    },
+    "scan40966": {
+      "START_queued_at_zero_credit": true,
+      "local_cancel_only": true
+    }
+  },
+  "association": {
+    "connect_OID_record": 7192,
+    "peer_create_record": 7288,
+    "peer_create_queued_at_zero_credit": true,
+    "local_HW_timeout_records": [
+      7385,
+      7513
+    ],
+    "local_CONNECT_COMPLETE_record": 7527,
+    "AP_rejection_observed": false,
+    "successful_security_stage_observed": false
+  },
+  "verdict": "No restored WMI/credit progression; recurring last-credit scan boundary remains as exercised. Priority-specific explanation weakened, common delivery/target-progress cause unresolved.",
+  "scope": "Loaded code and constructor log do not attest device-visible payload. HTC completion is not target handler execution. No AP rejection, DHCP-specific failure or firmware-death diagnosis. Event-filter failure is not absence evidence."
+}

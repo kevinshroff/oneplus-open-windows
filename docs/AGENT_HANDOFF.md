@@ -4,7 +4,7 @@ Latest update (Boot177):
 
 - [G1348 hardware result](../experiments/G1348/HARDWARE-RESULT.md): one SID0 instruction-translation query matched the expected MDL page, with result8/status1, restored controls and uncertainty0. GMU/HFI startup succeeded. Windows remained responsive; native calls returned and future Starts4/once0 were verified. No SQE start, packet, command fence or WDDM execution occurred.
 - The timer’s required output pointer and CB0 writable-mapping defects are corrected. The broad diagnostic mapping remains read-only; owner and TCU-vote firmware were reused. Continue toward first command/fence only under a new conditional owner profile with fresh same-run authority checks.
-- G1349 initialized once, queried the cache once, submitted one saved-profile connection and obtained no DHCP address within25seconds. The loaded scan-priority code words matched. The existing CPU transport log is retained for comparison; no conclusion about target-visible priority or association cause follows from the cache result alone.
+- G1349 initialized once, queried the cache once, submitted one saved-profile connection and obtained no DHCP address within25seconds. The loaded scan-priority code words matched. The retained 9,421-record CPU log shows the same failure with constructor priority2: the final credit is spent on scan40965, followed by no more firmware responses or credit returns. This rules out the priority-only candidate as exercised; target-visible payload and effective common-buffer cache attributes remain unproven.
 
 Previous update (Boot173):
 

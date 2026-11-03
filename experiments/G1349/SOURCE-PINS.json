@@ -2,9 +2,11 @@
   "schema": "G1349-authored-source-pins/1",
   "files": {
     "patch.py": "ae1332b91b0096d73763ec4e75b5eb9e39c78bfff0b50aa7c34f609a494ae05a",
-    "VALIDATION.md": "6557a5237949657e034c88c0e59adbdf1162397c965c08c54faf9367512508a7",
-    "README.md": "e55f59d48709c0948e019757a83ec0fba91bee5d0772a2f7f22c4fa8e8c129d7",
+    "VALIDATION.md": "64aacffe32444e02979dc30ad997098e14b760674391e64802d9adb069822dcd",
+    "README.md": "2dd71348c29bf35f1af3fce37ee01af9b0dae4e0d96d587829a1060d136d928e",
     "test_patch.py": "428d9fb6374fe972827c4ca98bfab7bca46a492c97b56c5fb2c3331d428719a6",
+    "HARDWARE-RESULT.json": "751c7b45270ea5c0f10e2c418d147cabae0f793e16eab46edd4e9355f92e7fa8",
+    "HARDWARE-RESULT.md": "0cbfd50c27721f5a8337f75c1944adef92bc4f096a14791ae3fe6c31cdef3df6",
     "priority_body.S": "46577f1ced7e453ba1dc516b27755af7e82efc3b593eb095d165b945bb83a04b"
   }
 }
