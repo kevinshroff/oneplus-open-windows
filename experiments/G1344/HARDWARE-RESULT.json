@@ -1,0 +1,101 @@
+{
+  "schema": "G1344-sanitized-hardware-result/1",
+  "initialization": {
+    "calls": 1,
+    "success": true,
+    "reboot_required": false
+  },
+  "driver_running": true,
+  "future_start_disabled": true,
+  "cache": {
+    "query_calls": 1,
+    "query_result": 0,
+    "networks": 0,
+    "init_call_to_cache_ms": 15020
+  },
+  "explicit_scan_calls": 0,
+  "connect_calls": 0,
+  "DHCP_achieved": false,
+  "loaded_code": {
+    "constructor_bytes": 2180,
+    "patched_sites_matched": 8,
+    "NC_word_matched": true,
+    "whole_image_attestation": false
+  },
+  "conclusion": "Hint suppression alone did not resolve the recurring admitted-command/credit/RX-silence boundary. Empty cache alone was not the stall evidence; retained transport records establish the subsequent silence.",
+  "transport_followup": {
+    "analysis_complete": true,
+    "command_journal": {
+      "records": 109,
+      "copies_equal": true,
+      "current_slot_excluded": 109,
+      "pre_HTC_credit_admission_only": true,
+      "retained_START_SCAN_records": 8,
+      "all_scan_payload_bytes": 312,
+      "all_scan_hint_lengths": [
+        0,
+        0
+      ]
+    },
+    "scan40965": {
+      "priority": 1,
+      "old_payload_bytes": 372,
+      "new_payload_bytes": 312,
+      "old_hint_lengths": [
+        24,
+        36
+      ],
+      "new_hint_lengths": [
+        0,
+        0
+      ],
+      "first_304_bytes_unchanged": true
+    },
+    "host_ring": {
+      "records": 7720,
+      "unwrapped": true,
+      "gaps": 0,
+      "metadata_stable": true,
+      "clock_alignment_pairs": 229,
+      "journal_command_prefix_matches": 109,
+      "initial_EP2_credit": 1,
+      "unit_credit_returns": 100,
+      "unit_credit_debits": 101,
+      "final_credit_balance": 0,
+      "final_admitted_command": "START_SCAN40965",
+      "host_HTC_completion_rc": 0,
+      "final_return_to_debit_seconds": 1.9640479,
+      "last_WMI_RX_to_final_debit_seconds": 1.9980505,
+      "continuing_CPU_log_seconds_after_final_debit": 229.0146894,
+      "later_logged_WMI_RX_or_credit_returns": 0
+    },
+    "CPU_snapshot": {
+      "stable_spans": 15,
+      "source_local_HP": 20,
+      "source_cached_TP": 20,
+      "source_DMA_RRI_TP": 20,
+      "reap_cursor": 16,
+      "reap_next": 20,
+      "software_read_write_entry_slots": [
+        5,
+        5
+      ],
+      "ownership_context_QWORDs": 32,
+      "nonzero_ownership_context_QWORDs": 0,
+      "EP2_queue": 8,
+      "EP2_credits": 0,
+      "later_ring_EP2_queue": 10,
+      "current_hardware_getter_used": false,
+      "hardware_HP_TP_empty_proven": false
+    }
+  },
+  "DHCP_attempted": false,
+  "limits": {
+    "target_execution_of_final_command_proven": false,
+    "all_coherency_faults_ruled_out": false,
+    "endpoint_awake_proven": false,
+    "NC_instruction_match_is_effective_memory_attribute_proof": false,
+    "post_task_captures_sequential_and_pause_perturbed": true,
+    "later_local_scan_completion_is_firmware_acknowledgement": false
+  }
+}
