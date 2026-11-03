@@ -3,8 +3,40 @@
 static NTSTATUS FaultCurrentOgbt(void){UCHAR data[124];ULONG n=sizeof(data);NTSTATUS s=AuxKlibGetSystemFirmwareTable(0x41435049u,0x5442474fu,data,sizeof(data),&n);return s==STATUS_SUCCESS&&(n!=sizeof(data)||OfOgbtContract(data,n))?STATUS_DEVICE_CONFIGURATION_ERROR:s;}
 static NTSTATUS FaultCurrentIort(void){NTSTATUS st;ULONG bytes=0;st=AuxKlibGetSystemFirmwareTable(0x41435049u,0x54524f49u,NULL,0,&bytes);if(st!=STATUS_BUFFER_TOO_SMALL&&st!=STATUS_SUCCESS)return st;if(bytes<48||bytes>65536)return STATUS_DEVICE_CONFIGURATION_ERROR;PVOID b=ExAllocatePool2(POOL_FLAG_NON_PAGED,bytes,'tIfO');if(!b)return STATUS_INSUFFICIENT_RESOURCES;ULONG got=0;st=AuxKlibGetSystemFirmwareTable(0x41435049u,0x54524f49u,b,bytes,&got);if(st==STATUS_SUCCESS&&(got!=bytes||OfIortContract(b,got)))st=STATUS_DEVICE_CONFIGURATION_ERROR;ExFreePoolWithTag(b,'tIfO');return st==STATUS_SUCCESS?FaultCurrentOgbt():st;}
 /* Private actual MMU1 owner, fixed two ordinary level interrupt resources. */
+#if OGO_GPU_FIRST_FAULT_TUPLE
+static VOID FaultTuplePrepare(OF_OWNER*f,OSM_CONTEXT*p){
+ /* Called only after connect's empty-map/retain/connect refusals. */
+ if(f->Journal.First.Generation!=p->Generation&&!f->KnownMask&&!f->UncertainMask&&!InterlockedCompareExchange(&f->Armed,0,0)){
+  RtlZeroMemory(&f->Journal.First,sizeof(f->Journal.First));f->Journal.First.Generation=p->Generation;
+ }
+ f->TupleOwner=p;
+}
+static OF_WORD FaultTupleRead(void*x,unsigned region,unsigned off){
+ OF_OWNER*f=x;return READ_REGISTER_ULONG((PULONG)((PUCHAR)f->Map[region]+off));
+}
+static VOID FaultLatchFirst(OF_OWNER*f,ULONG index,ULONG status){
+ OSM_CONTEXT*p=f->TupleOwner;
+ int current=p&&f->Bank&&f->Map[0]&&f->Generation==p->Generation&&
+  p->Started&&p->D0Ref&&!p->Removing;
+ /* Only the actual CB0 ISR may read CB0 diagnostics, under the effective
+  * committed SID0 owner and still-held NS interval. No GMU/CB2 substitution.
+  * Refusal never changes original ACK/revocation policy. */
+ int cb0=current&&index==2&&f->Map[2]&&p->GpuUser.Qualified&&
+  p->GpuUser.Active&&!p->GpuUser.Retained&&p->GpuUserGmu==f->Bank&&
+  p->GpuUser.Generation==f->Generation&&p->NsToken&&
+  p->NsGeneration==f->Generation&&p->NsBank==f->Bank&&p->NsFault==f;
+ if(OfFirstFaultCapture(&f->Journal.First,f->Generation,index,status,current,cb0,FaultTupleRead,f)){
+  OF_FIRST_FAULT*t=&f->Journal.First;
+  DbgPrintEx(DPFLTR_IHVVIDEO_ID,DPFLTR_ERROR_LEVEL,"OpenSmmuD0 G1339 first gen%llx idx%u status%08x read%x ones%x refused%x FARlo%08x FARhi%08x FSYNR%08x/%08x GFSYNR%08x/%08x/%08x beforeACK\n",t->Generation,t->Index,t->Status,t->ReadMask,t->AllOnesMask,t->Refused,t->FarLo,t->FarHi,t->Fsynr0,t->Fsynr1,t->Gfsynr0,t->Gfsynr1,t->Gfsynr2);
+ }
+}
+#endif
 static BOOLEAN FaultIsr(PKINTERRUPT irq,PVOID context){UNREFERENCED_PARAMETER(irq);OF_ISR_CONTEXT*c=context;OF_OWNER*f=c->Owner;if(!InterlockedCompareExchange(&f->Armed,0,0))return FALSE;
- ULONG off=c->Index?0x58:0x48;ULONG v=READ_REGISTER_ULONG((PULONG)((PUCHAR)f->Map[c->Index]+off));ULONG ack=OfAckPolicy(&f->Journal,c->Index,v);
+ ULONG off=c->Index?0x58:0x48;ULONG v=READ_REGISTER_ULONG((PULONG)((PUCHAR)f->Map[c->Index]+off));
+#if OGO_GPU_FIRST_FAULT_TUPLE
+ FaultLatchFirst(f,c->Index,v);
+#endif
+ ULONG ack=OfAckPolicy(&f->Journal,c->Index,v);
  if(ack){WRITE_REGISTER_ULONG((PULONG)((PUCHAR)f->Map[c->Index]+off),ack);KeMemoryBarrier();}return (c->Index?(v&~0x400u):v)?TRUE:FALSE;
 }
 static NTSTATUS CaptureFaultGrants(OSM_CONTEXT*p,PCM_RESOURCE_LIST raw,PCM_RESOURCE_LIST translated){
@@ -53,6 +85,11 @@ static NTSTATUS FaultConnectApi(PVOID x,OLB_NATIVE*b,PVOID*out){
  OLB_NATIVE_IO n={p,b->Hold};OLB_IO io=LocalOps(&n);OLB_CLAIM c;st=LocalStatus(OlbCheck(&p->Banks,&io,b->Id,&c));if(st!=STATUS_SUCCESS||c.Bank!=2){FaultLeave(p,out);return st==STATUS_SUCCESS?STATUS_NOT_SUPPORTED:st;}
  if(maps==3){p->GpuCandidateRead=TRUE;st=LocalStatus(OguCheckCold(&p->GpuUser,&io));p->GpuCandidateRead=FALSE;if(st!=STATUS_SUCCESS){FaultLeave(p,out);return st;}}
  st=FaultCurrentIort();if(st!=STATUS_SUCCESS){FaultLeave(p,out);return st;}
+#if OGO_GPU_FIRST_FAULT_TUPLE
+ /* Existing map/retain/connect refusal above plus disconnect joining means
+  * no reset while an ISR can own the record. Never reset for ACK/retry. */
+ FaultTuplePrepare(f,p);
+#endif
  f->Bank=b;f->Generation=p->Generation;f->Connecting=1;KeInitializeSpinLock(&f->Lock);
  PHYSICAL_ADDRESS pa;pa.QuadPart=0x03da0000;f->Map[0]=MmMapIoSpaceEx(pa,0x1000,PAGE_READWRITE|PAGE_NOCACHE);pa.QuadPart=0x03dc2000;f->Map[1]=MmMapIoSpaceEx(pa,0x1000,PAGE_READWRITE|PAGE_NOCACHE);if(maps==3){pa.QuadPart=0x03dc0000;f->Map[2]=MmMapIoSpaceEx(pa,0x1000,PAGE_READWRITE|PAGE_NOCACHE);}
  if(!f->Map[0]||!f->Map[1]||(maps==3&&!f->Map[2])){st=STATUS_INSUFFICIENT_RESOURCES;goto clean;}

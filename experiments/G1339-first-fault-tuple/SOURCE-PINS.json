@@ -1,0 +1,15 @@
+{
+  "Arm_IHI0062Dc": {
+    "url": "https://documentation-service.arm.com/static/5f900d34f86e16515cdc08fb",
+    "sha256": "5f12c28c3a449381913112ac15cc914cfe2ea1a98ce3685f3ef079b247ca7e9d"
+  },
+  "OnePlus_arm_smmu": {
+    "arm-smmu.h": "c034d02bf2a85f3cab0ab5b74444ac43066a2511bf002c754aa3a2fa581d1c50",
+    "arm-smmu.c": "1f901f861819ba92320e839d0fe958b3fd057b8610111d3581d7bff5de94f8e8"
+  },
+  "target_DT": {
+    "commit": "46cfd06fc4c0e12dbe294badb924a533f1d9fb06",
+    "path": "kernel_platform/qcom/proprietary/devicetree/qcom/msm-arm-smmu-kalama.dtsi",
+    "sha256": "8efd64bf38872c09bd9aedaef3f0e4b5929ec9f3dd1a268da7a9ead7d08e888c"
+  }
+}

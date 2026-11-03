@@ -32,3 +32,22 @@ intentionally replaced for this experiment; its catalog is not signature proof
 for the modified binary. The original source-package SYS/CAT/INF/firmware payload
 remains unchanged. No driver load, new boot or connectivity result is claimed.
 [Signed inactive-stage result](SIGNED-DISABLED-RESULT.json).
+
+## Boot171 result
+
+The signed driver initialized once; all18 runtime hashes matched before and
+after. A CPU capture verified the patched instruction in loaded code. The first
+cache query lacked the requested network, so it made no connection attempt.
+One separately scoped same-boot scan also returned no usable saved-network
+entry. No second initialization or profile change occurred.
+
+The coherent CPU log still shows the established boundary: initialization's
+scan receives management traffic and completes, subsequent commands receive
+replies, then a Windows-started scan consumes the final credit. There are101
+sends,100 returned credits plus the initial credit, and no later RX/credit for
+1,004.9seconds. [Structured result](BOOT171-RESULT.json).
+
+The cache-policy change as exercised was insufficient. Effective descriptor and
+RRI cache attributes remain unverified; this does not rule out a visibility bug.
+The next useful discriminator is a qualified hardware producer/RRI observation,
+including actual static-versus-dynamic access and wake ownership.

@@ -1,0 +1,102 @@
+{
+  "schema": "g1339-validation/1",
+  "source_tests": {
+    "schema": "g1339-source-tests/1",
+    "default_off_ISR_token_parity": true,
+    "source_pins": {
+      "experiments/G1287-cold-aperture/source/fault_owner_native.inc": "f66e222e4898fbf81df26481072c61fdb2b8e2d1e0657c78e18aadc46440ad26",
+      "experiments/G1287-cold-aperture/source/fault_owner.h": "51919303163ce4d0bf5b8b78468d53e3d4261974355a18ed28abf96c957cd01e",
+      "experiments/G1287-cold-aperture/source/fault_policy.h": "8dd68b326394a681fe00043a8e90d4befbab4c7d7c9788dc9284a922cf991f2e",
+      "experiments/G1287-cold-aperture/source/fault_policy.c": "566fb37d500293cdf651864cf44e17c5901f08bc830308446c96713a08b18ff4",
+      "experiments/G1287-cold-aperture/source/g1339_fault_tuple.h": "ba88af16f702cf6ed3daa84b4ae299c3c08749df5b03c7c61b33bd279d626444"
+    },
+    "tests": [
+      {
+        "option": 0,
+        "output": "PASS 102 source-bound ISR/ACK/guard/reset cases option0",
+        "ASan_UBSan": true
+      },
+      {
+        "option": 1,
+        "output": "PASS 127 source-bound ISR/ACK/guard/reset cases option1",
+        "ASan_UBSan": true
+      }
+    ],
+    "invalid_selectors": 2,
+    "native_broker_COFF_compiled": false,
+    "hardware": false,
+    "activation": false,
+    "comment_only_followup": {
+      "kind": "comment_and_documentation_only_root_review",
+      "header_previous_sha256": "466e57081187ea0c6590d4a420887e9eec465f3bb6ac6a387a7a6fdbc4abd6c9",
+      "header_current_sha256": "ba88af16f702cf6ed3daa84b4ae299c3c08749df5b03c7c61b33bd279d626444",
+      "header_code_bytes_equal_after_removing_comments": true,
+      "removed_notice": "unsolicited MIT SPDX from wholly project-authored new header only",
+      "preexisting_and_third_party_notices_preserved": true,
+      "first_slot_preemption_documented": true,
+      "tests_or_compiles_repeated": false,
+      "prior_checks_remain_scoped_to_equivalent_code": true
+    }
+  },
+  "genuine_header_ARM64_clang": {
+    "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)",
+    "defaultoff_broker_policy_equal_except_COFF_TimeDateStamp": true,
+    "enabled_compile_pass": true,
+    "COFF": [
+      {
+        "variant": "baseline",
+        "unit": "broker",
+        "bytes": 56840,
+        "sha256": "73fae07429e5b0b342affdd9a635bdbe0452c7348b2988c2a86f2fd7905d2320"
+      },
+      {
+        "variant": "baseline",
+        "unit": "policy",
+        "bytes": 711,
+        "sha256": "1640ceeb54fb7fbc4c4442bd42ec0265d62755b9575da907bb5cda100c6bd117"
+      },
+      {
+        "variant": "off",
+        "unit": "broker",
+        "bytes": 56840,
+        "sha256": "7abe78e604915f1aefd33681f54b89699d59bb5d2b248821fcc1e5930a8e8743"
+      },
+      {
+        "variant": "off",
+        "unit": "policy",
+        "bytes": 711,
+        "sha256": "17fc61bcfb38591ad2e5c95a091f29acea76fb400555f7063b62bbb4c02976e3"
+      },
+      {
+        "variant": "on",
+        "unit": "broker",
+        "bytes": 58332,
+        "sha256": "350a2e8b14462162e70498cc85de184ee30aae337ef2ec8465aeb527ffb01e8f"
+      },
+      {
+        "variant": "on",
+        "unit": "policy",
+        "bytes": 719,
+        "sha256": "946d508499f59d22da441297f14e834717e0d62de114efc7502ae7c549ae9d08"
+      }
+    ]
+  },
+  "native_MSVC_compile": false,
+  "linked": false,
+  "signed": false,
+  "staged": false,
+  "loaded": false,
+  "hardware_test": false,
+  "activation_selected": false,
+  "comment_only_followup": {
+    "kind": "comment_and_documentation_only_root_review",
+    "header_previous_sha256": "466e57081187ea0c6590d4a420887e9eec465f3bb6ac6a387a7a6fdbc4abd6c9",
+    "header_current_sha256": "ba88af16f702cf6ed3daa84b4ae299c3c08749df5b03c7c61b33bd279d626444",
+    "header_code_bytes_equal_after_removing_comments": true,
+    "removed_notice": "unsolicited MIT SPDX from wholly project-authored new header only",
+    "preexisting_and_third_party_notices_preserved": true,
+    "first_slot_preemption_documented": true,
+    "tests_or_compiles_repeated": false,
+    "prior_checks_remain_scoped_to_equivalent_code": true
+  }
+}

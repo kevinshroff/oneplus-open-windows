@@ -1,6 +1,6 @@
 # Agent handoff — Wi-Fi and GPU development
 
-Latest update (Boot170):
+Latest update (Boot171):
 
 - Wi-Fi4478/firmware341 matched package installs and initializes without reboot; all18 runtime files and platform policies verify. Corrected published-INF→DriverStore selector and exact native source qualification are in G1333.
 - The first requested RF scan received two management frames and firmware completion. A later scan60seconds afterward exhausted the final command credit; no later RX/credit return, association or DHCP. Both the immediate Boot169 and cache-only Boot170 trials failed to obtain DHCP. Windows still initiated a scan in170 despite zero task scans/statistics reads.
@@ -153,7 +153,12 @@ The [cache-only Wi-Fi result](../experiments/G1337-wifi-initialization-cache/REA
 
 The next [Wi-Fi cache-policy candidate](../experiments/G1338-wifi-common-buffer-cache/README.md)
 is prepared offline: one allocator policy changes from cached to noncached, with
-matching metadata/cleanup and exact compiled byte validation. It has not run on
-hardware. Five historical Windows minidumps were also recovered; one symbolized
+matching metadata/cleanup and exact compiled byte validation. Boot171 initialized it and verified the live changed opcode, but the response/credit stall remained; effective mapping attributes are unverified. Five historical Windows minidumps were also recovered; one symbolized
 stack proves a debugger physical-read SEA, with matching address patterns in the
 others. They do not explain Boot170's GPU release failure.
+
+[G1339 first-fault capture](../experiments/G1339-first-fault-tuple/README.md)
+adds a default-off broker record and one bounded debug line before existing fault
+ACKs. Source tests and genuine-header ARM64 Clang checks pass, with default-off
+object parity apart from timestamps. Native MSVC/link/signing and runtime tests
+remain; it is diagnostic coverage, not a GPU execution fix.
