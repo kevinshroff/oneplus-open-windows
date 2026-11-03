@@ -1,0 +1,20 @@
+{
+  "schema": "g1341-source-tests/1",
+  "tests": [
+    {
+      "mode": 0,
+      "output": "PASS 127 source-bound ISR/ACK/guard/reset cases option1\nPASS G1341 stalled TF retained, tuple before ACK, no SS ACK or RESUME"
+    },
+    {
+      "mode": 1,
+      "output": "PASS 127 source-bound ISR/ACK/guard/reset cases option1\nPASS G1341 stalled TF retained, tuple before ACK, no SS ACK or RESUME"
+    }
+  ],
+  "invalid_flags_rejected": 2,
+  "actual_ISR_and_ACK_unchanged": true,
+  "GMU_sources_unchanged": true,
+  "RESUME_writes": 0,
+  "SS_acknowledged": false,
+  "ASan_UBSan": true,
+  "hardware": false
+}

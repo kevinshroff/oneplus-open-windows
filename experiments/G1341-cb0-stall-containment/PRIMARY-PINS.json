@@ -1,0 +1,30 @@
+[
+  {
+    "url": "https://raw.githubusercontent.com/torvalds/linux/e2f57c576f14f96449cfee840860cb9707501d23/arch/arm64/boot/dts/qcom/sm8550.dtsi",
+    "commit": "e2f57c576f14f96449cfee840860cb9707501d23",
+    "path": "arch/arm64/boot/dts/qcom/sm8550.dtsi",
+    "sha256": "077e1456c363586d0eb823e4b7d02c9d96a5b7c43b880e653a043663e100c1ab",
+    "bytes": 188159
+  },
+  {
+    "url": "https://raw.githubusercontent.com/torvalds/linux/e2f57c576f14f96449cfee840860cb9707501d23/drivers/iommu/arm/arm-smmu/arm-smmu-qcom.c",
+    "commit": "e2f57c576f14f96449cfee840860cb9707501d23",
+    "path": "drivers/iommu/arm/arm-smmu/arm-smmu-qcom.c",
+    "sha256": "5e99f17f316977da6408dd5d9600c89e6d8297ac1e45e85d339959d702fd3ee0",
+    "bytes": 27137
+  },
+  {
+    "url": "https://raw.githubusercontent.com/torvalds/linux/e2f57c576f14f96449cfee840860cb9707501d23/drivers/iommu/arm/arm-smmu/arm-smmu.h",
+    "commit": "e2f57c576f14f96449cfee840860cb9707501d23",
+    "path": "drivers/iommu/arm/arm-smmu/arm-smmu.h",
+    "sha256": "b7221ee9b767594ba79cfc139fca838236f81ba949fb5e0be81e31ef42b1911c",
+    "bytes": 16885
+  },
+  {
+    "url": "https://raw.githubusercontent.com/torvalds/linux/e2f57c576f14f96449cfee840860cb9707501d23/drivers/gpu/drm/msm/msm_iommu.c",
+    "commit": "e2f57c576f14f96449cfee840860cb9707501d23",
+    "path": "drivers/gpu/drm/msm/msm_iommu.c",
+    "sha256": "912f862675b2dcd95b125dbfa17d028fb19ba558479a8f261058fb77f1a88b09",
+    "bytes": 21758
+  }
+]

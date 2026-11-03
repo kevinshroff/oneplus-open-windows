@@ -1,0 +1,22 @@
+{
+  "schema": "g1341-pre-native-validation/1",
+  "genuine_header_Clang_COFF_compiles": 100,
+  "objects_each_profile": 50,
+  "owner_objects": 35,
+  "broker_objects": 15,
+  "default_off_matches_G1335_owner_and_G1339_broker": 50,
+  "comparison_excludes_only_COFF_timestamp": true,
+  "enabled_changed_objects": [
+    "owner/44_gpu_cp_translate.obj",
+    "broker/0_open_smmu_wdm.obj"
+  ],
+  "source_ISR_cases_each_mode": 128,
+  "invalid_selectors_rejected": 2,
+  "GMU_CB2_unchanged": true,
+  "fault_ACK_unchanged": true,
+  "matched_CB0_SCTLR": "00c001e7",
+  "GMU_CB2_SCTLR": "00c00067",
+  "native_link_performed": false,
+  "signed": false,
+  "hardware_qualified": false
+}
