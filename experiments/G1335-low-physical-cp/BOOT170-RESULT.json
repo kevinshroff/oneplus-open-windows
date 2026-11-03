@@ -1,0 +1,23 @@
+{
+  "BootId": 170,
+  "signed_driver_sha256": "91c3c22730295cf984203aa7abbffed4792ac72b72ea9f45cf1e05734ff14ae2",
+  "activation_attempts": 1,
+  "broker_restart_returned": true,
+  "broker_return": 0,
+  "owner_restart_returned": false,
+  "CP_and_table_allocations_qualified_below_4GiB_by_executed_control_flow": true,
+  "individual_physical_addresses_captured": false,
+  "original_GPU_IOVAs_retained": true,
+  "SQE_IOVA": "0x4000010000",
+  "SQE_low_IOVA_trial": false,
+  "last_stage": 3,
+  "last_boundary": "STORE_CALL_BEGIN",
+  "STORE_CALL_RETURN_observed": false,
+  "fence_observed": false,
+  "USB_terminal_state": "Qualcomm Diagnostics 900E",
+  "software_recovery_reset_acknowledged": true,
+  "recovery_storage_writes": 0,
+  "exact_fault_PC_known": false,
+  "cause_established": false,
+  "automatic_retry": false
+}

@@ -1,0 +1,48 @@
+{
+  "BootId": 170,
+  "matched_package_version": "1.0.4478.2200",
+  "driver_install": {
+    "success": true,
+    "error": 0,
+    "NeedReboot": false,
+    "calls": 1,
+    "Flags": 0,
+    "explicit_matched_single_INF": true,
+    "automatic_reboot": false
+  },
+  "task_returned": 0,
+  "error": null,
+  "explicit_scan_requests": 0,
+  "optional_statistics_queries": 0,
+  "cached_list_queries": 1,
+  "cache_entries_including_saved_profile_duplicates": 4,
+  "connect_requests": 1,
+  "init_to_connect_ms": 6309,
+  "connect_request_exit": 0,
+  "DHCP": {
+    "ready": false,
+    "polls": 22,
+    "elapsedMilliseconds": 24801,
+    "actual": null,
+    "timeout_budget_ms": 25000,
+    "budget_exceeded": false
+  },
+  "HTTP_attempted": false,
+  "future_Start": 4,
+  "future_state": "Running",
+  "profile_writes": 0,
+  "cause_established": false,
+  "CPU_trace": {
+    "coherent_records": 7860,
+    "gaps": 0,
+    "credit_debits": 101,
+    "credit_returns": 100,
+    "initial_credit": 1,
+    "final_queue_depth": 35,
+    "last_debit": "Windows-initiated START_SCAN40965",
+    "last_RX_to_last_debit_seconds": 2.001,
+    "last_debit_before_task_connect_ms": 608.0025,
+    "no_later_RX_seconds": 93.012,
+    "trigger_of_Windows_scan_established": false
+  }
+}

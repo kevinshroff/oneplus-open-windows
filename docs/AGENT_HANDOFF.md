@@ -1,10 +1,10 @@
 # Agent handoff — Wi-Fi and GPU development
 
-Latest update (Boot169; next experiment prepared):
+Latest update (Boot170):
 
 - Wi-Fi4478/firmware341 matched package installs and initializes without reboot; all18 runtime files and platform policies verify. Corrected published-INF→DriverStore selector and exact native source qualification are in G1333.
-- The first requested RF scan received two management frames and firmware completion. A later scan60seconds afterward exhausted the final command credit; no later RX/credit return, association or DHCP. The immediate Boot169 attempt also failed; the next Wi-Fi trial removes the extra explicit scan and optional statistics queries.
-- G1335 low-physical candidate has35-object parity/boundary tests, native MSVC link and bounded compiled review. It changes CP BO/table placement only, retains original IOVAs and GMU policy, and is signed/selected disabled with no activation. No first GPU fence or WDDM acceleration yet.
+- The first requested RF scan received two management frames and firmware completion. A later scan60seconds afterward exhausted the final command credit; no later RX/credit return, association or DHCP. Both the immediate Boot169 and cache-only Boot170 trials failed to obtain DHCP. Windows still initiated a scan in170 despite zero task scans/statistics reads.
+- G1335 low-physical candidate has35-object parity/boundary tests, native MSVC link and bounded compiled review. It changes CP BO/table placement only, retains original IOVAs and GMU policy, and was activated once on Boot170: it again entered900E at the release-store boundary, with no store return/fence. Low physical placement alone did not fix it. No WDDM acceleration yet.
 - G1334's low-SQE trial is consumed and negative; recovery is complete. Keep GPU disabled during Wi-Fi work and do not reuse old Wi-Fi RVAs on4478.
 
 
@@ -148,3 +148,5 @@ Offered-table Sahara recovery and one RESET7/ACK8 were demonstrated; always-unat
 Keep one live hardware operator. Other agents can research/build offline without touching the device. Stage and verify an exact payload before asking for physical fastboot, because this device leaves inactive fastboot quickly. Never automatically replay a timed-out native API/SMC, treat termination as rollback, or relax a guard merely to obtain a green result. Preserve uncertain ownership until a qualified recovery boundary.
 
 Public source has privacy placeholders and excluded inputs. Historical host model/COFF/native-review results describe the private source closure tested then; they do not certify a bit-identical rebuild of this sanitized publication. Acquire inputs, configure paths/signing locally, regenerate manifests and validate the exact result before a future hardware attempt.
+
+The [cache-only Wi-Fi result](../experiments/G1337-wifi-initialization-cache/README.md) and [G1335 runtime result](../experiments/G1335-low-physical-cp/BOOT170-RESULT.json) are the latest negative experiments. Next work focuses on Wi-Fi receive-ring visibility and GPU release/security ordering, rather than another timing or address variant.

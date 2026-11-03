@@ -80,3 +80,15 @@ untested.
 The existing G1334 native packager/profile must not be used to classify this
 new candidate. Any future packet needs an explicitly named profile and its
 own review; none is generated or activation-selected here.
+
+## Hardware result on Boot170
+
+One activation reached the command-processor release store, then entered
+Qualcomm900E without a returned store or fence. The executed compiled path
+requires all CP buffers and page-table backing below4GiB before that boundary;
+individual physical addresses were not captured. Original GPU virtual addresses
+and SQE0x4000010000 were retained. Low physical placement alone did not resolve
+this failure. No GPU acceleration or exact fault PC was established.
+
+The existing software recovery reset acknowledged, with no programmer upload
+or storage write. [Structured result](BOOT170-RESULT.json).
