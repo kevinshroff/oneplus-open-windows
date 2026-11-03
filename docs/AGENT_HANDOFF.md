@@ -1,6 +1,12 @@
 # Agent handoff — Wi-Fi and GPU development
 
-Latest update (Boot173):
+Latest update (Boot177):
+
+- [G1348 hardware result](../experiments/G1348/HARDWARE-RESULT.md): one SID0 instruction-translation query matched the expected MDL page, with result8/status1, restored controls and uncertainty0. GMU/HFI startup succeeded. Windows remained responsive; native calls returned and future Starts4/once0 were verified. No SQE start, packet, command fence or WDDM execution occurred.
+- The timer’s required output pointer and CB0 writable-mapping defects are corrected. The broad diagnostic mapping remains read-only; owner and TCU-vote firmware were reused. Continue toward first command/fence only under a new conditional owner profile with fresh same-run authority checks.
+- G1349 initialized once, queried the cache once, submitted one saved-profile connection and obtained no DHCP address within25seconds. The loaded scan-priority code words matched. The existing CPU transport log is retained for comparison; no conclusion about target-visible priority or association cause follows from the cache result alone.
+
+Previous update (Boot173):
 
 - [G1342 hardware result](../experiments/G1342/HARDWARE-RESULT.md): two accepted native CE3 reads returned HP20/TP20. Fifteen stable CPU spans matched local/cached/RRI indices20, software entry slots5/5 and reap16→20; all32 ownership-context slots were zero. EP2 queue7/credits0 makes this a credit-blocked snapshot without persistent source TX backlog. Correct device-visible payloads and target WMI execution remain unresolved.
 - One initialization succeeded without a reboot request. The initializer requested no scan, cached-list query or connection.

@@ -2,9 +2,11 @@
   "schema": "G1348-public-source-pins/1",
   "files": {
     "BASE-AND-DELTA.json": "7f6981816067ad38a0c20f770c0a74af51bbd91f15e681b9336c7f469d3c257d",
+    "HARDWARE-RESULT.json": "83c1f2ae772efd37aa439e89d70219bacf93b2fc4b49d5722d06d9a4327599cf",
+    "HARDWARE-RESULT.md": "7dfd83de37467c63ece55543aab5903e461749fa23adf5ed3f566feb8e308695",
     "OFFLINE-QUALIFICATION.json": "bd69bdedeff550caa81f6c2980aae2655bb0961cd20890867b6aa3afa2b6bc91",
-    "README.md": "e8dde9f3eabd4d427a0a56a7fc83c28d7dfb6684159e8e0528a092d2bd26b6bb",
-    "VALIDATION.md": "693dd3a3818cfdc6a657575b010bb59d7822ef864b09323997d7f0895295d190",
+    "README.md": "5b5234196f9e59b218140cb1f82ee09c6ccfe61791975eb44c8a2bd061fbac0a",
+    "VALIDATION.md": "d6379b48dba2c0a4df53b2dcd5d9eb2c72f17bab3457d8597e8131c935043489",
     "overlay/source/qtb_native.inc": "05416e4715d82bf2c4c4c783c9e5474d90517407655967ddf4fc414ae98ae247",
     "prepare.py": "bf2e6117631fa14ca07fe55b625defddeb2db61b784e24197e4e5c50ea8ec93c",
     "test_cb0_write_authority.py": "f67e1d962c731396d739e732dfcbf9a7a7e9b3dc8bca830ffbe5724a2c4737fe"

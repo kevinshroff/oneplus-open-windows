@@ -7,7 +7,8 @@ Current source groups are listed first. `experiments/` also contains older sourc
 | Current input | `drivers/touch/G379/` | 23-TU linked closure; older 19-TU builder is incomplete; key unit needs `G293_POWER_REPORTS=1`. |
 | Clock-only parent | `drivers/parent/G746/` | Seven-TU closure; do not substitute historical sensor-producing parents. |
 | UEFI / ACPI | `firmware/` | Authored overlays and reconstruction recipes; fetch pinned MU dependencies and obtain OEM inputs separately. |
-| GPU native startup | `experiments/G1287-cold-aperture/` | Latest attempted cold-aperture baseline; still no first CP completion. |
+| GPU hardware translation | `experiments/G1348/` | Actual SID0 page-walk match and control restoration; no CP command/fence yet. |
+| GPU native startup | `experiments/G1287-cold-aperture/` | Cold-aperture foundation reused by later overlays; still no first CP completion. |
 | Secure query transport | `experiments/G1268-runtime-query/` | Fixed query only, explicit once operation, no arbitrary SMC interface. |
 | Wi-Fi epoch reader | `experiments/G1295-wifi-fault-epoch/` | Phase-qualified read-only diagnostic for a future authorized boot; not a Wi-Fi fix. |
 | WDDM / Mesa | See exported group index below | Offline scaffolding/patches; no accelerated adapter demonstrated. |

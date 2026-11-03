@@ -25,7 +25,7 @@ The project reuses Windows ARM64 CPU/storage/USB stacks and OEM firmware, develo
 | USB debugging / control | **WORKS ✅** | Kernel debugging and remote control over USB. |
 | Cover display / folding | **PARTIAL 🟡** | Cover image can be cleared to black; panel switching and folding remain unfinished. |
 | Physical buttons | **IN PROGRESS 🛠️** | Hardware reader implemented; power-button behavior awaits a physical test. |
-| GPU / WDDM acceleration | **IN PROGRESS 🛠️** | GMU firmware and HFI working; first GPU command completion is the current blocker. |
+| GPU / WDDM acceleration | **IN PROGRESS 🛠️** | GMU/HFI and a hardware memory-translation witness work; first command/fence and WDDM remain. |
 | Wi-Fi | **IN PROGRESS 🛠️** | Firmware loads and initial exchanges work; response/credit stalls block usable networking. |
 | USB peripherals | **NOT WORKING ❌** | External keyboard / host-mode support remains unfinished. |
 | Crash recovery | **PARTIAL 🟡** | Recovery tools work; automatic reconnection is not reliable after every crash. |
@@ -107,11 +107,12 @@ These [subfeature checklists](docs/STATUS.md) track implementation and future re
 - [ ] Physical power-button display-off test.
 - [ ] Physical second-press wake test.
 
-## GPU / WDDM — 3/8 complete
+## GPU / WDDM — 4/9 complete
 
 - [x] Kernel resource/ownership foundations.
 - [x] GMU firmware and HFI acknowledgements.
 - [x] CPU-verified GPU buffer/table preparation.
+- [x] Hardware translation to the expected SQE firmware page, with controls restored.
 - [ ] First CP command/fence completion.
 - [ ] Repeatable submission, interrupts and completion.
 - [ ] A740 WDDM memory/scheduling/DDI integration.
@@ -224,8 +225,8 @@ https://github.com/user-attachments/assets/2b834bc3-bc92-4345-a5e6-32ab159f1ff7
 
 ## The next useful work
 
-- **Adreno 740:** obtain the first native command-processor completion. GMU/HFI and the secure-aperture call work; the latest attempt still failed at the first SQE-start store boundary. WDDM and userspace integration remain downstream of this blocker.
-- **Wi-Fi:** resolve the firmware response/credit stall before another association attempt. A thread/scheduler metadata correspondence is a lead, not an established crash diagnosis.
+- **Adreno 740:** obtain the first native command-processor completion. GMU/HFI, the secure-aperture call and the [G1348 hardware translation witness](experiments/G1348/HARDWARE-RESULT.md) work. Proceed to a conditional first command/fence; WDDM and userspace rendering follow.
+- **Wi-Fi:** resolve the firmware response/credit stall before another association attempt. The latest bounded connection test still obtained no DHCP address; transport evidence is being compared across scan-priority variants.
 - **Reproducibility:** turn the source closures and upstream pins into portable local builds using independently obtained platform inputs.
 
 See the [agent handoff](docs/AGENT_HANDOFF.md) for the latest experiment, failed hypotheses, precise next discriminators and preservation rules. The [source map](docs/SOURCE_MAP.md) separates current components from historical experiments. Read [build and publication boundaries](docs/BUILDING.md) before using any tooling.
