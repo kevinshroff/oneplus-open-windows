@@ -1,0 +1,33 @@
+{
+  "profile_id": "wifi-commonbuf-mmnoncached",
+  "signed_sha256": "0ece5510b871fadf9723dc3627e605f17f389144a04ba8ed2ca09456d3bb46ea",
+  "unsigned_sha256": "927bf9450f462607435d616c0d2f00884f6689bcd2c395bcc949896ff93c8ee0",
+  "authenticode_sha256": "4d8f6b8404ea68ec586187cda1b97d10593cc77b84d96d5bb8e982739b5341e7",
+  "unsigned_payload_unchanged": true,
+  "cms_RSA_SHA256_math": true,
+  "signed_content_digest_matches_PE": true,
+  "existing_project_signer": true,
+  "host_chain_trust": false,
+  "phone_load_qualified": false,
+  "evidence": {
+    "method": "Independent local PE range hashing and DER/CMS RSA PKCS1v15 SHA256 verification",
+    "native_sign_result_sha256": "b2e073879dcd2fa6f104de6554a451427969655e44314b6a85d1978ba394f986",
+    "existing_project_certificate_sha256": "7b0145c8bd5b23a58cca4b084252ea6f67fb73fb344308852c6a22e38d8dfda7",
+    "payload": "Every original byte identical except PE checksum and security directory; appended certificate region/padding only",
+    "digest": "SHA256 excluded checksum, security directory and certificate table; contiguous section layout checked; digest equals SPC DigestInfo",
+    "cms": "Signed messageDigest equals SHA256 of embedded SPC SEQUENCE contents (legacy PKCS7, excluding outer tag/length); native content bytes match embedded content; RSA verifies signed SET attributes",
+    "signer": "Embedded certificate DER SHA256 matches pinned existing-project identity; CMS serial and native thumbprint match",
+    "trust": "Native Authenticode status UnknownError; no trust assertion or trust change",
+    "hardware": "No device calls or load verification"
+  },
+  "inactive_runtime_stage_verified": true,
+  "runtime_location": "INF-selected DriverStore SYS",
+  "startup_disabled": true,
+  "driver_loads": 0,
+  "source_package_payload_unchanged": true,
+  "DriverStore_SYS_intentionally_replaced": true,
+  "DriverStore_CAT_unchanged": true,
+  "OEM_catalog_not_candidate_signature_proof": true,
+  "rollback_original_preserved": true,
+  "no_new_boot_selected": true
+}

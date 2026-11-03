@@ -150,3 +150,10 @@ Keep one live hardware operator. Other agents can research/build offline without
 Public source has privacy placeholders and excluded inputs. Historical host model/COFF/native-review results describe the private source closure tested then; they do not certify a bit-identical rebuild of this sanitized publication. Acquire inputs, configure paths/signing locally, regenerate manifests and validate the exact result before a future hardware attempt.
 
 The [cache-only Wi-Fi result](../experiments/G1337-wifi-initialization-cache/README.md) and [G1335 runtime result](../experiments/G1335-low-physical-cp/BOOT170-RESULT.json) are the latest negative experiments. Next work focuses on Wi-Fi receive-ring visibility and GPU release/security ordering, rather than another timing or address variant.
+
+The next [Wi-Fi cache-policy candidate](../experiments/G1338-wifi-common-buffer-cache/README.md)
+is prepared offline: one allocator policy changes from cached to noncached, with
+matching metadata/cleanup and exact compiled byte validation. It has not run on
+hardware. Five historical Windows minidumps were also recovered; one symbolized
+stack proves a debugger physical-read SEA, with matching address patterns in the
+others. They do not explain Boot170's GPU release failure.

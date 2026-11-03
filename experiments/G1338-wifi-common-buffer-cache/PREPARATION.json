@@ -1,0 +1,23 @@
+{
+  "base_SYS_SHA256": "f59d9e98bb736ccd78aa4ebd569616456fa0f09bf345a7b1002b0105693aeeef",
+  "patched_SHA256": "527f2df366d6c021e1c1cc8ba01d9da244329ad31dbb08e87cb2319c98151fec",
+  "bytes": 3861808,
+  "RVA": "0x7dbc",
+  "file_offset": "0x71bc",
+  "opcode_before": "28008052",
+  "opcode_after": "08008052",
+  "changed_file_bytes": 1,
+  "code_change": "mov w8,#1 -> mov w8,#0",
+  "paired_tracking_and_free_cleanup_consistent": true,
+  "other_binary_bytes_identical": true,
+  "bounded_REA_disassembly_rows_compared": 164,
+  "differing_instructions": 1,
+  "offline_checks_passed": true,
+  "originals_modified": false,
+  "original_OEM_signature_invalidated_by_patch": true,
+  "candidate_signed_at_this_preparation": false,
+  "driver_loaded": false,
+  "hardware_effect_proven": false,
+  "OEM_binary_distributed": false,
+  "patch_script_SHA256": "71803a32694583e9daeac844917b64203ff3016504fe69648e07c5067d3e2225"
+}
