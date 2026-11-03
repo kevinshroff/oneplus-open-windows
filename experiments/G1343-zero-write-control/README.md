@@ -1,6 +1,6 @@
 # G1343: terminal SQE zero-write control
 
-Source variant of the [matched G1341 pair](../G1341-cb0-stall-containment/README.md). It replaces the sole initial SQE control write1 with write0, then terminates before CP packet construction or submission. It is a discriminator, not a diagnosed repair. **Cold A740 zero-write idempotence is unknown.** No hardware result is claimed.
+Source variant of the [matched G1341 pair](../G1341-cb0-stall-containment/README.md). It replaces the sole initial SQE control write1 with write0, then terminates before CP packet construction or submission. It is a discriminator, not a diagnosed repair. **Cold A740 zero-write idempotence is unknown.** The [Boot173 zero-write control returned](HARDWARE-RESULT.md); no GPU execution or first fence was attempted or demonstrated.
 
 Earlier zero readbacks did not establish a completed zero store. A returned zero store/readback would weaken the hypothesis that every CPU write to this address is fatal under the tested state. With prestate0, it would not prove an effective bus strobe, exclude value-dependent protection, or prove a healthy SQE fetch. A fatal result would remain ambiguous. Neither outcome establishes a retired store or fault PC.
 

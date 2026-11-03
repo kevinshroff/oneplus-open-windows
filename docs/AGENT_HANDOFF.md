@@ -3,7 +3,8 @@
 Latest update (Boot173):
 
 - [G1342 hardware result](../experiments/G1342/HARDWARE-RESULT.md): two accepted native CE3 reads returned HP20/TP20. Fifteen stable CPU spans matched local/cached/RRI indices20, software entry slots5/5 and reap16→20; all32 ownership-context slots were zero. EP2 queue7/credits0 makes this a credit-blocked snapshot without persistent source TX backlog. Correct device-visible payloads and target WMI execution remain unresolved.
-- One initialization succeeded without a reboot request. The initializer requested no scan, cached-list query or connection. A terminal GPU zero-write control is prepared; no new GPU result is established at this checkpoint.
+- One initialization succeeded without a reboot request. The initializer requested no scan, cached-list query or connection.
+- [G1343 zero-write control](../experiments/G1343-zero-write-control/HARDWARE-RESULT.md) returned through the original store/barriers, post-AHB0 and readback0, with Windows still reachable. It then stopped intentionally at stage3 with no submission/fence. This narrows the earlier value1 failure toward release/value-dependent behavior; it does not prove a healthy first fetch. The task verified future Starts4/once0 while retaining hardware ownership.
 
 Previous update (Boot172):
 

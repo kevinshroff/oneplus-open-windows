@@ -1,0 +1,61 @@
+{
+  "schema": "g1343-sanitized-zero-hardware-result/1",
+  "epoch": "Boot173",
+  "result": "Positive zero-write diagnostic; no GPU execution or first fence.",
+  "owner_signed_sha256": "1c49da65fe83077cd5f2ff756a49ac4e24da1d46807927e28eb5b43bf134c2e1",
+  "matched_broker_signed_sha256": "144a5746ce85095cef3239cd2c3a88533c70cc90a870f06207510c412602d64a",
+  "actual": {
+    "SQE_store_value": 0,
+    "native_store_return_status": 0,
+    "post_AHB_status": 0,
+    "post_AHB_value": 0,
+    "post_AHB_valid": true,
+    "zero_readback_status": 0,
+    "zero_readback_value": 0,
+    "zero_readback_accepted": true,
+    "G433_terminal_state": 3,
+    "owner_terminal_NTSTATUS": "c0000483",
+    "stage": 3,
+    "issued": 0,
+    "completed": 0,
+    "retained": true,
+    "secure_exit": false,
+    "release1_executed": false,
+    "first_fence": false,
+    "task_state": "Ready",
+    "task_last_result": 0,
+    "broker_PnP_command_exit": 0,
+    "owner_PnP_command_exit": 0,
+    "owner_PnP_problem": 10,
+    "owner_SCM_state": "Running",
+    "future_Start_owner": 4,
+    "future_Start_broker": 4,
+    "owner_once_flags": 0,
+    "USB900E_observed": false,
+    "normal_controller_task_query_returned": true
+  },
+  "CGH_scope": {
+    "reported_state": 5,
+    "reported_error": 0,
+    "reported_gx_snapshot": 3,
+    "software_scope_released": true,
+    "hardware_retained": true,
+    "current_GX_off_proven": false,
+    "no_faults_proven": false,
+    "explanation": "Owner logging prints stored cold-hold fields. RetainFailure poisons/retains and releases only the owning software scope; it does not perform a new GX/reset/fault snapshot. G810 raw SCTLR belongs to the earlier GMU activation report, not a fresh GPU CB0 witness."
+  },
+  "interpretation": {
+    "generic_same_address_CPU_zero_transaction_can_return": true,
+    "effective_zero_bus_strobe_proven": false,
+    "value1_or_release_dependent_failure_remains": true,
+    "value_dependent_access_protection_excluded": false,
+    "GPU_first_fetch_or_translation_proven": false,
+    "all_coherency_or_security_faults_excluded": false
+  },
+  "provenance": {
+    "full_private_trace_sha256": "5fb80f0ff669aefc437077e321423504bb7b4d929789a48f3ba85d43715fb6fc",
+    "private_nonterminal_observation_sha256": "b302d6476738089ece89d38e858cbbffcaa94260547fb90272445a1a446ed906",
+    "private_native_task_lookup_sha256": "e6829ae38c7d4cb81721d136ff9451b70e434672347e1a1c1890fd2cf661af10",
+    "raw_trace_published": false
+  }
+}
