@@ -1,6 +1,13 @@
 # Agent handoff — Wi-Fi and GPU development
 
-Latest update (Boot171):
+Latest update (Boot172):
+
+- [G1340's actual hardware result](../experiments/G1340/HARDWARE-RESULT.md) establishes a working bounded native CE2 getter: four accepted register queries matched the later stable CPU snapshot. Status HP/TP were 132/132 and destination HP/TP were 62/66, in DWORD index units. The observations were sequential, not atomic; the CPU capture's pause upper bound was 910.4454 ms.
+- Wi-Fi remains unconnected. One initialization succeeded without a reboot request, but the trace again ended with EP2 credit 0 and queue 25. The 9,144 retained records contain 101 credit debits and 100 returns from initial credit 1; the final debit was START_SCAN 40965. No later WMI RX or credit return was recorded, including after the getter queries. The 677.429164-second retained interval starts at the last credit return, not the final debit.
+- Matching hardware producer/consumer indices, CPU cached indices and RAM RRI shadows show no persistent CE2 status receive backlog at these observations. They do not prove firmware death, delivery/execution of the final TX command, absence of transient servicing faults or correctness of all coherency paths. The getter uses the native wake/lock/window protocol; actual DMA cache attributes remain unmeasured despite the loaded noncached-allocation instruction match.
+- Source-qualified CE TX publication/ownership is the next distinct evidence gap. Do not repeat timing/cache variants or infer networking from scan notifications. No new GPU hardware outcome is established by this Wi-Fi checkpoint; retain the prior GPU results below.
+
+Previous update (Boot171):
 
 - Wi-Fi4478/firmware341 matched package installs and initializes without reboot; all18 runtime files and platform policies verify. Corrected published-INF→DriverStore selector and exact native source qualification are in G1333.
 - The first requested RF scan received two management frames and firmware completion. A later scan60seconds afterward exhausted the final command credit; no later RX/credit return, association or DHCP. Both the immediate Boot169 and cache-only Boot170 trials failed to obtain DHCP. Windows still initiated a scan in170 despite zero task scans/statistics reads.

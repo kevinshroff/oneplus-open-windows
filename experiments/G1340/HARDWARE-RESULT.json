@@ -1,0 +1,146 @@
+{
+  "schema": "G1340-sanitized-hardware-result/1",
+  "epoch": "Boot172",
+  "verdict": "Native CE register queries succeeded; Wi-Fi connectivity remains unresolved.",
+  "runtime": {
+    "signed_SYS_sha256": "7af740a1dd32bb4a02030196e7ad16400ec211b62ee01934b740dd7a7ca160ec",
+    "layout_base_SYS_sha256": "f59d9e98bb736ccd78aa4ebd569616456fa0f09bf345a7b1002b0105693aeeef",
+    "loaded_getter_body_sha256": "d79e419c48b4804a6eec529bf4ece3392ffe28053bc8f7b66f311a69c8f9a59e",
+    "loaded_NC_opcode_verified": true,
+    "effective_DMA_cache_policy_verified": false
+  },
+  "initialization": {
+    "calls": 1,
+    "success": true,
+    "NeedReboot": false,
+    "task_explicit_scan_calls": 0,
+    "OS_scan_activity_observed": true,
+    "service_running": true,
+    "service_Start": 4,
+    "WiFi_connected": false
+  },
+  "native_queries": {
+    "order": [
+      2,
+      3,
+      0,
+      1
+    ],
+    "accepted": 4,
+    "bytes_returned_each": 100,
+    "output_count_each": 1,
+    "atomic_snapshot": false,
+    "elapsed_ms_reported_total": 1,
+    "zero_ms_per_query_is_clock_resolution_not_zero_latency": true
+  },
+  "CE2_DWORD_indices": {
+    "status": {
+      "hardware_HP": 132,
+      "hardware_TP": 132,
+      "later_CPU_local_TP": 132,
+      "later_CPU_cached_HP": 132,
+      "later_CPU_RRI_HP": 132
+    },
+    "destination": {
+      "hardware_HP": 62,
+      "hardware_TP": 66,
+      "later_CPU_local_HP": 62,
+      "later_CPU_cached_TP": 66,
+      "later_CPU_RRI_TP": 66
+    },
+    "destination_wrapper_entry_slots": {
+      "software": 33,
+      "write": 31
+    }
+  },
+  "CPU_snapshot": {
+    "stable_before_after_spans": 29,
+    "pause_upper_ms": 910.4454,
+    "MHI_state": 2,
+    "MHI_wake_reference": 0,
+    "HIF_request_success_release_count_each": 472,
+    "HIF_errors": 0,
+    "MMIO_access_by_CPU_snapshot": false
+  },
+  "ring": {
+    "records": 9144,
+    "gaps": 0,
+    "ASCII_incoherent": 0,
+    "stable_capture_metadata": true,
+    "EP2_credit_debits": 101,
+    "EP2_credit_returns": 100,
+    "WMI_RX_records": 67,
+    "firmware_management_RX_events": 6,
+    "driver_scan_start_records": 17,
+    "initial_EP2_credit": 1,
+    "final_EP2_credit": 0,
+    "final_EP2_queue": 25,
+    "record_completion_individually_proven": false
+  },
+  "timeline": {
+    "origin": "actual caller init-begin journal; ring SystemTime aligned by 675 exact embedded anchors",
+    "events": [
+      {
+        "record_index_zero_based": 0,
+        "event": "first_retained_record",
+        "seconds_from_caller_init_begin": 0.4122281
+      },
+      {
+        "record_index_zero_based": 6969,
+        "event": "last_WMI_RX_UPDATE_STATS",
+        "seconds_from_caller_init_begin": 3.7538972
+      },
+      {
+        "record_index_zero_based": 7034,
+        "event": "last_EP2_credit_return_0_to_1",
+        "seconds_from_caller_init_begin": 3.7818932
+      },
+      {
+        "record_index_zero_based": 7042,
+        "event": "WDI_TASK_SCAN",
+        "seconds_from_caller_init_begin": 5.7556513
+      },
+      {
+        "record_index_zero_based": 7068,
+        "event": "last_EP2_debit_1_to_0_START_SCAN_40965",
+        "seconds_from_caller_init_begin": 5.7556513
+      },
+      {
+        "record_index_zero_based": 7614,
+        "event": "first_native_read_reg_query",
+        "seconds_from_caller_init_begin": 192.2978565
+      },
+      {
+        "record_index_zero_based": 7667,
+        "event": "fourth_native_query_return",
+        "seconds_from_caller_init_begin": 192.2978565
+      },
+      {
+        "record_index_zero_based": 9143,
+        "event": "retained_trace_end",
+        "seconds_from_caller_init_begin": 681.2110572
+      }
+    ],
+    "caller_init_return_seconds": 2.7038898,
+    "last_credit_to_end_seconds": 677.429164,
+    "last_RX_to_end_seconds": 677.45716,
+    "final_debit_to_end_seconds": 675.4554059,
+    "WMI_RX_or_credit_return_after_native_queries": false
+  },
+  "interpretation": {
+    "native_hardware_observation_route_works": true,
+    "persistent_CE2_status_producer_vs_RRI_or_local_backlog_observed": false,
+    "firmware_dead_proven": false,
+    "all_coherency_faults_ruled_out": false,
+    "snapshots_simultaneous": false,
+    "TX_delivery_or_target_command_execution_proven": false
+  },
+  "provenance": {
+    "raw_ring_sha256": "c47316f1dd21a6e89c015e2d34bbb1e1594a63aaaa9a6164009ae75f46b36bc0",
+    "records_sha256": "c455c6dc54cbfb64859b4d52e6c8612082bc0fcdad7e2c10e4942ffa38f0dc1a",
+    "native_getter_outcome_sha256": "ca883a08f8b0fc6de7761a14a2e6306a7d2252a2efb8e65a35a78a9d07eb0dde",
+    "CPU_comparison_sha256": "54eeeda0e903364e847b9fa9d79f41dcc51ff99cadde1f3e14b04b2440fe2d42",
+    "init_outcome_sha256": "c255817bcd7aa2f3cd2d86887c4fcd44065a4ed21803d7c61a765257f1c6948c",
+    "private_raw_data_published": false
+  }
+}
