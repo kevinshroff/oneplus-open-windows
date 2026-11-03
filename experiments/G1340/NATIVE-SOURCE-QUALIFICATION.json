@@ -1,0 +1,56 @@
+{
+  "client": {
+    "codec_pass": true,
+    "native_CS_compiled": 1,
+    "PS_AST": 2,
+    "default_inert": true,
+    "source_sha256": {
+      "CeGetter.cs": "a3241b04c0e53b7a5f174f4e25671289760ca4c80997d407d4bfe539250c91fe",
+      "Native-Compile-Only.ps1": "b1efa1b7c515070d61ccbce74200584d4e20916d1778b7b2dcaca696817bb9e7",
+      "Query-Once.ps1": "3cfc6afd529c2cb3a6d12f473266233d67dcac81682d15659314ef6a8a981260",
+      "README.md": "f0091a585d68c9b34d775f6c2932426e8ca6ed053b090da0d0d9bdcf4a4b5abc",
+      "getter.S": "1b3692f0e13567f19b8d0660c584eaf71aec410db0663e1423dba4269427e00a",
+      "patch.py": "cfb8eb0336bb4c98b3632f85c862969b0b4e7da211a42cda6ed8c9f2d3997bd2",
+      "test_offline.py": "3b59b96686a1ba6869b9b2a04d02ceaede279f511fc07017d9b18ed34e263420",
+      "verify_candidate.py": "122b13aec4e260c8e0fb74b433fa7f3cace7df1c4da5ae4e1684353ac2e2d250"
+    },
+    "device_calls": 0,
+    "runtime_approval": false
+  },
+  "init": {
+    "schema": "G1340-init-only-source-native-compile/1",
+    "native_CS_compiled": 1,
+    "native_PS_parsed": [
+      "Initialize-Once.ps1",
+      "Launch-FutureTask.ps1",
+      "Policy.ps1"
+    ],
+    "default_inert_scripts": 2,
+    "source_sha256": {
+      "SingleInfSelector.cs": "8f9837ce29bd795bbd9c12b1ed12e09eccd1a722a3b5e43709a5b78cc82c09a2",
+      "Policy.ps1": "3416f07240ad14dd16342777fbb9fb15ce70bf211d9ebf3eb39c737af619c1ff",
+      "Initialize-Once.ps1": "516ea6a0b0f2f47c5e22953ebe16faf4de856e2983049069203f713a3cc28d8a",
+      "Launch-FutureTask.ps1": "bd0c5b14a09c77b7bec117d9e36f5b67575900ec0bcf3589b32757acd81981fe",
+      "Native-Compile-Only.ps1": "a456e1cb0e9a8eef174e2e898164aea9806e9b2c97e1ec8179e273af02bdd35f"
+    },
+    "flag_policy_test_pass": true,
+    "selector_layout": {
+      "pointer_bytes": 8,
+      "DEV_bytes": 32,
+      "PARAMS_bytes": 584,
+      "DRIVER_bytes": 1568,
+      "DETAIL_bytes": 1584,
+      "native_calls": 0
+    },
+    "constructors_invoked": 0,
+    "SetupAPI_calls": 0,
+    "driver_install_calls": 0,
+    "WLAN_calls": 0,
+    "device_calls": 0,
+    "runtime_approval": false,
+    "live_new_package_qualification": false
+  },
+  "device_calls": 0,
+  "driver_loads": 0,
+  "schema": "G1340-native-source-qualification/1"
+}

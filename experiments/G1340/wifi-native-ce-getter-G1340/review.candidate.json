@@ -1,0 +1,26 @@
+{
+  "schema": "G1340-native-CE-getter-review/1",
+  "BootId": null,
+  "phone_session": null,
+  "instance_id": null,
+  "root_nonce": null,
+  "signed_driver_sha256": null,
+  "selected_runtime_image": null,
+  "output_directory": null,
+  "query_mode": "statusHP-first-only",
+  "accept_query_once": false,
+  "accept_first_four": false,
+  "root_current_same_session": false,
+  "root_loaded_getter_identity_and_no_unload": false,
+  "root_signed_payload_independently_verified": false,
+  "root_broker_flags_zero": false,
+  "source_sha256": {
+    "CeGetter.cs": "a3241b04c0e53b7a5f174f4e25671289760ca4c80997d407d4bfe539250c91fe",
+    "Query-Once.ps1": "3cfc6afd529c2cb3a6d12f473266233d67dcac81682d15659314ef6a8a981260",
+    "Native-Compile-Only.ps1": "b1efa1b7c515070d61ccbce74200584d4e20916d1778b7b2dcaca696817bb9e7"
+  },
+  "receipt_sha256": {
+    "signed-content-review.json": null,
+    "native-compile-result.json": null
+  }
+}

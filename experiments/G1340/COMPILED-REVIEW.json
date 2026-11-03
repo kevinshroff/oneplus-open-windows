@@ -1,0 +1,31 @@
+{
+  "schema": "G1340-independent-compiled-review/1",
+  "verdict": "PASS_SCOPED",
+  "candidate_sha256": "2a0d977055dd6e8e59cbad80f2e3462d6e1e2d6a62d88f18a0753504d60e8495",
+  "candidate_bytes": 3841536,
+  "base_sha256": "927bf9450f462607435d616c0d2f00884f6689bcd2c395bcc949896ff93c8ee0",
+  "changed_bytes": 258,
+  "all_changes_in_original_280_byte_body": true,
+  "REA_bundle": "REA-INDEPENDENT-CANDIDATE.json",
+  "REA_records": 4,
+  "REA_closed": true,
+  "checks": [
+    "Actual REA instructions implement magicCE28/u32index0..7 bound before native access",
+    "ADR exact table14e184, ADRP global397000, sole body BL exact1eb588",
+    "Same globaladapter chain and HAL backpointer/window-mode guards",
+    "HAL77e4 counter before/after with negative status on mismatch",
+    "Reject0/C000000D/FFFFFFFF; outputstore14e16c only after checks",
+    "All failbranches14e178 returnC0000185; both returns originalepilogue14e1b4",
+    "Actual32B table contains exactly8 approved CE constants;16B paddingNOP",
+    "OriginalPAC/GS/prologue/epilogue/pdata/xdata preserved via wholefile bounded diff and REA rawunwind reads",
+    "NativeHALhelper and NC MOV0 unchanged by bounded diff"
+  ],
+  "limitations": [
+    "Static compiled review, not runtime functionality or signature qualification",
+    "Known native failedwake vote retention remains; no manualrelease and stop sequence after firstfailure",
+    "Validzero deliberately refused; possible partial/no hardware tuple",
+    "Existing native IOCTL ownership precedent reused; independent teardown rundown not fully reconstructed",
+    "Forwarded220182 may notexecute getter; require actualonevalue response, notAPI successalone"
+  ],
+  "hardware_calls": 0
+}

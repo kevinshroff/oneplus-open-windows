@@ -1,0 +1,16 @@
+{
+  "schema": "G1340-getter-source-pins/1",
+  "files": {
+    "CeGetter.cs": "a3241b04c0e53b7a5f174f4e25671289760ca4c80997d407d4bfe539250c91fe",
+    "Native-Compile-Only.ps1": "b1efa1b7c515070d61ccbce74200584d4e20916d1778b7b2dcaca696817bb9e7",
+    "Query-Once.ps1": "3cfc6afd529c2cb3a6d12f473266233d67dcac81682d15659314ef6a8a981260",
+    "README.md": "f0091a585d68c9b34d775f6c2932426e8ca6ed053b090da0d0d9bdcf4a4b5abc",
+    "getter.S": "1b3692f0e13567f19b8d0660c584eaf71aec410db0663e1423dba4269427e00a",
+    "patch.py": "cfb8eb0336bb4c98b3632f85c862969b0b4e7da211a42cda6ed8c9f2d3997bd2",
+    "test_offline.py": "3b59b96686a1ba6869b9b2a04d02ceaede279f511fc07017d9b18ed34e263420",
+    "verify_candidate.py": "122b13aec4e260c8e0fb74b433fa7f3cace7df1c4da5ae4e1684353ac2e2d250"
+  },
+  "base_unsigned_NC_sha256": "927bf9450f462607435d616c0d2f00884f6689bcd2c395bcc949896ff93c8ee0",
+  "candidate_unsigned_sha256": "2a0d977055dd6e8e59cbad80f2e3462d6e1e2d6a62d88f18a0753504d60e8495",
+  "runtime_approval": false
+}

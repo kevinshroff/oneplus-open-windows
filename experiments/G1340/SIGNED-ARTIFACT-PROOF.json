@@ -1,0 +1,16 @@
+{
+  "profile_id": "G1340-native-CE-getter",
+  "source_manifest_sha256": "1fc320cb7c6468fa61d1945c0154b0f8ff1d8f55cfb56e97016e36fbb60b9d76",
+  "compiled_review_sha256": "0abcb21ce5d072da99ff7377e9e7971c7ad21426a8d551c09bc58640b26b76c2",
+  "signed_sha256": "7af740a1dd32bb4a02030196e7ad16400ec211b62ee01934b740dd7a7ca160ec",
+  "unsigned_sha256": "2a0d977055dd6e8e59cbad80f2e3462d6e1e2d6a62d88f18a0753504d60e8495",
+  "authenticode_sha256": "9c703175de6d535bf3bfa86e2c3815fc64e983ab8533aa22fb4bedaebb9defe3",
+  "unsigned_payload_unchanged": true,
+  "cms_RSA_SHA256_math": true,
+  "signed_content_digest_matches_PE": true,
+  "existing_project_signer": true,
+  "host_chain_trust": false,
+  "phone_load_qualified": false,
+  "schema": "G1340-signed-artifact-proof/1",
+  "device_calls": 0
+}
