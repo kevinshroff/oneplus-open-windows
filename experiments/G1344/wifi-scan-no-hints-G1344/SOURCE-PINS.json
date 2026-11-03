@@ -1,0 +1,8 @@
+{
+  "schema": "G1344-source-pins/1",
+  "files": {
+    "patch.py": "66bda1c96c4557448abb4842a252f1533f3418ae357f0c25fd5c04813dbfcb7a"
+  },
+  "default_inert": true,
+  "live_calls": false
+}
