@@ -1,0 +1,65 @@
+{
+  "schema": "G1342-sanitized-hardware-result/1",
+  "status": "COMPLETED_BOUNDED_OBSERVATION",
+  "candidate_signed_sha256": "c5eb06416f3f66110d7a689a059b8b240b356f4e53ea0f289e034a7f7c7adc6b",
+  "initialization": {
+    "calls": 1,
+    "success": true,
+    "NeedReboot": false,
+    "explicit_scan_calls": 0,
+    "cached_network_queries": 0,
+    "connect_requests": 0
+  },
+  "getter": {
+    "task_ready": true,
+    "task_result": 0,
+    "accepted_queries": 2,
+    "query_order": [
+      4,
+      5
+    ],
+    "hardware_HP": 20,
+    "hardware_TP": 20,
+    "index_unit": "DWORD",
+    "retry": false,
+    "atomic_snapshot": false
+  },
+  "CPU": {
+    "stable_before_after_spans": 15,
+    "local_HP": 20,
+    "cached_TP": 20,
+    "DMA_RRI_TP": 20,
+    "reap_cursor": 16,
+    "reap_next": 20,
+    "entries": 32,
+    "entry_DWORDs": 4,
+    "ring_DWORDs": 128,
+    "software_read_entry_slot": 5,
+    "software_write_entry_slot": 5,
+    "ownership_context_qwords": 32,
+    "nonzero_ownership_context_qwords": 0,
+    "HAL_error_counter": 0,
+    "EP2_queue": 7,
+    "EP2_credits": 0
+  },
+  "interpretation": {
+    "credit_blocked_snapshot": true,
+    "persistent_source_TX_backlog_observed": false,
+    "source_indices_agree": true,
+    "target_WMI_execution_proven": false,
+    "device_visible_payload_correctness_proven": false,
+    "all_coherency_faults_ruled_out": false,
+    "firmware_dead_proven": false,
+    "hardware_CPU_samples_sequential": true
+  },
+  "scope": {
+    "payload_pointer_dereferences": 0,
+    "claimed_repair": false,
+    "CPU_capture_MMIO_reads": 0,
+    "CPU_capture_MMIO_writes": 0,
+    "native_getter_reuses_existing_wake_lock_window_protocol": true,
+    "native_getter_MMIO_write_count_measured": false,
+    "extra_initializer_WiFi_API_calls": 0,
+    "additional_native_queries_beyond_selected_pair": 0
+  }
+}

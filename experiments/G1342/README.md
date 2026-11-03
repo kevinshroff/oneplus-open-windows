@@ -7,7 +7,8 @@ The isolated candidate changes only two fixed entries in G1340's native getter t
 - [Patch recipe and route interpretation](wifi-native-ce3-getter-G1342/README.md)
 - [Native and signed validation](NATIVE-SIGNED-VALIDATION.md)
 - [Validation receipt summary](VALIDATION.md)
+- [Actual hardware result](HARDWARE-RESULT.md)
 
-A paired CPU snapshot is prepared to compare local HP, cached TP, DMA RRI TP, the completion cursor and ownership-context values. Hardware queries and the CPU snapshot are sequential, not atomic. A drained ring would support descriptor consumption; it would not prove correct device-visible WMI bytes or firmware command processing.
+A paired CPU snapshot compared local HP, cached TP, DMA RRI TP, the completion cursor and ownership-context values. Hardware queries and the CPU snapshot are sequential, not atomic. A drained ring would support descriptor consumption; it would not prove correct device-visible WMI bytes or firmware command processing.
 
-Status: source, compiled review, native client qualification and signed-content verification passed. No G1342 hardware outcome is recorded here. This experiment is a bounded discriminator, not a claimed repair for the credit stall.
+Status: hardware getter and CPU comparison completed. HP/TP20/20 matched local/cached/RRI state; all32 ownership slots were zero, while endpoint2 had queue7/credits0. This is a credit-blocked snapshot without an observed persistent source TX backlog. Target command execution, complete coherency and firmware health remain unresolved; no repair is claimed.

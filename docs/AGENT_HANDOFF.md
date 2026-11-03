@@ -1,6 +1,11 @@
 # Agent handoff — Wi-Fi and GPU development
 
-Latest update (Boot172):
+Latest update (Boot173):
+
+- [G1342 hardware result](../experiments/G1342/HARDWARE-RESULT.md): two accepted native CE3 reads returned HP20/TP20. Fifteen stable CPU spans matched local/cached/RRI indices20, software entry slots5/5 and reap16→20; all32 ownership-context slots were zero. EP2 queue7/credits0 makes this a credit-blocked snapshot without persistent source TX backlog. Correct device-visible payloads and target WMI execution remain unresolved.
+- One initialization succeeded without a reboot request. The initializer requested no scan, cached-list query or connection. A terminal GPU zero-write control is prepared; no new GPU result is established at this checkpoint.
+
+Previous update (Boot172):
 
 - [G1340's actual hardware result](../experiments/G1340/HARDWARE-RESULT.md) establishes a working bounded native CE2 getter: four accepted register queries matched the later stable CPU snapshot. Status HP/TP were 132/132 and destination HP/TP were 62/66, in DWORD index units. The observations were sequential, not atomic; the CPU capture's pause upper bound was 910.4454 ms.
 - Wi-Fi remains unconnected. One initialization succeeded without a reboot request, but the trace again ended with EP2 credit 0 and queue 25. The 9,144 retained records contain 101 credit debits and 100 returns from initial credit 1; the final debit was START_SCAN 40965. No later WMI RX or credit return was recorded, including after the getter queries. The 677.429164-second retained interval starts at the last credit return, not the final debit.
