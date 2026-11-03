@@ -1,0 +1,169 @@
+{
+  "schema": "g1339-actual-linked-broker-review/1",
+  "result": "PASS_WITH_STATED_SCOPE",
+  "unsigned_sha256": "792fbad89b4e9492f4afb0e283996d21af537ef2494760f60f6d249e2c2c4fa1",
+  "unsigned_bytes": 87040,
+  "manifest_sha256": "6e68daef572800bf5fdd07016436cc99daea30baa103ccd5d5ecf1ea14415d79",
+  "manifest_files_verified": 92,
+  "public_source_dependencies_verified": 67,
+  "owner_TUs": 0,
+  "broker_TUs": 15,
+  "selected_flag": {
+    "OGO_GPU_FIRST_FAULT_TUPLE": 1,
+    "OGO_GPU_MMIO_WRITECOMBINE": 0
+  },
+  "compiler_division": "genuine Microsoft-header Clang ARM64 COFF; native Microsoft14.29.30159 linker; not cl.exe compilation",
+  "code_ranges": {
+    "FaultIsr": {
+      "RVA_start": "0x83ec",
+      "RVA_end_inclusive": "0x8873",
+      "bytes": 1160,
+      "file_offset": 30700,
+      "sha256": "1dfe2f26b2d3bf4ad6800c781388102b9b0bf0a356e99510ff0b19a9308bf8a3",
+      "extent_authority": "actual REA analyzed body"
+    },
+    "FaultTuplePrepare": {
+      "RVA_start": "0x836c",
+      "RVA_end_inclusive": "0x83eb",
+      "bytes": 128,
+      "file_offset": 30572,
+      "sha256": "c5bdd03cb716d28cdb9204046ae1bb3dc1296eeaa58d6e80571842e66bf66144",
+      "extent_authority": "actual REA analyzed body"
+    },
+    "OfAckPolicy": {
+      "RVA_start": "0xdb04",
+      "RVA_end_inclusive": "0xdbab",
+      "bytes": 168,
+      "file_offset": 52996,
+      "sha256": "e15e9387c6bb5296fa0b72c3db1ad43ec40da56d73765ed6ced75544a97b793c",
+      "extent_authority": "actual REA analyzed body"
+    }
+  },
+  "ISR_order": {
+    "original_status_read_RVA": "0x8454",
+    "first_claim_exclusive_pair_RVAs": [
+      "0x8550",
+      "0x8558"
+    ],
+    "diagnostic_reads": [
+      {
+        "name": "CB0.FARlo",
+        "RVA": "0x85cc",
+        "map_index": 2,
+        "offset": "0x60",
+        "width": 4
+      },
+      {
+        "name": "CB0.FARhi",
+        "RVA": "0x8608",
+        "map_index": 2,
+        "offset": "0x64",
+        "width": 4
+      },
+      {
+        "name": "CB0.FSYNR0",
+        "RVA": "0x8644",
+        "map_index": 2,
+        "offset": "0x68",
+        "width": 4
+      },
+      {
+        "name": "CB0.FSYNR1",
+        "RVA": "0x8680",
+        "map_index": 2,
+        "offset": "0x6c",
+        "width": 4
+      },
+      {
+        "name": "GR0.GFSYNR0",
+        "RVA": "0x86e0",
+        "map_index": 0,
+        "offset": "0x50",
+        "width": 4
+      },
+      {
+        "name": "GR0.GFSYNR1",
+        "RVA": "0x871c",
+        "map_index": 0,
+        "offset": "0x54",
+        "width": 4
+      },
+      {
+        "name": "GR0.GFSYNR2",
+        "RVA": "0x8758",
+        "map_index": 0,
+        "offset": "0x58",
+        "width": 4
+      }
+    ],
+    "publish2_exclusive_store_RVA": "0x8788",
+    "publish_barrier_RVA": "0x8790",
+    "debug_print_call_RVA": "0x8800",
+    "debug_component": "0x4e IHVVIDEO",
+    "debug_level": 0,
+    "original_policy_call_RVA": "0x8810",
+    "original_W1C_store_RVA": "0x8830",
+    "ISR_callees": [
+      "NTOSKRNL.EXE::DbgPrintEx",
+      "OfAckPolicy at0xdb04"
+    ],
+    "additional_ISR_MMIO_writes": 0
+  },
+  "prepare_connect_binding": {
+    "Prepare_call_in_Connect_RVA": "0x3a1c",
+    "Armed_store_in_Connect_RVA": "0x3b58",
+    "ISR_address_registration_RVA": "0x3ba8",
+    "prepare_clear_bytes": 64,
+    "prepare_clears_only_First": true,
+    "prepare_checks": [
+      "different generation",
+      "KnownMask0",
+      "UncertainMask0",
+      "Armed0"
+    ],
+    "lifetime_pointer_store_offset": "OF_OWNER+0x130"
+  },
+  "policy_preserved": {
+    "zero_noACK": true,
+    "context_Format400_noACK": true,
+    "allones_fatal_noACK": true,
+    "context_ACK_mask": "0x800001fe",
+    "global_ACK": "observed status",
+    "fatal_latch_and_saturating_counts": true
+  },
+  "guard_scope": [
+    "existing Armed first",
+    "enclosing owner pointer nonnull",
+    "bank/global mapping nonnull",
+    "owner/context generation equality",
+    "Started",
+    "D0Ref",
+    "not Removing",
+    "CB0 only index2 and mapped",
+    "GpuUser Qualified Active not Retained",
+    "GpuUser broker and generation match",
+    "NS token nonzero and generation/bank/fault match"
+  ],
+  "source_private_journal_no_query_ABI_change": true,
+  "hardware_qualification": false,
+  "signed": false,
+  "staged": false,
+  "activation_selected": false,
+  "REA_export": "REA-ACTUAL-LINKED-BROKER.json",
+  "REA_closed": true,
+  "limitations": [
+    "Scoped compiled check, not whole-driver semantic equivalence or a signing decision.",
+    "Earlier global/CB2/allones/refused first event consumes sole slot.",
+    "FAR halves/syndromes not a hardware-atomic snapshot or GPU translation proof.",
+    "No ISR/log delivery guarantee if firmware/interconnect fails first.",
+    "Ghidra did not create a ConnectApi procedure; three exact instruction observations plus saved offline disassembly establish call/arm/registration binding, not a claimed full decompilation."
+  ],
+  "artifact_sha256": {
+    "native-prep/OpenSmmuD0.map": "6ed30db029614d80d926e41f5dcdc835723c6c6a6be045a523fb2e8e4c6cd4e8",
+    "native-prep/link.log": "3967647f0b82291117b59dcaaed68cf1774e700e1ac3a535642313fd835eb8a4",
+    "native-prep/RESULT.json": "8c7286f08102b896d174a65b35b23baff86da39a05721b978092968236adf799",
+    "native-prep/inputs/MANIFEST.json": "6e68daef572800bf5fdd07016436cc99daea30baa103ccd5d5ecf1ea14415d79",
+    "REA-ACTUAL-LINKED-BROKER.json": "c9e973904612af0d6b7a054f30666e6430f3e093c965ce55d664e4495f4000ef",
+    "actual-ConnectApi-offline-disassembly.txt": "85170e9eb1bb44414c4f33fa932f370d79539f7f1bb890ebc601836893576221"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "profile_id": "G1339-first-fault-tuple-broker",
+  "source_manifest_sha256": "6e68daef572800bf5fdd07016436cc99daea30baa103ccd5d5ecf1ea14415d79",
+  "compiled_review_sha256": "951210642d05415419231a1e355603a874d6e9b82c1708ac321fe8768b815643",
+  "signed_sha256": "379b4b72100dd6490d642eb281f27efe19c8c54a81873a647b12880a1f1986ec",
+  "unsigned_sha256": "792fbad89b4e9492f4afb0e283996d21af537ef2494760f60f6d249e2c2c4fa1",
+  "authenticode_sha256": "d62fe0fa3bebda3f309c325f6a6498f15895d7019231ebc53020031cee1f1db6",
+  "unsigned_payload_unchanged": true,
+  "cms_RSA_SHA256_math": true,
+  "signed_content_digest_matches_PE": true,
+  "existing_project_signer": true,
+  "host_chain_trust": false,
+  "phone_load_qualified": false,
+  "schema": "g1339-signed-artifact-proof/1",
+  "signed_bytes": 88504,
+  "phone_staged": false,
+  "activated": false,
+  "certificate_distributed": false
+}
