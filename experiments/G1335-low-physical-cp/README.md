@@ -3,7 +3,8 @@
 This is an unselected source candidate after G1334's negative low-SQE trial.
 It tests physical placement independently of GPU virtual placement. It does
 not assert a hardware4GiB limit, a security-window fix or GPU fetch success.
-No signing, staging, loading, live inventory or activation was performed.
+The [candidate is now signed and selected while disabled](SIGNED-DISABLED-RESULT.json).
+No GPU driver load, live GPU trial or allocation inventory was performed.
 
 The authoritative G1287/G1311 closure remains unchanged. `source.patch`,
 `ogo_gpu_allocation.h` and `prepare.py` produce a fresh external copy after
@@ -70,7 +71,11 @@ only11_open_smmu_inactive.obj and43_gpu_cp_native.obj. Configured OAS remains36
 in the actual allocator test. The exact35-object candidate also [linked with native MSVC](NATIVE-LINK-RESULT.json)
 to an unsigned ARM64 PE. A bounded compiled review confirmed the CP allocation
 bounds, unchanged generic GMU limit, original SQE IOVA and normal release/fence
-paths. It has not been signed, installed or activated.
+paths. It was subsequently signed with the existing project certificate and selected
+with Start4, Stopped and all once flags zero. Independent PE/CMS/RSA checks
+verified the original payload is unchanged. No trust-store change or GPU
+activation occurred; actual allocation availability, fetch and fences remain
+untested.
 
 The existing G1334 native packager/profile must not be used to classify this
 new candidate. Any future packet needs an explicitly named profile and its

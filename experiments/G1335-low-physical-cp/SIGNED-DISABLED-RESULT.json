@@ -1,0 +1,19 @@
+{
+  "signed_sha256": "91c3c22730295cf984203aa7abbffed4792ac72b72ea9f45cf1e05734ff14ae2",
+  "unsigned_sha256": "1928cb44cbe617d5ac60e41bccd5c502b09cf51edebd3416748c9c3075bd0c60",
+  "unsigned_payload_unchanged": true,
+  "cms_RSA_SHA256_math": true,
+  "signed_content_digest_matches_PE": true,
+  "existing_project_signer": true,
+  "host_chain_trust": false,
+  "phone_load_qualified": false,
+  "existing_certificate_only": true,
+  "trust_changes": 0,
+  "disabled_stage_verified": true,
+  "stage_BootId": 169,
+  "startup_Start": 4,
+  "current_state": "Stopped",
+  "once_flags_all_zero": true,
+  "driver_loads": 0,
+  "hardware_activation_selected": false
+}

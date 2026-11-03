@@ -1,10 +1,10 @@
 # Agent handoff — Wi-Fi and GPU development
 
-Latest update (Boot168):
+Latest update (Boot169; next experiment prepared):
 
 - Wi-Fi4478/firmware341 matched package installs and initializes without reboot; all18 runtime files and platform policies verify. Corrected published-INF→DriverStore selector and exact native source qualification are in G1333.
-- The first requested RF scan received two management frames and firmware completion. A later scan60seconds afterward exhausted the final command credit; no later RX/credit return, association or DHCP. Next Wi-Fi attempt batches immediate connection/DHCP/traffic after the first scan on a clean boot.
-- G1335 low-physical candidate has35-object parity/boundary tests, native MSVC link and bounded compiled review. It changes CP BO/table placement only, retains original IOVAs and GMU policy, and is unsigned/uninstalled/unactivated. No first GPU fence or WDDM acceleration yet.
+- The first requested RF scan received two management frames and firmware completion. A later scan60seconds afterward exhausted the final command credit; no later RX/credit return, association or DHCP. The immediate Boot169 attempt also failed; the next Wi-Fi trial removes the extra explicit scan and optional statistics queries.
+- G1335 low-physical candidate has35-object parity/boundary tests, native MSVC link and bounded compiled review. It changes CP BO/table placement only, retains original IOVAs and GMU policy, and is signed/selected disabled with no activation. No first GPU fence or WDDM acceleration yet.
 - G1334's low-SQE trial is consumed and negative; recovery is complete. Keep GPU disabled during Wi-Fi work and do not reuse old Wi-Fi RVAs on4478.
 
 
@@ -20,6 +20,12 @@ software recovery restored WinPE control and disabled future GPU starts.
 A [newer matched Wi-Fi package](../experiments/G1333-wifi-new-package/README.md)
 initialized on Boot168 and completed the first RF scan, but a later scan again
 stalled credits. See its runtime result and immediate-connection next step.
+
+The [Boot169 immediate-connection trial](../experiments/G1336-wifi-immediate-connect/README.md)
+requested connection7.162seconds after initialization but still failed association
+and DHCP. Its first postscan command again exhausted the final credit. A metadata
+observer exposed three incorrect cross-wrapper assumptions in the reader; the
+allocation headers matched, and no driver-data corruption was established. The corrected observer completed65 paired CPU-state reads; software wake counters showed no recorded failures, without proving hardware receive state.
 
 ## Read first
 
