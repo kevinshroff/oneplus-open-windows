@@ -1,0 +1,47 @@
+{
+  "schema": "G1348-existing-CB0-write-map-source/1",
+  "baseline": "G1347",
+  "changed_source": "source/qtb_native.inc",
+  "base_sha256": "31af12441055eb09ae44810b2f18e5c7af714d14531b75f10d089a972f30132d",
+  "variant_sha256": "05416e4715d82bf2c4c4c783c9e5474d90517407655967ddf4fc414ae98ae247",
+  "exact_replacements": [
+    {
+      "old": "PVOID Tag,Map,SmmuMap;",
+      "new": "PVOID Tag,Map,SmmuMap,Cb0WriteMap;"
+    },
+    {
+      "old": "p->Map[0]!=q->SmmuMap||!p->QtbGranted",
+      "new": "p->Map[0]!=q->SmmuMap||!q->Cb0WriteMap||p->Fault.Map[2]!=q->Cb0WriteMap||p->Fault.Bank!=q->B||p->Fault.Generation!=q->Generation||!p->QtbGranted"
+    },
+    {
+      "old": "WRITE_REGISTER_ULONG((PULONG)((PUCHAR)q->SmmuMap+0x20000),v);",
+      "new": "WRITE_REGISTER_ULONG((PULONG)((PUCHAR)q->Cb0WriteMap+0),v);"
+    },
+    {
+      "old": "if(p->Qtb||!GpuScope(p,b,s)||Frame(p,p->Generation)",
+      "new": "if(p->Qtb||!p->Fault.Map[2]||p->Fault.Bank!=b||p->Fault.Generation!=p->Generation||!GpuScope(p,b,s)||Frame(p,p->Generation)"
+    },
+    {
+      "old": "q->SmmuMap=p->Map[0];q->Root",
+      "new": "q->SmmuMap=p->Map[0];q->Cb0WriteMap=p->Fault.Map[2];q->Root"
+    }
+  ],
+  "authority": {
+    "map": "Fault.Map[2]",
+    "physical": "0x03dc0000",
+    "bytes": 4096,
+    "protection": "PAGE_READWRITE|PAGE_NOCACHE",
+    "allocator_source_sha256": "2cf0dfd9fe198fa3427e3a331705c28266104d3b98d477e894b6bbc86321297b",
+    "no_new_mapping": true,
+    "cleanup_joins": [
+      "same nonnull captured pointer",
+      "Fault.Bank identity",
+      "Fault.Generation identity"
+    ],
+    "IRQ_armed_required_for_cleanup": false
+  },
+  "signed_owner_reused_sha256": "a089ee59de66d26a009ec63eaf72a16e6f2dbb621ecc7734c0c17e8f70b82cc3",
+  "firmware_reused_sha256": "328ffac3c14e885a355b7297747e6906430489c98eb0dc82ff4e5ed945923e8c",
+  "hardware_qualified": false,
+  "target_calls": 0
+}

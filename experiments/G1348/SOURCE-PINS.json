@@ -1,0 +1,12 @@
+{
+  "schema": "G1348-public-source-pins/1",
+  "files": {
+    "BASE-AND-DELTA.json": "7f6981816067ad38a0c20f770c0a74af51bbd91f15e681b9336c7f469d3c257d",
+    "OFFLINE-QUALIFICATION.json": "bd69bdedeff550caa81f6c2980aae2655bb0961cd20890867b6aa3afa2b6bc91",
+    "README.md": "e8dde9f3eabd4d427a0a56a7fc83c28d7dfb6684159e8e0528a092d2bd26b6bb",
+    "VALIDATION.md": "693dd3a3818cfdc6a657575b010bb59d7822ef864b09323997d7f0895295d190",
+    "overlay/source/qtb_native.inc": "05416e4715d82bf2c4c4c783c9e5474d90517407655967ddf4fc414ae98ae247",
+    "prepare.py": "bf2e6117631fa14ca07fe55b625defddeb2db61b784e24197e4e5c50ea8ec93c",
+    "test_cb0_write_authority.py": "f67e1d962c731396d739e732dfcbf9a7a7e9b3dc8bca830ffbe5724a2c4737fe"
+  }
+}

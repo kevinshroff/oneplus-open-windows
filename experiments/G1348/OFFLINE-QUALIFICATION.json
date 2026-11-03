@@ -1,0 +1,28 @@
+{
+  "schema": "G1348-offline-qualification/1",
+  "exact_changed_files": [
+    "source/qtb_native.inc"
+  ],
+  "five_exact_substitutions": true,
+  "public_prepare_default_inert": true,
+  "public_prepared_source_matches_actual_compile_source": true,
+  "actual_cleanup_and_write_host_regression": "PASS_ASan_UBSan",
+  "genuine_Microsoft_header_ARM64_COFF_compile": "PASS",
+  "recompiled_broker_TUs": 1,
+  "actual_G1347_COFF_reused_byte_exact": 14,
+  "owner_recompiled": false,
+  "firmware_rebuilt": false,
+  "native_MSVC_link_performed": true,
+  "signed": true,
+  "hardware_outcome": null,
+  "target_calls": 0,
+  "unsigned_broker_sha256": "e8e0c5c3504270341e047af07075f93ddbc7246c5ab5e7f354a2102459e69f37",
+  "unsigned_broker_bytes": 92672,
+  "compiled_review": "PASS",
+  "compiled_review_sha256": "7dc4276da608efa1173a4e0f36b997280601364780c34fcbb3a457b89c6b7c66",
+  "signed_broker_sha256": "893ecbdcbf78a38dfca039d9a6cc7b5c2a985de6a24f11eff1792dc433efa8a2",
+  "signed_broker_bytes": 94136,
+  "independent_PE_SPC_CMS_verification": "PASS",
+  "existing_signing_identity_reused": true,
+  "trust_changes": 0
+}
