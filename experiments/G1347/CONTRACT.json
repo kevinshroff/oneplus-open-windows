@@ -1,0 +1,11 @@
+{
+  "schema": "g1347-time-api-source-contract/1",
+  "header": "Microsoft WDK10.0.26100.0 km/wdm.h",
+  "header_sha256": "c6a2a650c9799791accc407800861f672aea75ff0f1f60e2d3bf62d836275732",
+  "declaration": "ULONG64 KeQueryInterruptTimePrecise(_Out_ PULONG64 QpcTimeStamp);",
+  "output_optional": false,
+  "return_units": "100ns",
+  "retained_conversion": "divide return value by10 to microseconds",
+  "official_documentation": "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-kequeryinterrupttimeprecise",
+  "hardware_result_established": false
+}

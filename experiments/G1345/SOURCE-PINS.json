@@ -7,8 +7,8 @@
     "LOCAL-COMPILE-RESULT.json": "5ba4dbd1273d077864c921ff1a9b0881e478d95714d2534e3733df54bd6fa0c5",
     "OFFLINE-QUALIFICATION.json": "76b11e4bc3d5d5f9c9093f98ba6db0c78e767ebd43901757b62dd2439c0278bf",
     "PRIMARY-PINS.json": "4db3173d3f143f2998368bb5229b23ee59929ba5cb86c8ded94bf16fda4e6d5a",
-    "README.md": "35625f51c87787f88a0467fa46d88eb2e6eaac5afc233f56ce3072f7cc20afb5",
-    "VALIDATION.md": "aa03acf4c79e8405f71e81398755b5598fdd2e51b062c87c411dcaf34769f073",
+    "README.md": "53055f93d1ffab93557065ef8667ec2fafefc791fbda54e98af4ff1ed0ea6541",
+    "VALIDATION.md": "2377503e41ecb21f895a2a6f3f3ca6556a9fc0b29cb8d2a6bce0d656e071b59c",
     "firmware/Mmu1.asl": "e6373932b577b54aeacfcc10b2712da61d6916a4b329fbaeed655d7745a979fe",
     "firmware/Publish.c": "71c5b8e0d234a3416d653726983c68ff5733ebdb25a5ceeabea71828df8823a3",
     "firmware/Publish.inf": "e1be45035f356f1fe66e74596a10d83574019af73384cf2f9e6614df61b71d44",
@@ -27,7 +27,9 @@
     "prepare.py": "86651eb47490c4f2b3797de1a6382d2d233cbdb95e737bc47c89e39c22e0fa64",
     "test_source.py": "0fd604f4643831bdde4162aa43bc0f67d2709d843c79c050b106ca6319ff1798",
     "tests/test_qtb.c": "2202331790a9d0ddd1e1b16057e0d6dfad6a548a9e7d7bb954d0ace9fa34f597",
-    "tests/test_vote.c": "ab017e327729578a13151f17a08ebfa5a5c0e8ea7e041183ffdb3063ab1f6c00"
+    "tests/test_vote.c": "ab017e327729578a13151f17a08ebfa5a5c0e8ea7e041183ffdb3063ab1f6c00",
+    "HARDWARE-RESULT.md": "5aa76ec2fc59503e32fd1c78f668b189268277993a1044e2ba2307489204deb7",
+    "HARDWARE-RESULT.json": "5a4330e82578336cfc9b316f73c6b40c4dffbc2118233705a66492b64d582ede"
   },
   "native_link": true,
   "firmware_dependency_revision_built": true,

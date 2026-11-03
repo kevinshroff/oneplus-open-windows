@@ -1,0 +1,44 @@
+{
+  "schema": "G1345-hardware-attempt-result/1",
+  "boot_id": 175,
+  "GMU": {
+    "status": 0,
+    "HFI": 1,
+    "startup_ack_mask": 15
+  },
+  "terminal": {
+    "kind": "second_chance_access_violation",
+    "API": "KeQueryInterruptTimePrecise",
+    "caller": "QtbNow",
+    "required_output_pointer_was_null": true,
+    "faulting_store_to_null_confirmed": true,
+    "classification": "software_API_contract_defect"
+  },
+  "QTB": {
+    "translation_result_observed": false,
+    "ECATS_execution_established": false,
+    "halt_request_write_call_return": "source_control_flow_inference_only",
+    "halt_acknowledgement_established": false,
+    "electrical_state_established": false,
+    "cleanup_established": false
+  },
+  "SQE1_reached": false,
+  "first_CP_fence": false,
+  "WDDM_execution": false,
+  "recovery": {
+    "fixed_debugger_reboot_dispatch_returned_success": true,
+    "reset_attempts": 1,
+    "resume_calls": 0,
+    "fresh_PE_kernel_verified": true,
+    "fresh_PE_controller_verified": true,
+    "offline_startup_fence_verified": true
+  },
+  "correction": {
+    "experiment": "G1347",
+    "scope": "broker_timer_output_pointer_only",
+    "owner_reused": true,
+    "firmware_reused": true,
+    "runtime_success_claim": false
+  },
+  "raw_debugger_context_published": false
+}

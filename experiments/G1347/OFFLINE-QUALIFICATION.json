@@ -1,0 +1,22 @@
+{
+  "schema": "g1347-offline-qualification/1",
+  "new_source_files": 1,
+  "changed_function": "QtbNow",
+  "recompiled_broker_TUs": 1,
+  "prior_broker_COFF_reused_exact": 14,
+  "native_MSVC_link": "PASS",
+  "unsigned_broker_sha256": "9709ab03e93efc0eb7280a21b8d5a16a607f9b521027b0fb257dde31f08e745d",
+  "unsigned_broker_bytes": 92672,
+  "independent_compiled_review": "PASS",
+  "compiled_review_sha256": "a1bdc1a8a56b25077080396921b158cb78012bc9deedf02ac96e057959cbde54",
+  "compiled_timer_output": "Address of local stack ULONG64 storage, not NULL",
+  "compiled_return_conversion": "Preserved100ns/10",
+  "signed_broker_sha256": "65cfd26debcbac6b749d8474d8f0c96d519762d1fa25a2ac4841b4f14d89c38f",
+  "signed_broker_bytes": 94136,
+  "independent_PE_SPC_CMS_existing_identity": "PASS",
+  "reused_signed_owner_sha256": "a089ee59de66d26a009ec63eaf72a16e6f2dbb621ecc7734c0c17e8f70b82cc3",
+  "owner_recompiled_or_resigned": false,
+  "reused_firmware_sha256": "328ffac3c14e885a355b7297747e6906430489c98eb0dc82ff4e5ed945923e8c",
+  "firmware_rebuilt": false,
+  "new_hardware_result": false
+}

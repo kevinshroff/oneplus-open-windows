@@ -1,6 +1,6 @@
 # G1345 — terminal QTB translation witness
 
-Source-only, disabled by default. No hardware result, firmware image, signed driver or selected activation is provided. This couples an explicit GPU TCU interconnect request, one additional OS resource and a matched owner/broker operation. It is a diagnostic, not a GPU execution fix.
+Source-only assets, disabled by default. The [retained hardware-attempt result](HARDWARE-RESULT.md) identifies a native timer API-contract defect; no translation result was obtained. No firmware image or signed driver is provided. This couples an explicit GPU TCU interconnect request, one additional OS resource and a matched owner/broker operation. It is a diagnostic, not a GPU execution fix.
 
 The earlier [zero-write control](../G1343-zero-write-control/HARDWARE-RESULT.md) returned without releasing SQE. This experiment asks whether hardware can translate the actual retained SQE mapping before engine start. It never writes SQE1, submits packets or continues to normal configuration.
 
@@ -34,4 +34,4 @@ Every result is terminal and retains hardware/code/table/MDL/clock resources. Ex
 
 A matching walk qualifies only this injected request's attributes and observed translation state. It does not prove real GPU attributes, instruction-data fetch or execution. Faults/timeouts remain diagnostic evidence; the vendor post-failure erratum makes a single failure potentially inconclusive.
 
-See [VALIDATION.md](VALIDATION.md) and [CREDITS.md](CREDITS.md). Native link, independent compiled review, firmware build/table admission and any future activation remain separate review steps.
+See [VALIDATION.md](VALIDATION.md), [HARDWARE-RESULT.md](HARDWARE-RESULT.md) and [CREDITS.md](CREDITS.md). Offline qualification and the actual failed attempt are recorded separately; neither establishes a successful translation witness.

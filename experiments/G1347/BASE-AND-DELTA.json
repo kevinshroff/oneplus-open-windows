@@ -1,0 +1,13 @@
+{
+  "schema": "g1347-required-qpc-output-source/1",
+  "baseline": "G1345",
+  "changed_source": "source/qtb_native.inc",
+  "base_sha256": "76d45eae612c786fc071405da79ac2cc824e02084a4a3181ce39a426847b1633",
+  "variant_sha256": "31af12441055eb09ae44810b2f18e5c7af714d14531b75f10d089a972f30132d",
+  "exact_old": "static uint64_t QtbNow(void*x){UNREFERENCED_PARAMETER(x);return KeQueryInterruptTimePrecise(NULL)/10;}",
+  "exact_new": "static uint64_t QtbNow(void*x){ULONGLONG QpcTimestamp=0;UNREFERENCED_PARAMETER(x);return KeQueryInterruptTimePrecise(&QpcTimestamp)/10;}",
+  "signed_owner_reused_sha256": "a089ee59de66d26a009ec63eaf72a16e6f2dbb621ecc7734c0c17e8f70b82cc3",
+  "firmware_reused_sha256": "328ffac3c14e885a355b7297747e6906430489c98eb0dc82ff4e5ed945923e8c",
+  "native_link_performed": false,
+  "hardware_qualified": false
+}
