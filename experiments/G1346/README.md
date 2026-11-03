@@ -15,4 +15,4 @@ Static compiled review confirms the two intended branches and preserved release 
 
 The intended functional comparison reuses one initialization, the minimum15-second callsite-to-cache interval, one cached query and at most one exact saved-profile connection/DHCP observation. No repeated scan or force-wake API is part of this recipe. Any trial combined with a changed QTB firmware image must report that configuration and cannot attribute success to this driver change alone.
 
-The recipe defaults to inert, requires an exact base hash and an exclusive output directory, and performs no signing, installation or device access. See [validation](VALIDATION.md). No G1346 hardware result is established here.
+The recipe defaults to inert, requires an exact base hash and an exclusive output directory, and performs no signing, installation or device access. See [validation](VALIDATION.md). The [Boot175 hardware result](HARDWARE-RESULT.md) records loaded patch words and initial scan/RF progress, followed by recurring credit starvation and local connection timeouts. Complete Wi-Fi operation remains unfinished.

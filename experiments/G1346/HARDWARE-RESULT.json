@@ -1,0 +1,139 @@
+{
+  "schema": "G1346-hardware-result/1",
+  "checkpoint": "Boot175",
+  "configuration": {
+    "signed_WLAN_SYS_sha256": "a537535d6831ce17dbc5fbe90de9a06e6081e0adc5acef6703e63f0e41528e6c",
+    "firmware_image_sha256": "328ffac3c14e885a355b7297747e6906430489c98eb0dc82ff4e5ed945923e8c",
+    "coupled_firmware_TCU_vote_change": true,
+    "isolated_driver_causality_established": false
+  },
+  "initialization": {
+    "calls": 1,
+    "returned_success": true,
+    "NeedReboot": false,
+    "Start": 4,
+    "State": "Running",
+    "task_state": "Ready",
+    "task_last_result": 0,
+    "outcome_error": null
+  },
+  "scope": {
+    "explicit_scan_requests": 0,
+    "optional_statistics_requests": 0,
+    "HTTP_requests": 0,
+    "saved_profile_connect_requests": 1,
+    "profile_writes": 0,
+    "initialization_or_OS_scans_count_known": false
+  },
+  "cache": {
+    "query_requests": 1,
+    "entries": 5,
+    "distinct_SSID_count": 3,
+    "deduplication": "Exact equality of private SSID Base64 bytes; identities excluded",
+    "requested_SSID_entries": 3,
+    "requested_saved_pair_present": true,
+    "reported_quality": 46,
+    "connectable": true,
+    "not_connectable_reason": 0,
+    "reported_BSSID_count": 1,
+    "current_RF_reception_established_by_cache": false,
+    "init_call_to_cache_ms": 15008,
+    "cache_call_to_connect_ms_approx": 2357
+  },
+  "connection": {
+    "submission_exit": 0,
+    "submission_is_association_success": false,
+    "init_to_connect_ms": 17365,
+    "DHCP_ready": false,
+    "DHCP_budget_ms": 25000,
+    "DHCP_observed_elapsed_ms": 24893,
+    "later_state": "Disconnected",
+    "later_event": 8002,
+    "later_failure_reason": "The specific network is not available.",
+    "security_stage_success_established": false,
+    "usable_IPv4_and_default_route_established": false,
+    "association_initiation_events": [
+      8000,
+      11000
+    ],
+    "connect_initiation_to_failure_ms": 36530,
+    "successful_association_established": false,
+    "observed_failure_stage": "Local hardware-request timeouts after peer/vdev control commands queued with zero EP2 credits; no received AP association/security rejection observed",
+    "local_timeout_reason": 2
+  },
+  "interpretation": {
+    "complete_WiFi_success": false,
+    "electrical_wake_state_proven": false,
+    "loaded_patch_words_verified": true,
+    "transport_capture_analyzed": true,
+    "no_further_trial_selected_in_this_record": true,
+    "transport_progress_stall_observed": true,
+    "two_site_change_sufficient_for_sustained_recovery_in_this_epoch": false,
+    "AP_rejection_or_RF_security_failure_diagnosed": false,
+    "target_execution_of_final_command_proven": false,
+    "firmware_dead_diagnosis": false
+  },
+  "private_receipt_provenance": {
+    "immediate-outcome.json": "bb036f9e7d1dd200021a6b0674e4b85fbb48d60bc136c60916a7ee2e05f2d476",
+    "functional-status.json": "09d67bd957ff77ece3df3f37b90913c0271a39032cf51ffef767c4c499b63ce0",
+    "INDEPENDENT-ASSOCIATION-REVIEW.json": "766971d035b51e8a076db485073197b0af8cadca835de3bedabbba669712916a",
+    "WAKE-CODE-WORDS.json": "b38963579c2261814719e838dd5431f4114631f8de47f9fa3cfb4f0890e3f214",
+    "TRANSPORT-REVIEW.json": "d9cd15682271d2ab8e11d5d44154680ebdb7238d17cce505463e7311de4b93bc"
+  },
+  "raw_network_and_device_identity_excluded": true,
+  "loaded_word_proof": {
+    "scope": "Two image-relative patched instruction sites, read from actual loaded image",
+    "words": [
+      {
+        "RVA": "0x1b334c",
+        "word": "0xd503201f",
+        "instruction": "NOP"
+      },
+      {
+        "RVA": "0x228548",
+        "word": "0x1400000d",
+        "instruction": "B 0x22857c"
+      }
+    ],
+    "matched": true,
+    "electrical_wake_state_proven": false
+  },
+  "transport": {
+    "decoded_records": 9109,
+    "gaps": 0,
+    "time_scope": "Seconds from first retained ring record, not independently aligned UTC or initialization entry",
+    "initial_scan_id": 40964,
+    "initial_scan_completion_record": 6837,
+    "initial_management_RX_records": 4,
+    "logged_firmware_WMI_RX_records": 65,
+    "last_firmware_WMI_RX_record": 6932,
+    "EP2_initial_credits": 1,
+    "EP2_unit_returns": 100,
+    "EP2_unit_debits": 101,
+    "EP2_final_balance": 0,
+    "last_credit_return_record": 6997,
+    "last_credit_return_seconds": 3.3436695,
+    "final_admitted_command": "WMI_START_SCAN_CMDID",
+    "final_scan_id": 40965,
+    "final_credit_debit_record": 7022,
+    "final_credit_debit_seconds": 5.3141258,
+    "last_return_to_final_debit_seconds": 1.9704563,
+    "same_buffer_HTC_completion_rc": 0,
+    "HTC_completion_is_target_execution_proof": false,
+    "WMI_RX_or_credit_returns_after_final_debit": 0,
+    "retained_CPU_logging_after_final_debit_seconds": 505.453411,
+    "connect_request_record": 7193,
+    "connect_request_seconds": 17.306824,
+    "peer_create_command_record": 7289,
+    "peer_create_zero_credit_queue_record": 7290,
+    "local_HW_REQ_TIMEOUT_records": [
+      7387,
+      7515
+    ],
+    "paired_CPU_final_EP2_credits": 0,
+    "paired_CPU_final_EP2_queue_depth": 51,
+    "paired_CPU_metadata_before_after_equal": true,
+    "current_hardware_ring_getter_performed": false,
+    "historical_comparison": "Boot168 already showed stronger initial RF/scan progress before the recurring quiet-gap/final-credit pattern; this cache result is not sustained transport recovery."
+  }
+}

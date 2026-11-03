@@ -2,8 +2,10 @@
   "schema": "G1346-public-source-pins/1",
   "files": {
     "wifi-sustained-wake-G1346/patch.py": "27403d539bd2faf6f28606ccdaff68a2f0c78b74a6723f33411434ce4f2045c0",
-    "README.md": "71325a9db4e2064fa91b62b42577cc9a51045323bdc3f54d7548e43966f14214",
-    "VALIDATION.md": "3402798cb9ba52e4ac8130d15982e07679a2ca5fcb4fcf6871ac7c1796c3aaf6"
+    "README.md": "d3ee7203d587cbd6001161026f6585a02d22799535434b80100881105c13347b",
+    "VALIDATION.md": "c0c574605d309dcb6b5367c0c09e8fe5aa7b1d7f5b29185e14862ffa17c7bddc",
+    "HARDWARE-RESULT.md": "47c1efc07e7ce8b8547137c1969aa708983c5af32ca618f5a05de2bdf8960b8c",
+    "HARDWARE-RESULT.json": "d3d07dc915fddc523c1a3b11f988c10eb7a96d98db905028df66cf35632c59ae"
   },
   "primary_compiled_seams_export_sha256": "3c7c9e38f2c0e775c3f28fc15590f39c636b279a3c438ab71626fb290b3c4baa",
   "actual_candidate_compiled_review_sha256": "24ff6f90a66b039a25924d244fc69de662723e57a1344cc45ece10617c64c6a2"
