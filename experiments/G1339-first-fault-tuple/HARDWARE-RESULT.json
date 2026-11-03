@@ -1,0 +1,63 @@
+{
+  "schema": "g1339-hardware-result/1",
+  "result": "NEGATIVE_FIRST_FETCH_BOUNDARY_NO_TUPLE",
+  "scope": "One root-selected hardware activation of enabled G1339 broker with unchanged signed G1335 owner; sanitized summary, not raw target evidence.",
+  "artifacts": {
+    "signed_broker_sha256": "379b4b72100dd6490d642eb281f27efe19c8c54a81873a647b12880a1f1986ec",
+    "signed_owner_sha256": "91c3c22730295cf984203aa7abbffed4792ac72b72ea9f45cf1e05734ff14ae2"
+  },
+  "observed": {
+    "native_inert_admission_passed": true,
+    "native_reviewed_admission_passed": true,
+    "selected_new_broker_alias_and_file_hash_checked": true,
+    "preload_owner_and_broker_absent": true,
+    "IHVVIDEO_mask_before_activation": 9,
+    "pre_AHB_current_returned_success": true,
+    "pre_AHB_drop_value": 0,
+    "CP_control_release_requested_value": 1,
+    "STORE_CALL_BEGIN_present": true,
+    "STORE_CALL_RETURN_present": false,
+    "real_GPU_completion_observed": false,
+    "first_fault_tuple_line_present": false,
+    "terminal_USB_mode": "900E",
+    "Sahara_RESET7_ACK8_observed": true,
+    "programmer_uploads": 0,
+    "storage_write_commands": 0
+  },
+  "identity_limits": {
+    "postload_module_identity_independently_captured": false,
+    "loaded_broker_PE_bytes_independently_read": false,
+    "selected_on_disk_signed_image_identity_proven": true,
+    "explanation": "Fresh native guards proved disabled selected alias/hash before activation; successful owner progress implies broker interfaces in use. The retained trace has no independent postload broker module identity capture."
+  },
+  "ISR_lifetime_limits": {
+    "ARMED_log_marker_implemented": false,
+    "first_fault_line_requires": "Armed ISR, nonzero/non-Format-only status, successful first-record claim and delivered debug output.",
+    "source_inference": "Successful namespace/current checks require connected known interrupt objects, matching generation, Armed and no revocation/fatal state. This is software readiness, not observed interrupt delivery at fatal time.",
+    "no_tuple_does_not_exclude_SMMU_fault": true,
+    "hardware_fault_cause": "UNKNOWN",
+    "faulting_PC": "UNKNOWN",
+    "failure_between_store_and_ordering_completion": "NOT_DISAMBIGUATED"
+  },
+  "historical_900E_review": {
+    "table_regions": 46,
+    "selected_old_log_files": 7,
+    "selected_old_log_bytes": 99300,
+    "actionable_NoC_fault_or_PC_already_recovered": false,
+    "load_script_scope": "Address/filename loading map only, not fault decoding.",
+    "limits": "Old episodes, not current failure evidence; small reset/power status payloads remain opaque. No new capture/key handling/decryption was performed."
+  },
+  "next_boundary": {
+    "hardware_fix_justified_by_trace": false,
+    "no_trial_selected": true,
+    "WDDM_provider_remains_closed": true,
+    "next_action_requirement": "Substantive source-backed intervention or distinguishing observation; do not rerun merely to add readiness logging."
+  },
+  "private_evidence_digests": {
+    "completed_trace_sha256": "8aa4ebc4473c1f4b17706e575e7b13c24ce19230d9d65c9e46f95597de569f66",
+    "native_inert_admission_sha256": "489ff606fce97d8927b524121bee5605cd6f47b08993a2814ab7677a5c102cb2",
+    "native_final_admission_sha256": "5bf43e95ede481eb935ff94f236dcd851fec3b519adfe40f0b105d2cd13c4f6b",
+    "terminal_observation_sha256": "744fe5f10bd312a49fba6e2fec35ce6901810c22752ed6325c684aa432704f1b",
+    "recovery_ack_sha256": "1de957af34383154185e2c2c69c137268bc0e2c850a817def3df4dd5ef7e024a"
+  }
+}
