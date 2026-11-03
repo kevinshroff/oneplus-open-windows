@@ -1,0 +1,13 @@
+{
+  "schema": "G1342-public-native-client-source/1",
+  "sources": {
+    "CeGetter.cs": "f77124fccf915eb5eab790b3cda72f402ad16eb22ad1d6fa0dcb90af85f1f977",
+    "Query-Once.ps1": "ebd368279ba5784deafb579d58d00ce346d769899aa08ad2602b27b12cdef86a",
+    "Native-Compile-Only.ps1": "90c4b9cd0d8e37d291c1dcfa1f8596aa7e6483606d94f0c1752b91696d006771"
+  },
+  "native_CS_compiled": 1,
+  "PS_AST": 2,
+  "codec_pass": true,
+  "device_calls": 0,
+  "runtime_approval": false
+}

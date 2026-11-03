@@ -1,0 +1,11 @@
+{
+  "schema": "G1342-patch-source/1",
+  "files": {
+    "patch.py": "4ee35680c736ba127da3bb6c8a9fed3e00c93193152e4db2fb4015b986ed11c4",
+    "README.md": "d31543793cfeceac3b6686780d65e6d80d576e0abe64458521b285fe81fab513"
+  },
+  "candidate_sha256": "a98840b66a8598ddb4ef2aa59300e36b4f1a6d626156b4f9aa68c1b6ec1961db",
+  "whole_image_parity_test": "PASS",
+  "wrong_base_rejected": true,
+  "target_calls": 0
+}
