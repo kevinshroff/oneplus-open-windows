@@ -1,0 +1,72 @@
+{
+  "schema": "G1341-sanitized-hardware-result/1",
+  "epoch": "Boot172",
+  "result": "Same SQE start-call boundary followed by confirmed Qualcomm 900E; no first fence or containment benefit demonstrated.",
+  "selected_pair": {
+    "owner_signed_sha256": "a0997a15e1ba2b366f5310188499917d27d33f195965727aafd8d342cb985603",
+    "broker_signed_sha256": "144a5746ce85095cef3239cd2c3a88533c70cc90a870f06207510c412602d64a",
+    "selected_disk_hash_and_service_path_guards": true,
+    "independent_postload_mapped_PE_identity_proven": false
+  },
+  "actual_trace": {
+    "aperture_return_x0": 0,
+    "aperture_return_x1": 0,
+    "aperture_entries": 1,
+    "aperture_returns": 1,
+    "GMU_status": 0,
+    "GMU_phase": 6,
+    "GMU_stage": 11,
+    "HFI": 1,
+    "startupAcked": 15,
+    "Configure_return_status": 0,
+    "postConfigureLease_success_records": 2,
+    "STORE_CALL_BEGIN_records": 1,
+    "store_return_observed": false,
+    "first_fence_observed": false,
+    "G1339_first_fault_line_observed": false,
+    "SCTLR_programming_or_readback_line_observed": false,
+    "exception_PC_observed": false,
+    "store_retirement_proven": false
+  },
+  "SCTLR": {
+    "source_expected_CB0": "00c001e7",
+    "source_expected_GMU_CB2": "00c00067",
+    "owner_exact_write_readback_gate": true,
+    "broker_exact_commit_and_currentness_gate": true,
+    "runtime_policy_evidence": "Progression is consistent with successful exact source gates, conditional on the selected compiled pair being the executing pair. No direct SCTLR log or independent mapped-image measurement is present."
+  },
+  "terminal": {
+    "USB900E_confirmed": true,
+    "Sahara_HELLO_received": true,
+    "one_reset_ACK_received": true,
+    "normal_or_PE_recovery_complete_claimed_here": false
+  },
+  "limits": [
+    "No first-fault output is not proof that no SMMU fault occurred or that its IRQ was delivered.",
+    "No fault cause, first GPU fetch or retired SQE start store follows from the final marker.",
+    "The selected stall policy did not demonstrate containment benefit in this attempt; it does not exclude all SMMU or interconnect faults."
+  ],
+  "next_source_assessment": {
+    "new_source_supported_first_fence_fix_identified": false,
+    "do_not_repeat": [
+      "low physical placement",
+      "low SQE placement",
+      "VA layout",
+      "SECVID zero-store parity",
+      "unchanged CB0 stall profile"
+    ],
+    "rejected_as_unqualified": [
+      "Moving PAS13 before first SQE release conflicts with retained A740 sequences.",
+      "Changing ACTLR32b to301 solely to match UniXNU has contrary chip-specific vendor policy and no captured causal fault."
+    ],
+    "remaining_distinction": "A same-failure exception/interconnect/SMMU record that separates CPU MMIO/barrier failure from the first target fetch; direct selected-image/SCTLR evidence should accompany any separately justified future activation."
+  },
+  "provenance": {
+    "completed_trace_sha256": "bc0e99610125180cba29511c1245cdf33503cc957b46e076689268dd0160be21",
+    "transition_observation_sha256": "f86d6f8a92afba91143a14e42e2fe27a24d0a798cf7604eed6e9664576cd8a6f",
+    "profile_sha256": "8db46094f925f654e1009453b904d81a38a8e10d7fe22a8872a0dd0fdc0ab671",
+    "selected_pair_native_receipt_sha256": "70dfbefcb19c615b70099a3108e08adc868f2d1b807f7d0679e0179139307ce1",
+    "frozen_compiled_review_sha256": "3263add8d8de2ecdc0ea6ebe6fce934bbc97bf203ec6b32ece384b69108f3b3d",
+    "raw_trace_published": false
+  }
+}

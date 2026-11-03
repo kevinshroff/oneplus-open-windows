@@ -1,12 +1,14 @@
 # G1341: matched CB0 stall containment
 
-Source-only variant of the G1335 low-physical owner and G1339 first-fault broker.
-It changes the owned GPU CB0 fault response, not its translations. No successful
-GPU execution, runtime qualification, installation or activation is claimed.
+Variant of the G1335 low-physical owner and G1339 first-fault broker.
+It changes the owned GPU CB0 fault response, not its translations. The
+[Boot172 hardware trial](HARDWARE-RESULT.md) reached the same fatal SQE start-call
+boundary without a store return, first-fault line or first fence.
 
 The matched pair has since passed native linking, compiled review and independent
 signed-content verification: [scoped validation](NATIVE-SIGNED-VALIDATION.md).
-Those results do not establish hardware execution or containment benefit.
+Those results do not establish successful GPU execution; the hardware trial
+did not demonstrate containment benefit.
 
 `prepare.py --out <fresh-external-directory>` reuses G1335's source-copy recipe
 and adds the shared `g1341_cb0_policy.h`. The authoritative baseline files are

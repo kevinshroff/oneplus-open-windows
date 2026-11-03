@@ -7,6 +7,8 @@ Latest update (Boot172):
 - Matching hardware producer/consumer indices, CPU cached indices and RAM RRI shadows show no persistent CE2 status receive backlog at these observations. They do not prove firmware death, delivery/execution of the final TX command, absence of transient servicing faults or correctness of all coherency paths. The getter uses the native wake/lock/window protocol; actual DMA cache attributes remain unmeasured despite the loaded noncached-allocation instruction match.
 - Source-qualified CE TX publication/ownership is the next distinct evidence gap. Do not repeat timing/cache variants or infer networking from scan notifications. No new GPU hardware outcome is established by this Wi-Fi checkpoint; retain the prior GPU results below.
 
+The [G1341 matched containment trial](../experiments/G1341-cb0-stall-containment/HARDWARE-RESULT.md) subsequently reached the same SQE start-call boundary and confirmed Qualcomm 900E without a store return or fence. The unchanged profile is consumed. Acknowledged software reset and fresh recovery-kernel attachment followed; the detailed result distinguishes selected disk images from independently measured mapped-image identity.
+
 Previous update (Boot171):
 
 - Wi-Fi4478/firmware341 matched package installs and initializes without reboot; all18 runtime files and platform policies verify. Corrected published-INF→DriverStore selector and exact native source qualification are in G1333.
