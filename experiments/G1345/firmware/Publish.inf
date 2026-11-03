@@ -1,0 +1,29 @@
+[Defines]
+ INF_VERSION = 0x00010017
+ BASE_NAME = OpenGpuOwnerTables
+ FILE_GUID = ce4ed4f2-f892-40cd-a8d0-0515d0010001
+ MODULE_TYPE = DXE_DRIVER
+ VERSION_STRING = 1.0
+ ENTRY_POINT = PublishEntry
+[Sources]
+ Publish.c
+ Mmu1.h
+ Gpu0.h
+ IortOriginal.h
+ IortLevel.h
+ qtb_npa_abi.h
+ qtb_tcu_vote.inc
+[Packages]
+ MdePkg/MdePkg.dec
+ OpenOwnerPkg/QtbProviders.dec
+[LibraryClasses]
+ UefiDriverEntryPoint
+ UefiBootServicesTableLib
+ BaseMemoryLib
+[Protocols]
+ gQtbNpaProtocolGuid
+ gQtbIcbProtocolGuid
+ gEfiAcpiTableProtocolGuid
+ gEfiAcpiSdtProtocolGuid
+[Depex]
+ gEfiAcpiTableProtocolGuid AND gEfiAcpiSdtProtocolGuid AND gQtbNpaProtocolGuid AND gQtbIcbProtocolGuid

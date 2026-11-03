@@ -1,0 +1,27 @@
+[
+  {
+    "url": "https://raw.githubusercontent.com/OnePlusOSS/android_kernel_oneplus_sm8550/c87f74901db572a762241d6dfcacc42dbdd9f798/drivers/iommu/arm/arm-smmu/arm-smmu.c",
+    "sha256": "1f901f861819ba92320e839d0fe958b3fd057b8610111d3581d7bff5de94f8e8",
+    "bytes": 107410
+  },
+  {
+    "url": "https://raw.githubusercontent.com/OnePlusOSS/android_kernel_oneplus_sm8550/c87f74901db572a762241d6dfcacc42dbdd9f798/drivers/iommu/arm/arm-smmu/arm-smmu-qcom.c",
+    "sha256": "368d28f233d49c6780859e7a7aa321e42d6d611105f34293c16419f03e4c19c0",
+    "bytes": 51679
+  },
+  {
+    "url": "https://raw.githubusercontent.com/OnePlusOSS/android_kernel_oneplus_sm8550/c87f74901db572a762241d6dfcacc42dbdd9f798/drivers/iommu/arm/arm-smmu/arm-smmu.h",
+    "sha256": "c034d02bf2a85f3cab0ab5b74444ac43066a2511bf002c754aa3a2fa581d1c50",
+    "bytes": 21701
+  },
+  {
+    "commit": "46cfd06fc4c0e12dbe294badb924a533f1d9fb06",
+    "path": "kernel_platform/qcom/proprietary/devicetree/qcom/msm-arm-smmu-kalama.dtsi",
+    "sha256": "8efd64bf38872c09bd9aedaef3f0e4b5929ec9f3dd1a268da7a9ead7d08e888c",
+    "bytes": 11368
+  },
+  {
+    "url": "https://raw.githubusercontent.com/OnePlusOSS/android_kernel_oneplus_sm8550/c87f74901db572a762241d6dfcacc42dbdd9f798/drivers/iommu/arm/arm-smmu/arm-smmu-qcom-pm.c",
+    "sha256": "24877019f94ff64fd63495a684ad8a0a3b7aa3556a0781f28dd7935a23292243"
+  }
+]

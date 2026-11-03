@@ -1,0 +1,27 @@
+{
+  "schema": "g1345-offline-qualification/1",
+  "native_link": "PASS",
+  "compiled_review": "PASS",
+  "compiled_review_sha256": "d235f7b5312d7f1958c9022020920aadd38a11e310ebeaf9a3182f7bfcbdf5d2",
+  "components": {
+    "owner": {
+      "unsigned_sha256": "5bc8bfe64534ccdcc8b1c2b5b44ca5fbde81dd35c5d116fd73f7cd603148f714",
+      "unsigned_bytes": 131584,
+      "signed_sha256": "a089ee59de66d26a009ec63eaf72a16e6f2dbb621ecc7734c0c17e8f70b82cc3",
+      "signed_bytes": 133048,
+      "independent_PE_CMS_existing_identity": "PASS"
+    },
+    "broker": {
+      "unsigned_sha256": "9cf6b033f51271de10981c6bbc4ff5f26df876d5104f6d401b8b29c608125b21",
+      "unsigned_bytes": 92672,
+      "signed_sha256": "b36064106521f032e9d48f8a73218f7299b5b993d09d68cea181ddabb9d1b1ce",
+      "signed_bytes": 94136,
+      "independent_PE_CMS_existing_identity": "PASS"
+    }
+  },
+  "firmware_dependency_revision_build": "PASS",
+  "firmware_image_sha256": "328ffac3c14e885a355b7297747e6906430489c98eb0dc82ff4e5ed945923e8c",
+  "firmware_only_publisher_and_compression_container_changed": true,
+  "hardware_qualified": false,
+  "activation_selected": false
+}

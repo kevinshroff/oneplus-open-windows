@@ -1,0 +1,16 @@
+{
+  "schema": "g1345-firmware-dependency-source-review/1",
+  "NPA_protocol": "79d6c870-725e-489e-a0a1-27e7a5d0cb35",
+  "ICB_protocol": "5824f9de-17d2-4b1f-a5fe-5eb77fa53093",
+  "ICB_artifact_sha256": "0f5ef846d52d143d6ab43ffbe9e5e131b91dde505124f19501bf12c30eac5451",
+  "observed_static_order": [
+    "DAL_environment_initialization_2170",
+    "ICB_initialization_2930",
+    "ICB_protocol_installation",
+    "custom_postinit_event_registration"
+  ],
+  "resource_registration_success_guaranteed": false,
+  "runtime_arbiter_availability_check_preserved": true,
+  "target_execution_performed": false,
+  "REA_exported_and_closed": true
+}

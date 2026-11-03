@@ -1,0 +1,27 @@
+{
+  "schema": "g1345-local-coff-validation/1",
+  "compiler": "Clang ARM64 Windows COFF using retained genuine Microsoft headers",
+  "objects": 100,
+  "units_per_profile": {
+    "owner": 35,
+    "broker": 15
+  },
+  "default_off_matches_baseline_except_COFF_timestamp": true,
+  "enabled_changed_units": [
+    "owner:source/owner/owner_entry.c",
+    "owner:source/owner/bootstrap.c",
+    "owner:source/owner/inputs.c",
+    "owner:source/native_bootstrap.c",
+    "owner:source/local_bank_consumer.c",
+    "owner:source/cold_hold_native.c",
+    "owner:source/owner/gmu_runtime.c",
+    "owner:source/owner/gpu_cp_native.c",
+    "owner:source/owner/gpu_cp_translate.c",
+    "broker:source/broker/open_smmu_wdm.c",
+    "broker:source/fault_iort.c",
+    "broker:source/cold_hold_native.c"
+  ],
+  "native_link": false,
+  "firmware_build": false,
+  "hardware_calls": 0
+}

@@ -1,0 +1,59 @@
+{
+  "schema": "g1345-source-overlay/1",
+  "baseline": "G1343-zero-write-control",
+  "flag": "OPEN_QTB_WITNESS=1",
+  "default_enabled": false,
+  "changes": {
+    "source/local_bank_interface.h": {
+      "base_sha256": "58f8574fa304082a4e6168dfffdee1cf84242168b5716a3d538022c630ca431d",
+      "variant_sha256": "825e0572496263fb2d637b5cc690850b10a6c26ce707d1777fec78b81a797ad3"
+    },
+    "source/local_bank_consumer.c": {
+      "base_sha256": "9ea0e69de100813510f3a039700d24176aa3fb1b1025036b7ef52a04ff6fe799",
+      "variant_sha256": "6c9679d9a5f630434f244996262d386d07b8046b32e9a77342837e69d826dfff"
+    },
+    "source/broker/open_smmu_wdm.c": {
+      "base_sha256": "dabce0892aaa0334d43a856576c234c4dad8187b30159c09e7be7b613a494f56",
+      "variant_sha256": "48fe9924c4e5a276578639701f0970ae97ac83cd87c6ad6d574479600c64c449"
+    },
+    "source/fault_owner_native.inc": {
+      "base_sha256": "f66e222e4898fbf81df26481072c61fdb2b8e2d1e0657c78e18aadc46440ad26",
+      "variant_sha256": "2cf0dfd9fe198fa3427e3a331705c28266104d3b98d477e894b6bbc86321297b"
+    },
+    "source/fault_iort.c": {
+      "base_sha256": "7a0cbc164c0a6fab68121b89e31ec34199285eceebab53d4658f9d5133979ed5",
+      "variant_sha256": "a33a625a690809dc424e48e20642227cc1ad4136e637b1277e9153e015563061"
+    },
+    "source/owner/gpu_cp_native.c": {
+      "base_sha256": "5d7c5ef780f1dca48a338c34ca020e5a59b27097fd1685646e7347265cf0b1f6",
+      "variant_sha256": "0e6bdcae1106e9f5726f61c17e45c5c9bb6a986f3324454ba637dc70086145e0"
+    },
+    "source/qtb_once.h": {
+      "base_sha256": null,
+      "variant_sha256": "03388cbe8659b0ada3d68466b603ef6ffd02fe4fbee894930d604c523204b1bb"
+    },
+    "source/qtb_once.c": {
+      "base_sha256": null,
+      "variant_sha256": "266a336ad03aee64cb5766ed0c9c026c487187e5a0f668c01115c3bc36b2bc6e"
+    },
+    "source/qtb_native.inc": {
+      "base_sha256": null,
+      "variant_sha256": "76d45eae612c786fc071405da79ac2cc824e02084a4a3181ce39a426847b1633"
+    }
+  },
+  "firmware_base": "firmware/G991",
+  "native_link_performed": false,
+  "firmware_built": false,
+  "hardware_selected": false,
+  "firmware_base_pins": {
+    "firmware/G991/Gpu0.asl": "3ea734ec3d1eb70e3dd1d1146b4973742f152574c4e1e0161b68937fbc1c290b",
+    "firmware/G991/Mmu1.asl": "9461091bfc0a48dba4f54dcef9f72ab28af2148248d5228ffc1ef9e48b7b91a5",
+    "firmware/G991/OpenOwnerPkg/Gpu0.h": "ff25bc323997efa5284b65130cc842d15eaded28423ede8a8aa3359b8f079095",
+    "firmware/G991/OpenOwnerPkg/IortLevel.h": "3d16730b1c4e178fc905739ef690a7f2bc768e67d372db7290ac5400524ed491",
+    "firmware/G991/OpenOwnerPkg/IortOriginal.h": "4f1b215fd8eeda884262b5593922fee02d2740517d4bb260130faba087b52d97",
+    "firmware/G991/OpenOwnerPkg/Mmu1.h": "6be9d9782ed6b7fa1108485022b7699c58bc7cf46c2bce1021de144d1e29c6ee",
+    "firmware/G991/OpenOwnerPkg/Owner.dsc": "0dbb5fa6cfa5accaf1c75aa25f10c901dcb622dc84a7d5eda2115fce36ad9ad1",
+    "firmware/G991/OpenOwnerPkg/Publish.c": "473551102ff14459d7c8accd3d5210cd51fb7540e26a27905e800864815346a4",
+    "firmware/G991/OpenOwnerPkg/Publish.inf": "841534f79ca786d2ed96ed6ac9407e73b5cde87eb12d209ab8b726dcb095974d"
+  }
+}
