@@ -3,9 +3,11 @@
   "files": {
     "BASE-AND-DELTA.json": "cffdeec4ff6e6b40f918301cff62f5abbc7833f207c7167924b257e9a11b1179",
     "CONTRACT.json": "02d3ee30687df1b04db8d0bb2c0c746c713eaf5fa787f3852a9e65b4ecb6816c",
+    "HARDWARE-RESULT.json": "895d591799a7b76dde698bfdca7d28c1756922d554626298680d43d2e4265d32",
+    "HARDWARE-RESULT.md": "efd13ddc32f83b53b06568de0df6fab2c65fa09333ece6a49cab3fa33c602c12",
     "OFFLINE-QUALIFICATION.json": "1d68ca988184f422a0ba47c56396378fc75929082f85610f90678005b999285f",
-    "README.md": "f779e84389217378b4ef85188dabe2cd2a4609ea0be5d22d606a4c45445d1d3d",
-    "VALIDATION.md": "532897ff5911d5d06393a9ba16c5d06e7235dfedecaddba1686ce6cc04f585ad",
+    "README.md": "fd4d94a77840d0861f4e3db8e7dfdddea8523c70b686b43ddaebaa5663483ac3",
+    "VALIDATION.md": "cd4ae349916b75997af5ebfefdc9c07bfe5369082908e05fd158255ebd5398f6",
     "overlay/source/qtb_native.inc": "31af12441055eb09ae44810b2f18e5c7af714d14531b75f10d089a972f30132d",
     "prepare.py": "5f9a6593505e8d98e35be49a7af1a64c896325214a4ba9ced0d80e3aba812c10",
     "test_required_output.py": "8675063679b888ceb4376972755614ae4c6903f953e56e4e34f705e4eb3d23f3"
@@ -13,5 +15,7 @@
   "native_link": true,
   "compiled_review": "PASS",
   "broker_signature_qualified": true,
-  "hardware_qualified": false
+  "hardware_qualified": false,
+  "hardware_attempted": true,
+  "hardware_result": "software read-only mapping write fault; no translation result"
 }

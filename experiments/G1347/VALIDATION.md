@@ -10,4 +10,8 @@ Native MSVC LINK passed for15 broker objects: unsigned `9709ab03e93efc0eb7280a21
 
 The broker was signed with the existing project identity: `65cfd26debcbac6b749d8474d8f0c96d519762d1fa25a2ac4841b4f14d89c38f`,94136 bytes. Independent PE payload/SPC digest/CMS RSA verification passed. Original owner and firmware proofs were reused; there was no new owner compile/sign or firmware build. See [offline qualification](OFFLINE-QUALIFICATION.json).
 
-No new driver load, translation result or hardware success is established here. The old access violation supplies no QTB translation verdict. A future result must come from the separately reviewed linked broker and a fresh admitted GPU-only epoch; the consumed attempt is not replayed.
+The offline checks establish the timer correction and signature, not successful hardware translation. The later hardware attempt is reported separately below.
+
+## Actual attempt
+
+[Boot176 result](HARDWARE-RESULT.md): the timer correction progressed to SCTLR masking, where a write through the deliberately read-only power-core mapping caused bugcheck0x50. No ECATS or translation result was obtained. The focused timer review did not establish writable authority for this separate callback.
