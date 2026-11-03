@@ -1,0 +1,9 @@
+# Validation scope
+
+The actual overlay G433 core passed the host mock-IO test under ASan/UBSan for zero-write success and failure. Both remained poisoned/terminal at stage3: exactly one zero attempt, no release1, packet data, nonzero WPTR, polling, wait, secure transition or retry. Native-owner field/ABI behavior is not established by this model.
+
+The private isolated source preparation changed exactly the two supplied overlay files. Genuine Microsoft-header Clang compilation passed all35 owner translation units using the exact selected G1341 flags. Ignoring only COFF timestamp bytes4..7, 33 objects matched G1341; only `43_gpu_cp_native.obj` and `45_g433_cp.obj` changed.
+
+Root's native MSVC link passed with those35 objects. The unsigned owner SHA256 is `587b7245269460c90d66f280196c58c3e65c334d8f721e690076595ef788f7c7` (134144bytes). Independent compiled review passed and the REA export was closed; [scoped receipt](COMPILED-VALIDATION.json). It confirms the actual zero-only guard, stage3 terminal paths before stage4, unchanged DSB SY/STR/DSB OSH store sequence, and retained failure propagation. The owner was subsequently signed with the existing project certificate: SHA256 `1c49da65fe83077cd5f2ff756a49ac4e24da1d46807927e28eb5b43bf134c2e1` (135608bytes). Independent local PE/CMS verification passed: unchanged normalized unsigned payload, matching SPC PE digest, CMS SHA256/RSA mathematics and the same existing signing identity. This changes no trust store and establishes no host-chain trust or phone-load qualification. The G1341 matched broker is unchanged. No hardware execution, cold-zero safety, connectivity, fence or containment result follows from these build checks.
+
+No external SDK, library, firmware or native binary is supplied here. Source preparation and host tests require explicit invocation and external output directories; they do not select a boot or call a device.

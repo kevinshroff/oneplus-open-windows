@@ -1,0 +1,14 @@
+{
+  "schema": "g1343-public-source-pins/1",
+  "files": {
+    "BASE-AND-DELTA.json": "0a6451bafb830f058b329fc1a0618166bf080ca6ada04c56988560fe9da1de42",
+    "COMPILED-VALIDATION.json": "8709be4b18107dd3f065c1beebb93823d9f6b16dfd761e6ca20ff8b2204409f4",
+    "README.md": "d8c4250015302751fd42d3ec3720e63ebe3e5b15cf2ddd81c653780874dc5648",
+    "VALIDATION.md": "f191fa121737aa92369c3d97ce5512ee22bfb2438bc169f300d9c1572713235f",
+    "overlay/reference/runtime/g433_cp.c": "24af59e300477f09a44631c78483930279aadf8a269075cc827a170af22e8cb4",
+    "overlay/source/owner/gpu_cp_native.c": "5d7c5ef780f1dca48a338c34ca020e5a59b27097fd1685646e7347265cf0b1f6",
+    "prepare.py": "055806f8f99bd97183b2439809098bd0913200c1b56ed30d1fa405b85d32971d",
+    "test.py": "11f98bf23b85c2c735ca6726ecd237e50978c3e081ad52fd15b6a8b99368dbb6",
+    "tests/test_zero_core.c": "b9d048c98708c39e670b998128893f338d4b49774545c5cfcd1295a07f0f4497"
+  }
+}

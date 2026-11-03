@@ -1,0 +1,21 @@
+{
+  "schema": "g1343-public-compiled-validation/1",
+  "unsigned_owner_sha256": "587b7245269460c90d66f280196c58c3e65c334d8f721e690076595ef788f7c7",
+  "unsigned_owner_bytes": 134144,
+  "independent_review_sha256": "9a30eaee041d052c41848e0cc5aa36cdae98c68ed39c9f6dd46ee7af1542e213",
+  "verdict": "PASS",
+  "rea_exported_and_closed": true,
+  "record_count": 5,
+  "findings": [
+    "Native SQE branch rejects nonzero values and retains original first-use/prestate/base/AHB guards.",
+    "Actual stage3 sends zero; both returned outcomes are terminal state3 or IO5 and poisoned; no stage4 packet or fence path remains.",
+    "Native register store and pre/post barriers are unchanged.",
+    "Existing software-scope leave retains hardware on failure; no new rollback/free/reset path."
+  ],
+  "CB0": "00c001e7",
+  "GMU_CB2": "00c00067",
+  "matched_broker_reused": true,
+  "cold_zero_idempotence_proven": false,
+  "signed": false,
+  "hardware_result_claimed": false
+}

@@ -1,0 +1,21 @@
+{
+  "schema": "g1343-zero-source-overlay/1",
+  "base": "G1341 prepared matched CB0 stall pair",
+  "changes": {
+    "source/owner/gpu_cp_native.c": {
+      "base_sha256": "304e0cdd2a4744bfad59a8b3d6afbd23a7946f9f6307e61e8c33259e8ea2ce45",
+      "variant_sha256": "5d7c5ef780f1dca48a338c34ca020e5a59b27097fd1685646e7347265cf0b1f6"
+    },
+    "reference/runtime/g433_cp.c": {
+      "base_sha256": "85fe9ede2138c5e3a0e4c999d20e42e7341a6618da60d45f9b83dacee810f7e0",
+      "variant_sha256": "24af59e300477f09a44631c78483930279aadf8a269075cc827a170af22e8cb4"
+    }
+  },
+  "CB0_SCTLR": "00c001e7",
+  "GMU_CB2_SCTLR": "00c00067",
+  "matched_broker_signed_sha256": "144a5746ce85095cef3239cd2c3a88533c70cc90a870f06207510c412602d64a",
+  "cold_zero_idempotence_proven": false,
+  "build_approved": false,
+  "sign_approved": false,
+  "live_approved": false
+}
