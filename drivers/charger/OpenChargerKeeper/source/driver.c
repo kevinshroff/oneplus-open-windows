@@ -206,14 +206,15 @@ static int ReadPhysicalGauges(CK_OWNER *o, CK_TELEMETRY *t){
 static int ReadAdspFallback(const CK_OWNER *o, CK_TELEMETRY *t){
     const CL_BATTERY *b = &o->Glink.LastBattery;
     uint32_t mv = 0, temp_dk = 0, soc = 0;
-    if(b->Voltage >= 2800u && b->Voltage <= 4600u) mv = b->Voltage;
-    else if(b->VoltageNow >= 2800000u && b->VoltageNow <= 4600000u) mv = b->VoltageNow / 1000u;
+    if(b->VoltageNow >= 2800000u && b->VoltageNow <= 4600000u) mv = b->VoltageNow / 1000u;
     else if(b->OpenCircuitVoltage >= 2800000u && b->OpenCircuitVoltage <= 4600000u) mv = b->OpenCircuitVoltage / 1000u;
+    else if(b->Voltage >= 2800u && b->Voltage <= 4600u) mv = b->Voltage;
     if(!mv) return 0;
 
-    if(b->TemperatureRaw >= 2500u && b->TemperatureRaw <= 3500u) temp_dk = b->TemperatureRaw;
-    else if(b->TemperatureProperty >= 2500u && b->TemperatureProperty <= 3500u) temp_dk = b->TemperatureProperty;
+    /* ADSP TemperatureProperty (0x30/12) is in 0.01 degC (e.g. 2500 = 25.00 C). */
+    if(b->TemperatureProperty >= 1000u && b->TemperatureProperty <= 6000u) temp_dk = 2731u + (b->TemperatureProperty / 10u);
     else if(b->TemperatureProperty >= 100u && b->TemperatureProperty <= 600u) temp_dk = 2731u + b->TemperatureProperty;
+    else if(b->TemperatureRaw >= 2500u && b->TemperatureRaw <= 3500u) temp_dk = b->TemperatureRaw;
     else if(b->TemperatureRaw >= 100u && b->TemperatureRaw <= 600u) temp_dk = 2731u + b->TemperatureRaw;
     else return 0;
 
