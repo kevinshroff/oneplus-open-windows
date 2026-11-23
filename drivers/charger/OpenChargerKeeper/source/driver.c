@@ -202,6 +202,38 @@ static int ReadPhysicalGauges(CK_OWNER *o, CK_TELEMETRY *t){
     return 1;
 }
 
+
+static int ReadAdspFallback(const CK_OWNER *o, CK_TELEMETRY *t){
+    const CL_BATTERY *b = &o->Glink.LastBattery;
+    uint32_t mv = 0, temp_dk = 0, soc = 0;
+    if(b->Voltage >= 2800u && b->Voltage <= 4600u) mv = b->Voltage;
+    else if(b->VoltageNow >= 2800000u && b->VoltageNow <= 4600000u) mv = b->VoltageNow / 1000u;
+    else if(b->OpenCircuitVoltage >= 2800000u && b->OpenCircuitVoltage <= 4600000u) mv = b->OpenCircuitVoltage / 1000u;
+    if(!mv) return 0;
+
+    if(b->TemperatureRaw >= 2500u && b->TemperatureRaw <= 3500u) temp_dk = b->TemperatureRaw;
+    else if(b->TemperatureProperty >= 2500u && b->TemperatureProperty <= 3500u) temp_dk = b->TemperatureProperty;
+    else if(b->TemperatureProperty >= 100u && b->TemperatureProperty <= 600u) temp_dk = 2731u + b->TemperatureProperty;
+    else if(b->TemperatureRaw >= 100u && b->TemperatureRaw <= 600u) temp_dk = 2731u + b->TemperatureRaw;
+    else return 0;
+
+    if(b->CapacityProperty <= 100u) soc = b->CapacityProperty;
+    else if(b->CapacityProperty <= 10000u) soc = b->CapacityProperty / 100u;
+    else soc = 50u;
+
+    for(unsigned i = 0; i < 2; i++){
+        t->VoltageMv[i] = mv;
+        t->TempDeciK[i] = temp_dk;
+        t->SocPct[i]    = soc;
+        t->Flags[i]     = 0xAD5Bu;
+        t->CurrentMa[i] = (int32_t)b->CurrentNow / 1000;
+        t->RemMah[i]    = b->RemainingCapacity;
+        t->FullMah[i]   = 0;
+    }
+    t->Valid = 1u;
+    return 1;
+}
+
 static void DispatchPolicyAction(CK_OWNER *o, uint32_t act, uint64_t now){
     if(act == CK_ACT_SET_FV)       CkGlRequest(&o->Glink, CK_OP_SET_FV, now);
     else if(act == CK_ACT_DISABLE) CkGlRequest(&o->Glink, CK_OP_DISABLE, now);
@@ -298,7 +330,9 @@ static void Pump(void){
             if(ok){
                 t.UsbOnline = Owner->Glink.LastBattery.UsbOnline;
                 t.UsbType   = Owner->Glink.LastBattery.UsbType;
-                ReadPhysicalGauges(Owner, &t);
+                if(!ReadPhysicalGauges(Owner, &t)){
+                    ReadAdspFallback(Owner, &t);
+                }
             }
             uint32_t act = CkPolicyOnSample(&Owner->Policy, &t, now);
             DispatchPolicyAction(Owner, act, now);
