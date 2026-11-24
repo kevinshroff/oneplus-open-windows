@@ -4,14 +4,15 @@ Current source groups are listed first. `experiments/` also contains older sourc
 
 | Component | Source | Important boundary |
 |---|---|---|
+| Wi-Fi sleep clock | `drivers/wlan/OpenWcnSleepClk/` | `SYSTEM_START` driver enabling PMK8550 GPIO3 32.768 kHz `sleep_clk` for WCN7850; pairs with stock `qcwlanhmt8380.sys`. |
+| Adreno 740 WDDM / Turnip / Zink / DXVK | `drivers/gpu/turnip-wddm/` | Live-verified Mesa Turnip WDDM backend (`tu_knl_wddm.cc`), ARM64 patches, and Vulkan 1.3 / Zink OpenGL 4.6 / DXVK 3.1.1 harnesses over `topazgpu_v12.sys`. |
 | Current input | `drivers/touch/G379/` | 23-TU linked closure; older 19-TU builder is incomplete; key unit needs `G293_POWER_REPORTS=1`. |
 | Clock-only parent | `drivers/parent/G746/` | Seven-TU closure; do not substitute historical sensor-producing parents. |
 | UEFI / ACPI | `firmware/` | Authored overlays and reconstruction recipes; fetch pinned MU dependencies and obtain OEM inputs separately. |
-| GPU hardware translation | `experiments/G1348/` | Actual SID0 page-walk match and control restoration; no CP command/fence yet. |
-| GPU native startup | `experiments/G1287-cold-aperture/` | Cold-aperture foundation reused by later overlays; still no first CP completion. |
+| GPU hardware translation | `experiments/G1348/` | Historical SID0 page-walk witness superseded by `topazgpu_v12.sys` + `drivers/gpu/turnip-wddm/`. |
+| GPU native startup | `experiments/G1287-cold-aperture/` | Cold-aperture foundation reused by later overlays. |
 | Secure query transport | `experiments/G1268-runtime-query/` | Fixed query only, explicit once operation, no arbitrary SMC interface. |
-| Wi-Fi epoch reader | `experiments/G1295-wifi-fault-epoch/` | Phase-qualified read-only diagnostic for a future authorized boot; not a Wi-Fi fix. |
-| WDDM / Mesa | See exported group index below | Offline scaffolding/patches; no accelerated adapter demonstrated. |
+| Wi-Fi epoch reader | `experiments/G1295-wifi-fault-epoch/` | Historical diagnostic; WCN7850 stall resolved by `drivers/wlan/OpenWcnSleepClk/`. |
 
 ## Exact curated file index
 

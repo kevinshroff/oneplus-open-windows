@@ -7,26 +7,26 @@ The project reuses Windows ARM64 CPU/storage/USB stacks and OEM firmware, develo
 <img src="docs/media/oneplus-open-windows-desktop.jpg" alt="Windows 11 desktop running natively on the unfolded OnePlus Open" width="240">
 
 > [!IMPORTANT]
-> **Research source snapshot. GPU acceleration and reliable Wi-Fi networking are unfinished.** Development is active. Captured firmware, Windows binaries, signing certificates, credentials and private operator infrastructure are excluded; this repository does not provide a ready-to-flash installation bundle.
+> **Research source snapshot.** Development is active. Captured firmware, Windows binaries, signing certificates, credentials and private operator infrastructure are excluded; this repository does not provide a ready-to-flash installation bundle.
 
-**Demonstrated:** Windows desktop • inner framebuffer • native touchscreen • internal-storage boot • USB debugging/control • black cover framebuffer.  
-**Still unfinished:** WDDM acceleration • Wi-Fi networking • Bluetooth/audio/cameras • everyday battery/charging • complete buttons, folding and suspend/resume.
+**Demonstrated:** Windows 11 default boot • inner framebuffer • native touchscreen • internal-storage boot • **Wi-Fi (WCN7850 802.11ax, WPA2/DHCP/DNS/HTTPS)** • **Adreno 740 WDDM 1.3 + Mesa Turnip (Vulkan 1.3) + Mesa Zink (OpenGL 4.6) + DXVK 3.1.1 (DirectX 11)** • USB debugging/control • black cover framebuffer.  
+**Still unfinished:** Accelerated DWM desktop presentation • Bluetooth/audio/cameras • everyday battery/charging • complete buttons, folding and suspend/resume.
 
 ## Status
 
 | Area | Status | Notes |
 |---|---|---|
-| UEFI / ACPI | **WORKS ✅** | Boots WinPE and full Windows 11. |
+| UEFI / ACPI | **WORKS ✅** | Boots full Windows 11 (default) and WinPE. |
 | CPU | **WORKS ✅** | Native ARM64 execution; all eight logical processors available. |
 | RAM | **WORKS ✅** | Working Windows memory and native allocations. |
 | UFS / installation | **WORKS ✅** | Windows installed on and booting from internal storage. |
-| Inner display | **WORKS ✅** | Usable Windows desktop with scaling; currently framebuffer rendering. |
+| Inner display | **WORKS ✅** | Usable Windows desktop with scaling; currently framebuffer presentation. |
 | Touch | **WORKS ✅** | Native touchscreen input; sustained everyday use demonstrated. |
+| Wi-Fi | **WORKS ✅** | WCN7850 802.11ax WPA2/DHCP/DNS/HTTPS sustained live via [`OpenWcnSleepClk`](drivers/wlan/OpenWcnSleepClk/) (enabling PMK8550 GPIO3 32.768 kHz `sleep_clk`) + stock `qcwlanhmt8380.sys`. |
+| GPU / WDDM acceleration | **WORKS ✅** | Adreno 740 WDDM 1.3 bridge (`topazgpu_v12.sys`) + [Mesa Turnip Vulkan 1.3 + Mesa Zink OpenGL 4.6 + DXVK 3.1.1 D3D11](drivers/gpu/turnip-wddm/) live-verified on hardware; DWM desktop presentation remains framebuffer. |
 | USB debugging / control | **WORKS ✅** | Kernel debugging and remote control over USB. |
 | Cover display / folding | **PARTIAL 🟡** | Cover image can be cleared to black; panel switching and folding remain unfinished. |
 | Physical buttons | **IN PROGRESS 🛠️** | Hardware reader implemented; power-button behavior awaits a physical test. |
-| GPU / WDDM acceleration | **IN PROGRESS 🛠️** | GMU/HFI and a hardware memory-translation witness work; first command/fence and WDDM remain. |
-| Wi-Fi | **IN PROGRESS 🛠️** | Firmware loads and initial exchanges work; response/credit stalls block usable networking. |
 | USB peripherals | **NOT WORKING ❌** | External keyboard / host-mode support remains unfinished. |
 | Crash recovery | **PARTIAL 🟡** | Recovery tools work; automatic reconnection is not reliable after every crash. |
 | Battery reporting | **IN PROGRESS 🛠️** | Raw sensor readings acquired; Windows battery reporting remains unfinished. |
@@ -107,26 +107,26 @@ These [subfeature checklists](docs/STATUS.md) track implementation and future re
 - [ ] Physical power-button display-off test.
 - [ ] Physical second-press wake test.
 
-## GPU / WDDM — 4/9 complete
+## GPU / WDDM — 8/9 complete
 
 - [x] Kernel resource/ownership foundations.
 - [x] GMU firmware and HFI acknowledgements.
 - [x] CPU-verified GPU buffer/table preparation.
 - [x] Hardware translation to the expected SQE firmware page, with controls restored.
-- [ ] First CP command/fence completion.
-- [ ] Repeatable submission, interrupts and completion.
-- [ ] A740 WDDM memory/scheduling/DDI integration.
-- [ ] Hardware-backed userspace graphics integration.
-- [ ] Application rendering and desktop presentation.
+- [x] First CP command/fence completion.
+- [x] Repeatable submission, interrupts and completion.
+- [x] A740 WDDM memory/scheduling/DDI integration (`topazgpu_v12.sys`).
+- [x] Hardware-backed userspace graphics integration (Mesa Turnip Vulkan 1.3 + Mesa Zink OpenGL 4.6 + DXVK 3.1.1 D3D11).
+- [ ] Accelerated DWM desktop presentation.
 
-## Wi-Fi — 3/6 complete
+## Wi-Fi — 6/6 complete
 
 - [x] PCIe enumeration and register access.
 - [x] Firmware load and initial exchanges.
 - [x] Original Windows driver/interface initialization.
-- [ ] Sustained firmware responses/credits.
-- [ ] Stable scan, authentication and association.
-- [ ] DHCP, DNS and real network traffic.
+- [x] Sustained firmware responses/credits (PMK8550 GPIO3 32.768 kHz `sleep_clk` via `OpenWcnSleepClk.sys`).
+- [x] Stable scan, authentication and association (`802.11ax` WPA2-Personal CCMP).
+- [x] DHCP, DNS and real network traffic (sustained ping and HTTPS).
 
 ## USB — 3/6 complete
 
@@ -223,11 +223,20 @@ Windows 11 running natively on the OnePlus Open.
 
 https://github.com/user-attachments/assets/2b834bc3-bc92-4345-a5e6-32ab159f1ff7
 
+## Permanent driver & graphics stack
+
+- **Wi-Fi (WCN7850):** [`drivers/wlan/OpenWcnSleepClk/`](drivers/wlan/OpenWcnSleepClk/) installs as a `SYSTEM_START` kernel driver (`Group = "System Bus Extender"`) that configures PMK8550 GPIO3 (`SID=0, PPID=0xBA`) as `func1` 32.768 kHz `sleep_clk` output before `NDIS` starts stock `qcwlanhmt8380.sys`.
+- **Adreno 740 Kernel Bridge:** `OpenSmmuD0` (GPU SMMU bootstrap) + `OpenGpuStart` (`topazgpu_v12.sys`, WDDM 1.3 bridge) start automatically on Windows 11 boot.
+- **Userspace Graphics Stack (Option A):** [`drivers/gpu/turnip-wddm/`](drivers/gpu/turnip-wddm/) provides:
+  - **Vulkan 1.3 (Mesa Turnip):** Registered globally in `HKLM\SOFTWARE\Khronos\Vulkan\Drivers` (`freedreno_icd.aarch64.json` -> `vulkan_freedreno.dll`) so all Vulkan apps use `Turnip Adreno (TM) 740` automatically via `C:\Windows\System32\vulkan-1.dll`.
+  - **OpenGL 4.6 (Mesa Zink)** & **DirectX 8/9/10/11 (DXVK 3.1.1):** Staged in `C:\Program Files\Adreno740-Graphics\{zink,dxvk}\` for per-application drop-in next to target executables (leaving inbox `System32\d3d11.dll` and `dxgi.dll` untouched for DWM stability).
+
 ## The next useful work
 
-- **Adreno 740:** obtain the first native command-processor completion. GMU/HFI, the secure-aperture call and the [G1348 hardware translation witness](experiments/G1348/HARDWARE-RESULT.md) work. Proceed to a conditional first command/fence; WDDM and userspace rendering follow.
-- **Wi-Fi:** resolve the firmware response/credit stall before another association attempt. The priority2 variant retained the same response/credit stall. The next discriminator is the effective cache attributes of the DMA ring/common buffers.
-- **Reproducibility:** turn the source closures and upstream pins into portable local builds using independently obtained platform inputs.
+- **Display / DWM presentation:** Wire hardware-accelerated WDDM swapchain presentation onto the inner display panel (beyond the current framebuffer desktop).
+- **Power, battery & charging:** Complete Windows battery-class reporting, sustained normal-Windows USB-C charging, and suspend/resume integration.
+- **Peripherals & foldable UX:** Bring up Bluetooth, audio, cameras, cover-display switching, and external USB host mode.
+- **Reproducibility:** Turn the source closures and upstream pins into portable local builds using independently obtained platform inputs.
 
 See the [agent handoff](docs/AGENT_HANDOFF.md) for the latest experiment, failed hypotheses, precise next discriminators and preservation rules. The [source map](docs/SOURCE_MAP.md) separates current components from historical experiments. Read [build and publication boundaries](docs/BUILDING.md) before using any tooling.
 

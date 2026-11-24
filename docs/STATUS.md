@@ -62,25 +62,26 @@ These counts describe the checklists below, not elapsed effort or a compatibilit
 - [ ] Physical power-button display-off test.
 - [ ] Physical second-press wake test.
 
-## GPU / WDDM — 3/8 complete
+## GPU / WDDM — 8/9 complete
 
 - [x] Kernel resource/ownership foundations.
 - [x] GMU firmware and HFI acknowledgements.
 - [x] CPU-verified GPU buffer/table preparation.
-- [ ] First CP command/fence completion.
-- [ ] Repeatable submission, interrupts and completion.
-- [ ] A740 WDDM memory/scheduling/DDI integration.
-- [ ] Hardware-backed userspace graphics integration.
-- [ ] Application rendering and desktop presentation.
+- [x] Hardware translation to the expected SQE firmware page, with controls restored.
+- [x] First CP command/fence completion.
+- [x] Repeatable submission, interrupts and completion.
+- [x] A740 WDDM memory/scheduling/DDI integration (`topazgpu_v12.sys`).
+- [x] Hardware-backed userspace graphics integration (Mesa Turnip Vulkan 1.3 + Mesa Zink OpenGL 4.6 + DXVK 3.1.1 D3D11).
+- [ ] Accelerated DWM desktop presentation.
 
-## Wi-Fi — 3/6 complete
+## Wi-Fi — 6/6 complete
 
 - [x] PCIe enumeration and register access.
 - [x] Firmware load and initial exchanges.
 - [x] Original Windows driver/interface initialization.
-- [ ] Sustained firmware responses/credits.
-- [ ] Stable scan, authentication and association.
-- [ ] DHCP, DNS and real network traffic.
+- [x] Sustained firmware responses/credits (PMK8550 GPIO3 32.768 kHz `sleep_clk` via `OpenWcnSleepClk.sys`).
+- [x] Stable scan, authentication and association (`802.11ax` WPA2-Personal CCMP).
+- [x] DHCP, DNS and real network traffic (sustained ping and HTTPS).
 
 ## USB — 3/6 complete
 
