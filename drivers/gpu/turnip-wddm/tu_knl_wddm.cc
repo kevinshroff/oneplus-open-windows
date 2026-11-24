@@ -85,6 +85,8 @@ static PFN_D3DKMTCreateDevice g_CreateDevice = NULL;
 static PFN_D3DKMTDestroyDevice g_DestroyDevice = NULL;
 static TU_D3DKMT_HANDLE g_hAdapter = 0;
 static TU_D3DKMT_HANDLE g_hDevice = 0;
+static HANDLE g_hTopazDev = INVALID_HANDLE_VALUE;
+#define IOCTL_TOPAZ_ESCAPE 0x00222000u
 
 static bool
 wddm_load_gdi(void)
@@ -105,7 +107,24 @@ wddm_load_gdi(void)
 static int
 wddm_escape_adapter_dev(TU_D3DKMT_HANDLE hAdapter, TU_D3DKMT_HANDLE hDevice, uint32_t nr, void *data, uint32_t size)
 {
-   if (!g_Escape || !hAdapter || size > TOPAZGPU_ESC_MAX_DATA)
+   if (size > TOPAZGPU_ESC_MAX_DATA)
+      return -EINVAL;
+   if (g_hTopazDev != INVALID_HANDLE_VALUE) {
+      alignas(8) struct topazgpu_escape esc;
+      memset(&esc, 0, sizeof(esc));
+      esc.magic = TOPAZGPU_ESC_MAGIC;
+      esc.nr = nr;
+      esc.size = size;
+      if (data && size)
+         memcpy(esc.data, data, size);
+      DWORD br = 0;
+      if (!DeviceIoControl(g_hTopazDev, IOCTL_TOPAZ_ESCAPE, &esc, sizeof(esc), &esc, sizeof(esc), &br, NULL))
+         return -EIO;
+      if (data && size)
+         memcpy(data, esc.data, size);
+      return esc.ret;
+   }
+   if (!g_Escape || !hAdapter)
       return -EINVAL;
 
    alignas(8) struct topazgpu_escape esc;
@@ -632,6 +651,28 @@ static const struct tu_knl wddm_knl_funcs = {
 VkResult
 tu_knl_wddm_load(struct tu_instance *instance)
 {
+   TU_D3DKMT_HANDLE found = 0, found_dev = 0;
+   uint64_t gpu_id = 0, chip_id = 0, gmem_size = 0, gmem_base = 0;
+
+   /* Prefer pure-WDM \\.\TopazGpu (coexists cleanly with BasicDisplay/DWM) */
+   HANDLE hDev = CreateFileA("\\\\.\\TopazGpu", GENERIC_READ | GENERIC_WRITE,
+                             FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+   if (hDev != INVALID_HANDLE_VALUE) {
+      g_hTopazDev = hDev;
+      struct topazgpu_version ver;
+      memset(&ver, 0, sizeof(ver));
+      if (wddm_escape(TOPAZGPU_NR_VERSION, &ver, sizeof(ver)) == 0 &&
+          strcmp(ver.name, "msm") == 0 &&
+          wddm_get_param_dev(0, 0, MSM_PARAM_GPU_ID, &gpu_id) == 0 &&
+          wddm_get_param_dev(0, 0, MSM_PARAM_CHIP_ID, &chip_id) == 0) {
+         wddm_get_param_dev(0, 0, MSM_PARAM_GMEM_SIZE, &gmem_size);
+         wddm_get_param_dev(0, 0, MSM_PARAM_GMEM_BASE, &gmem_base);
+         goto have_device;
+      }
+      CloseHandle(hDev);
+      g_hTopazDev = INVALID_HANDLE_VALUE;
+   }
+
    if (!wddm_load_gdi())
       return VK_ERROR_INCOMPATIBLE_DRIVER;
 
@@ -649,8 +690,7 @@ tu_knl_wddm_load(struct tu_instance *instance)
       return VK_ERROR_INCOMPATIBLE_DRIVER;
    }
 
-   TU_D3DKMT_HANDLE found = 0, found_dev = 0;
-   uint64_t gpu_id = 0, chip_id = 0, gmem_size = 0, gmem_base = 0;
+
    for (ULONG i = 0; i < ea.NumAdapters; i++) {
       TU_D3DKMT_HANDLE h = infos[i].hAdapter;
       TU_D3DKMT_CREATEDEVICE cd;
@@ -686,6 +726,7 @@ tu_knl_wddm_load(struct tu_instance *instance)
 
    g_hAdapter = found;
    g_hDevice = found_dev;
+have_device:
 
    struct tu_physical_device *device = (struct tu_physical_device *)
       vk_zalloc(&instance->vk.alloc, sizeof(*device), 8,

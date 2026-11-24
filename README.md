@@ -226,14 +226,14 @@ https://github.com/user-attachments/assets/2b834bc3-bc92-4345-a5e6-32ab159f1ff7
 ## Permanent driver & graphics stack
 
 - **Wi-Fi (WCN7850):** [`drivers/wlan/OpenWcnSleepClk/`](drivers/wlan/OpenWcnSleepClk/) installs as a `SYSTEM_START` kernel driver (`Group = "System Bus Extender"`) that configures PMK8550 GPIO3 (`SID=0, PPID=0xBA`) as `func1` 32.768 kHz `sleep_clk` output before `NDIS` starts stock `qcwlanhmt8380.sys`.
-- **Adreno 740 Kernel Bridge:** `OpenSmmuD0` (GPU SMMU bootstrap) + `OpenGpuStart` (`topazgpu_v12.sys`, WDDM 1.3 bridge) start automatically on Windows 11 boot.
+- **Adreno 740 Kernel Bridge (Option 1 — Desktop-Safe Coexistence):** `OpenSmmuD0` (GPU SMMU bootstrap) + `OpenGpuStart` ([`topazgpu_wdm.c`](drivers/gpu/turnip-wddm/topazgpu_wdm.c)) start automatically on Windows 11 boot and expose `\\.\TopazGpu` (`IOCTL_TOPAZ_ESCAPE = 0x222000`) without registering a competing WDDM display adapter, keeping `Microsoft Basic Display Driver` (`BasicDisplay`) and `dwm.exe` 100% undisturbed.
 - **Userspace Graphics Stack (Option A):** [`drivers/gpu/turnip-wddm/`](drivers/gpu/turnip-wddm/) provides:
-  - **Vulkan 1.3 (Mesa Turnip):** Registered globally in `HKLM\SOFTWARE\Khronos\Vulkan\Drivers` (`freedreno_icd.aarch64.json` -> `vulkan_freedreno.dll`) so all Vulkan apps use `Turnip Adreno (TM) 740` automatically via `C:\Windows\System32\vulkan-1.dll`.
+  - **Vulkan 1.3 (Mesa Turnip):** Registered globally in `HKLM\SOFTWARE\Khronos\Vulkan\Drivers` (`freedreno_icd.aarch64.json` -> `vulkan_freedreno.dll`) so all Vulkan apps use `Turnip Adreno (TM) 740` automatically via `C:\Windows\System32\vulkan-1.dll` (prefers `\\.\TopazGpu` with fallback to `D3DKMT`).
   - **OpenGL 4.6 (Mesa Zink)** & **DirectX 8/9/10/11 (DXVK 3.1.1):** Staged in `C:\Program Files\Adreno740-Graphics\{zink,dxvk}\` for per-application drop-in next to target executables (leaving inbox `System32\d3d11.dll` and `dxgi.dll` untouched for DWM stability).
 
 ## The next useful work
 
-- **Display / DWM presentation:** Wire hardware-accelerated WDDM swapchain presentation onto the inner display panel (beyond the current framebuffer desktop).
+- **TODO (Option 2 — Full DWM / System UI GPU Acceleration):** Wire VidPN framebuffer presentation in `topazgpu` alongside a native Windows D3D11 User-Mode Driver (`UserModeDriverName`, e.g., Mesa Gallium D3D11 UMD over Zink/Turnip) so Windows DWM, Explorer, UWP/WinUI apps, and browsers also render directly on Adreno 740 instead of `BasicDisplay` + WARP.
 - **Power, battery & charging:** Complete Windows battery-class reporting, sustained normal-Windows USB-C charging, and suspend/resume integration.
 - **Peripherals & foldable UX:** Bring up Bluetooth, audio, cameras, cover-display switching, and external USB host mode.
 - **Reproducibility:** Turn the source closures and upstream pins into portable local builds using independently obtained platform inputs.
