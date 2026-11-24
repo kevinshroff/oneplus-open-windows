@@ -233,9 +233,16 @@ https://github.com/user-attachments/assets/2b834bc3-bc92-4345-a5e6-32ab159f1ff7
 
 ## The next useful work
 
-- **TODO (Option 2 — Full DWM / System UI GPU Acceleration):** Wire VidPN framebuffer presentation in `topazgpu` alongside a native Windows D3D11 User-Mode Driver (`UserModeDriverName`, e.g., Mesa Gallium D3D11 UMD over Zink/Turnip) so Windows DWM, Explorer, UWP/WinUI apps, and browsers also render directly on Adreno 740 instead of `BasicDisplay` + WARP.
-- **Power, battery & charging:** Complete Windows battery-class reporting, sustained normal-Windows USB-C charging, and suspend/resume integration.
-- **Peripherals & foldable UX:** Bring up Bluetooth, audio, cameras, cover-display switching, and external USB host mode.
+- **TODO (Option 2 — Full DWM / System UI GPU Acceleration):** Wire VidPN framebuffer presentation in `topazgpu` alongside a native Windows D3D11 User-Mode Driver (`UserModeDriverName`, e.g., Mesa `d3d10umd` + Gallium `freedreno` `FD740` or Zink/Turnip) so Windows DWM, Explorer, UWP/WinUI apps, and browsers also render directly on Adreno 740 instead of `BasicDisplay` + WARP.
+- **Post-GPU Roadmap (unordered):**
+  - **Sound:** Speakers, microphone, and Windows audio endpoint integration.
+  - **Bluetooth:** WCN7850 Bluetooth radio bring-up, pairing, and peripheral traffic.
+  - **Sleep (Modern Standby / S0ix):** SM8550 supports Low-Power S0 Idle (PSCI + RPMh/RSC); requires ACPI `_LPI`/PEP, display & touch sleep/wake recovery (including fixing touch becoming unresponsive after power-button screen on/off cycles), and clean `D0`/`D3` driver transitions.
+  - **Power management:** CPU DVFS, idle clock/rail policies, and thermal management.
+  - **USB accessories support:** USB host mode (DRD/URS role switching) for external keyboards, hubs, and peripherals.
+  - **Proper battery charging and indicator:** Sustained normal-Windows USB-C/PD charging and Windows battery-class indicator (`percentage`, `rate`, `charging state`).
+  - **Cameras:** Camera sensor/ISP bring-up and Windows camera integration.
+  - **Accelerometer and other useful sensors:** Motion, orientation, ambient light, proximity, and hinge/fold sensors.
 - **Reproducibility:** Turn the source closures and upstream pins into portable local builds using independently obtained platform inputs.
 
 See the [agent handoff](docs/AGENT_HANDOFF.md) for the latest experiment, failed hypotheses, precise next discriminators and preservation rules. The [source map](docs/SOURCE_MAP.md) separates current components from historical experiments. Read [build and publication boundaries](docs/BUILDING.md) before using any tooling.
