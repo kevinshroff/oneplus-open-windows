@@ -582,6 +582,17 @@ wddm_queue_submit(struct tu_queue *queue, struct vk_queue_submit *submit)
    req.nr_cmds = cmd_idx;
 
    int ret = wddm_escape(DRM_COMMAND_BASE + DRM_MSM_GEM_SUBMIT, &req, sizeof(req));
+   if (getenv("TU_WDDM_TRACE"))
+      fprintf(stderr, "[WDDM] GEM_SUBMIT nr_bos=%u nr_cmds=%u cmd0=(off=0x%x sz=%u) ret=%d fence=%u\n",
+              nr_bos, cmd_idx, cmds[0].submit_offset, cmds[0].size, ret, req.fence);
+   if (getenv("TU_WDDM_TRACE") && submit->command_buffer_count > 0) {
+      struct tu_cmd_buffer *cb0 = container_of(submit->command_buffers[0], struct tu_cmd_buffer, vk);
+      if (cb0->cs.entry_count > 0 && cb0->cs.entries[0].bo && cb0->cs.entries[0].bo->map) {
+         const uint32_t *dw = (const uint32_t *)((const uint8_t *)cb0->cs.entries[0].bo->map + cb0->cs.entries[0].offset);
+         fprintf(stderr, "[WDDM] cmd0_dw= %08x %08x %08x %08x %08x %08x %08x %08x\n",
+                 dw[0], dw[1], dw[2], dw[3], dw[4], dw[5], dw[6], dw[7]);
+      }
+   }
    free(cmds);
    free(bos);
 

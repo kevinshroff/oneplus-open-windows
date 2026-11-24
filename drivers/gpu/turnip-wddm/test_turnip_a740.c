@@ -100,6 +100,7 @@ int main(void) {
     DLOAD(vkAllocateCommandBuffers);
     DLOAD(vkBeginCommandBuffer);
     DLOAD(vkCmdFillBuffer);
+    DLOAD(vkCmdPipelineBarrier);
     DLOAD(vkEndCommandBuffer);
     DLOAD(vkCreateFence);
     DLOAD(vkQueueSubmit);
@@ -162,6 +163,8 @@ int main(void) {
     VkCommandBufferBeginInfo cbbi = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     pvkBeginCommandBuffer(cb, &cbbi);
     pvkCmdFillBuffer(cb, buf, 0, 4096, 0xDEADBEEFu);
+    VkMemoryBarrier mb = { VK_STRUCTURE_TYPE_MEMORY_BARRIER, NULL, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_HOST_READ_BIT };
+    pvkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 1, &mb, 0, NULL, 0, NULL);
     pvkEndCommandBuffer(cb);
 
     VkFenceCreateInfo fci = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
@@ -173,9 +176,11 @@ int main(void) {
     si.pCommandBuffers = &cb;
     r = pvkQueueSubmit(queue, 1, &si, fence);
     printf("vkQueueSubmit = %d\n", r);
+    uint32_t v0 = 0;
     if (r == VK_SUCCESS) {
         r = pvkWaitForFences(dev, 1, &fence, VK_TRUE, 5000000000ULL);
         printf("vkWaitForFences = %d\n", r);
+        v0 = ptr[0];
         printf("READBACK: ptr[0]=0x%08x ptr[1]=0x%08x ptr[1023]=0x%08x\n",
                ptr[0], ptr[1], ptr[1023]);
     }
@@ -186,5 +191,5 @@ int main(void) {
     pvkFreeMemory(dev, mem, NULL);
     pvkDestroyDevice(dev, NULL);
     pvkDestroyInstance(inst, NULL);
-    return (r == VK_SUCCESS && ptr[0] == 0xDEADBEEFu) ? 0 : 7;
+    return (r == VK_SUCCESS && v0 == 0xDEADBEEFu) ? 0 : 7;
 }

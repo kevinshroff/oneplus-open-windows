@@ -209,6 +209,24 @@ index 55ba003..dfbf525 100644
    link_depends : vulkan_icd_link_depends,
    install : true,
  )
+diff --git a/src/freedreno/vulkan/tu_buffer.cc b/src/freedreno/vulkan/tu_buffer.cc
+index 1b87562..ba57e5c 100644
+--- a/src/freedreno/vulkan/tu_buffer.cc
++++ b/src/freedreno/vulkan/tu_buffer.cc
+@@ -163,9 +163,10 @@ tu_BindBufferMemory2(VkDevice device,
+ 
+       TU_RMV(buffer_bind, dev, buffer);
+ 
+-      vk_address_binding_report(&instance->vk, &buffer->vk.base,
+-                                buffer->bo->iova, buffer->bo->size,
+-                                VK_DEVICE_ADDRESS_BINDING_TYPE_BIND_EXT);
++      if (buffer->bo)
++         vk_address_binding_report(&instance->vk, &buffer->vk.base,
++                                   buffer->bo->iova, buffer->bo->size,
++                                   VK_DEVICE_ADDRESS_BINDING_TYPE_BIND_EXT);
+    }
+    return VK_SUCCESS;
+ }
 diff --git a/src/freedreno/vulkan/tu_cs_breadcrumbs.cc b/src/freedreno/vulkan/tu_cs_breadcrumbs.cc
 index 2669a8b..310db90 100644
 --- a/src/freedreno/vulkan/tu_cs_breadcrumbs.cc
@@ -233,6 +251,47 @@ index 2669a8b..310db90 100644
 +
 +
 +#endif
+diff --git a/src/freedreno/vulkan/tu_device.cc b/src/freedreno/vulkan/tu_device.cc
+index 73b79fc..49786ca 100644
+--- a/src/freedreno/vulkan/tu_device.cc
++++ b/src/freedreno/vulkan/tu_device.cc
+@@ -112,6 +112,9 @@ static const struct vk_instance_extension_table tu_instance_extensions_supported
+ #ifdef VK_USE_PLATFORM_XLIB_KHR
+    .KHR_xlib_surface                    = true,
+ #endif
++#ifdef VK_USE_PLATFORM_WIN32_KHR
++   .KHR_win32_surface                   = true,
++#endif
+ #ifdef VK_USE_PLATFORM_DISPLAY_KHR
+    .EXT_acquire_drm_display             = true,
+ #endif
+@@ -361,7 +364,7 @@ tu_get_features(struct tu_physical_device *pdevice,
+    features->shaderClipDistance = true;
+    features->shaderCullDistance = true;
+    features->shaderFloat64 = false;
+-   features->shaderInt64 = false;
++   features->shaderInt64 = true;
+    features->shaderInt16 = true;
+    features->sparseBinding = false;
+    features->variableMultisampleRate = true;
+@@ -384,13 +387,13 @@ tu_get_features(struct tu_physical_device *pdevice,
+    /* Vulkan 1.2 */
+    features->samplerMirrorClampToEdge            = true;
+    features->drawIndirectCount                   = true;
+-   features->storageBuffer8BitAccess             = pdevice->info->a7xx.storage_8bit;
+-   features->uniformAndStorageBuffer8BitAccess   = false;
+-   features->storagePushConstant8                = false;
++   features->storageBuffer8BitAccess             = true;
++   features->uniformAndStorageBuffer8BitAccess   = true;
++   features->storagePushConstant8                = true;
+    features->shaderBufferInt64Atomics            = false;
+    features->shaderSharedInt64Atomics            = false;
+    features->shaderFloat16                       = true;
+-   features->shaderInt8                          = false;
++   features->shaderInt8                          = true;
+ 
+    features->descriptorIndexing                                 = true;
+    features->shaderInputAttachmentArrayDynamicIndexing          = false;
 diff --git a/src/freedreno/vulkan/tu_image.cc b/src/freedreno/vulkan/tu_image.cc
 index a0480b8..86ad4b2 100644
 --- a/src/freedreno/vulkan/tu_image.cc
@@ -340,6 +399,60 @@ index 7ce97cd..0a3aebc 100644
  
  struct _drmVersion;
  VkResult tu_knl_drm_msm_load(struct tu_instance *instance,
+diff --git a/src/freedreno/vulkan/tu_shader.cc b/src/freedreno/vulkan/tu_shader.cc
+index 00354e9..3d02d5f 100644
+--- a/src/freedreno/vulkan/tu_shader.cc
++++ b/src/freedreno/vulkan/tu_shader.cc
+@@ -2124,10 +2124,10 @@ tu_upload_shader(struct tu_device *dev,
+       size += vpc_size;
+    }
+ 
+-   pthread_mutex_lock(&dev->pipeline_mutex);
++   mtx_lock(&dev->pipeline_mutex);
+    VkResult result = tu_suballoc_bo_alloc(&shader->bo, &dev->pipeline_suballoc,
+                                           size * 4, 128);
+-   pthread_mutex_unlock(&dev->pipeline_mutex);
++   mtx_unlock(&dev->pipeline_mutex);
+ 
+    if (result != VK_SUCCESS)
+       return result;
+@@ -2157,9 +2157,9 @@ tu_upload_shader(struct tu_device *dev,
+ 
+    result = tu_setup_pvtmem(dev, shader, &pvtmem_config, pvtmem_size, per_wave);
+    if (result != VK_SUCCESS) {
+-      pthread_mutex_lock(&dev->pipeline_mutex);
++      mtx_lock(&dev->pipeline_mutex);
+       tu_suballoc_bo_free(&dev->pipeline_suballoc, &shader->bo);
+-      pthread_mutex_unlock(&dev->pipeline_mutex);
++      mtx_unlock(&dev->pipeline_mutex);
+       return result;
+    }
+ 
+@@ -2853,10 +2853,10 @@ tu_empty_shader_create(struct tu_device *dev,
+    if (!shader)
+       return VK_ERROR_OUT_OF_HOST_MEMORY;
+ 
+-   pthread_mutex_lock(&dev->pipeline_mutex);
++   mtx_lock(&dev->pipeline_mutex);
+    VkResult result = tu_suballoc_bo_alloc(&shader->bo, &dev->pipeline_suballoc,
+                                           32 * 4, 128);
+-   pthread_mutex_unlock(&dev->pipeline_mutex);
++   mtx_unlock(&dev->pipeline_mutex);
+ 
+    if (result != VK_SUCCESS) {
+       vk_free(&dev->vk.alloc, shader);
+@@ -2968,9 +2968,9 @@ tu_shader_destroy(struct tu_device *dev,
+    tu_cs_finish(&shader->cs);
+    TU_RMV(resource_destroy, dev, &shader->bo);
+ 
+-   pthread_mutex_lock(&dev->pipeline_mutex);
++   mtx_lock(&dev->pipeline_mutex);
+    tu_suballoc_bo_free(&dev->pipeline_suballoc, &shader->bo);
+-   pthread_mutex_unlock(&dev->pipeline_mutex);
++   mtx_unlock(&dev->pipeline_mutex);
+ 
+    if (shader->pvtmem_bo)
+       tu_bo_finish(dev, shader->pvtmem_bo);
 diff --git a/src/freedreno/vulkan/tu_util.cc b/src/freedreno/vulkan/tu_util.cc
 index 8a69d3a..f89b208 100644
 --- a/src/freedreno/vulkan/tu_util.cc
@@ -360,7 +473,7 @@ index 8a69d3a..f89b208 100644
   * Copyright © 2015 Intel Corporation
   * SPDX-License-Identifier: MIT
 diff --git a/src/freedreno/vulkan/tu_wsi.cc b/src/freedreno/vulkan/tu_wsi.cc
-index 1f3d7e2..b779e36 100644
+index 1f3d7e2..35dc799 100644
 --- a/src/freedreno/vulkan/tu_wsi.cc
 +++ b/src/freedreno/vulkan/tu_wsi.cc
 @@ -9,7 +9,9 @@
@@ -381,7 +494,7 @@ index 1f3d7e2..b779e36 100644
  static bool
  tu_wsi_can_present_on_device(VkPhysicalDevice physicalDevice, int fd)
  {
-@@ -28,6 +31,7 @@ tu_wsi_can_present_on_device(VkPhysicalDevice physicalDevice, int fd)
+@@ -28,13 +31,18 @@ tu_wsi_can_present_on_device(VkPhysicalDevice physicalDevice, int fd)
  
     return wsi_common_drm_devices_equal(fd, pdevice->local_fd);
  }
@@ -389,7 +502,18 @@ index 1f3d7e2..b779e36 100644
  
  VkResult
  tu_wsi_init(struct tu_physical_device *physical_device)
-@@ -45,9 +49,11 @@ tu_wsi_init(struct tu_physical_device *physical_device)
+ {
+    VkResult result;
+ 
++#ifdef _WIN32
++   const struct wsi_device_options options = { .sw_device = true };
++#else
+    const struct wsi_device_options options = { .sw_device = false };
++#endif
+    result = wsi_device_init(&physical_device->wsi_device,
+                             tu_physical_device_to_handle(physical_device),
+                             tu_wsi_proc_addr,
+@@ -45,9 +53,11 @@ tu_wsi_init(struct tu_physical_device *physical_device)
     if (result != VK_SUCCESS)
        return result;
  
@@ -400,6 +524,20 @@ index 1f3d7e2..b779e36 100644
 +#endif
  
     physical_device->vk.wsi_device = &physical_device->wsi_device;
+ 
+diff --git a/src/freedreno/vulkan/tu_wsi.h b/src/freedreno/vulkan/tu_wsi.h
+index db9de56..91f12ab 100644
+--- a/src/freedreno/vulkan/tu_wsi.h
++++ b/src/freedreno/vulkan/tu_wsi.h
+@@ -15,7 +15,8 @@
+ #if defined(VK_USE_PLATFORM_WAYLAND_KHR) || \
+     defined(VK_USE_PLATFORM_XCB_KHR) || \
+     defined(VK_USE_PLATFORM_XLIB_KHR) || \
+-    defined(VK_USE_PLATFORM_DISPLAY_KHR)
++    defined(VK_USE_PLATFORM_DISPLAY_KHR) || \
++    defined(VK_USE_PLATFORM_WIN32_KHR)
+ #define TU_USE_WSI_PLATFORM
+ #endif
  
 diff --git a/src/vulkan/util/vk_entrypoints_gen.py b/src/vulkan/util/vk_entrypoints_gen.py
 index 9dbe00e..8e02148 100644

@@ -30,7 +30,9 @@ static void test_zink(void) {
         PFD_TYPE_RGBA, 32, 0,0,0,0,0,0,0,0,0,0,0,0,0, 24, 8, 0, PFD_MAIN_PLANE, 0,0,0,0 };
     int pf = ChoosePixelFormat(hdc, &pfd);
     SetPixelFormat(hdc, pf, &pfd);
+    printf("Zink ptrs: pCreate=%p pMake=%p pGetStr=%p pf=%d\n", (void*)pCreate, (void*)pMake, (void*)pGetStr, pf);
     HGLRC rc = pCreate(hdc);
+    printf("wglCreateContext rc=%p\n", (void*)rc);
     if (!rc) { printf("wglCreateContext failed: %lu\n", GetLastError()); ReleaseDC(hwnd, hdc); DestroyWindow(hwnd); return; }
     pMake(hdc, rc);
     printf("GL_VENDOR  : %s\n", (const char *)pGetStr(0x1F00));
@@ -75,7 +77,7 @@ static void test_dxvk(void) {
 
 static LONG WINAPI crash_veh(EXCEPTION_POINTERS *ep) {
     DWORD code = ep->ExceptionRecord->ExceptionCode;
-    if (code == 0x406D1388 || code == 0x40010006 || code == 0xE06D7363) return EXCEPTION_CONTINUE_SEARCH;
+    if (code == 0x406D1388 || code == 0x40010006 || code == 0xE06D7363 || code == 0x20474343) return EXCEPTION_CONTINUE_SEARCH;
     void *addr = ep->ExceptionRecord->ExceptionAddress;
     HMODULE hm = NULL;
     char modname[260] = "?";
@@ -93,7 +95,7 @@ int main(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
     AddVectoredExceptionHandler(1, crash_veh); printf("[START] test_zink_dxvk.c\n");
-    test_zink();
     test_dxvk();
+    test_zink();
     return 0;
 }
