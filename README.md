@@ -243,6 +243,7 @@ https://github.com/user-attachments/assets/2b834bc3-bc92-4345-a5e6-32ab159f1ff7
   - **Proper battery charging and indicator:** Sustained normal-Windows USB-C/PD charging and Windows battery-class indicator (`percentage`, `rate`, `charging state`).
   - **Cameras:** Camera sensor/ISP bring-up and Windows camera integration.
   - **Accelerometer and other useful sensors:** Motion, orientation, ambient light, proximity, and hinge/fold sensors.
+  - **Brightness control:** Inner OLED panel brightness via DSI DCS commands and Windows brightness-slider integration (`GUID_DEVINTERFACE_BRIGHTNESS`).
 - **Reproducibility:** Turn the source closures and upstream pins into portable local builds using independently obtained platform inputs.
 
 See the [agent handoff](docs/AGENT_HANDOFF.md) for the latest experiment, failed hypotheses, precise next discriminators and preservation rules. The [source map](docs/SOURCE_MAP.md) separates current components from historical experiments. Read [build and publication boundaries](docs/BUILDING.md) before using any tooling.
