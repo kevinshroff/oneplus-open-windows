@@ -273,26 +273,100 @@ static VOID VsyncDpc(PKDPC Dpc, PVOID Ctx, PVOID A1, PVOID A2)
     VsyncWork(TRUE);                             /* fallback KTIMER path: one call per ~16 ms */
 }
 
+/* Power: the vsync timer runs at 60 Hz only while there is display work (DWM has the vsync interrupt
+ * enabled, a flip is pending/deferred, or the scanout copy is dirty) and stops after ~0.5 s idle.
+ * Before, a 1 ms high-resolution timer plus a global 1 ms timer resolution woke a CPU 1000x/s forever. */
+static volatile LONG g_TimerRunning;
+static KSPIN_LOCK g_TimerLock;
+static KDPC g_KickDpc;
+static ULONG g_IdleTicks;
+static volatile LONG64 g_TimerStarts, g_TimerStops;
+
+static BOOLEAN DispBusy(VOID)
+{
+    return g_VsyncOn || g_FlipPending || g_Deferred || g_ScanDirty;
+}
+
+static VOID TimerEnsure(VOID)
+{
+    KIRQL irql;
+    if (g_HrTimer == NULL || g_TimerRunning) {
+        return;
+    }
+    KeAcquireSpinLock(&g_TimerLock, &irql);
+    if (!g_TimerRunning && g_HrTimer != NULL) {
+        g_IdleTicks = 0;
+        InterlockedExchange(&g_TimerRunning, 1);
+        ExSetTimer(g_HrTimer, -VSYNC_PERIOD, VSYNC_PERIOD, NULL);
+        InterlockedIncrement64(&g_TimerStarts);
+    }
+    KeReleaseSpinLock(&g_TimerLock, irql);
+}
+
+static KDEFERRED_ROUTINE KickDpc;
+static VOID KickDpc(PKDPC Dpc, PVOID Ctx, PVOID A1, PVOID A2)
+{
+    UNREFERENCED_PARAMETER(Dpc); UNREFERENCED_PARAMETER(Ctx);
+    UNREFERENCED_PARAMETER(A1); UNREFERENCED_PARAMETER(A2);
+    TimerEnsure();
+}
+
+/* any IRQL (SetVidPnSourceAddress may run at DIRQL): set the work flag first, then call this */
+static VOID TimerKick(VOID)
+{
+    if (!g_TimerRunning && g_HrTimer != NULL) {
+        KeInsertQueueDpc(&g_KickDpc, NULL, NULL);
+    }
+}
+
+static VOID TimerMaybeStop(VOID)
+{
+    KIRQL irql;
+    if (DispBusy()) {
+        g_IdleTicks = 0;
+        return;
+    }
+    if (++g_IdleTicks < 30) {
+        return;
+    }
+    KeAcquireSpinLock(&g_TimerLock, &irql);
+    if (!DispBusy()) {
+        InterlockedExchange(&g_TimerRunning, 0);
+        ExCancelTimer(g_HrTimer, NULL);
+        InterlockedIncrement64(&g_TimerStops);
+        if (DispBusy()) {                        /* work raced in after the check: keep ticking */
+            InterlockedExchange(&g_TimerRunning, 1);
+            ExSetTimer(g_HrTimer, -VSYNC_PERIOD, VSYNC_PERIOD, NULL);
+        }
+    }
+    KeReleaseSpinLock(&g_TimerLock, irql);
+}
+
 static EXT_CALLBACK HrTimerCb;
 static VOID HrTimerCb(PEX_TIMER Timer, PVOID Ctx)
 {
     UNREFERENCED_PARAMETER(Timer);
     UNREFERENCED_PARAMETER(Ctx);
-    VsyncWork(FALSE);
+    VsyncWork(TRUE);                             /* one call per 60 Hz period (copy scanout, no MDP latch) */
+    TimerMaybeStop();
 }
 
 /* PASSIVE: one line of display/vsync state for the heartbeat in ddi.c */
 VOID DispLogStats(VOID)
 {
     LogPrint("DISP cb %lld notify %lld flipsDone %lld flipsReq %ld | vsyncOn %ld flipPending %ld deferred %ld held %u "
-             "| sync st %08x ret %ld | scanPa %llx shownPa %llx\n",
+             "| sync st %08x ret %ld | scanPa %llx shownPa %llx | timer %s starts %lld stops %lld\n",
              g_TotCb, g_TotNotify, g_TotFlipDone, g_FlipCount, g_VsyncOn, g_FlipPending, g_Deferred, g_FlipHeld,
-             g_LastSyncSt, g_LastSyncRet, g_ScanPa.QuadPart, g_ShownPa.QuadPart);
+             g_LastSyncSt, g_LastSyncRet, g_ScanPa.QuadPart, g_ShownPa.QuadPart,
+             g_TimerRunning ? "on" : "off", g_TimerStarts, g_TimerStops);
 }
 
 VOID DispVsyncEnable(BOOLEAN Enable)
 {
     InterlockedExchange(&g_VsyncOn, Enable ? 1 : 0);
+    if (Enable) {
+        TimerKick();
+    }
 }
 
 NTSTATUS DispGetScanLine(DXGKARG_GETSCANLINE *A)
@@ -408,6 +482,7 @@ NTSTATUS DispSetSourceAddress(const DXGKARG_SETVIDPNSOURCEADDRESS *A)
         InterlockedExchange(&g_Deferred, 1);
         InterlockedExchange(&g_FlipPending, 1);
         g_DeferCount++;
+        TimerKick();
         return STATUS_SUCCESS;
     }
     InterlockedExchange(&g_Deferred, 0);
@@ -416,6 +491,7 @@ NTSTATUS DispSetSourceAddress(const DXGKARG_SETVIDPNSOURCEADDRESS *A)
         InterlockedExchange(&g_ScanDirty, 1);
     }
     InterlockedExchange(&g_FlipPending, 1);
+    TimerKick();
     if (++count <= 60) {
         LogPrint("SetVidPnSourceAddress: src %u alloc %p seg %u pa %llx flags %x%s\n", A->VidPnSourceId, A->hAllocation,
                  A->PrimarySegment, A->PrimaryAddress.QuadPart, A->Flags.Value, direct ? " (direct scanout)" : "");
@@ -440,7 +516,7 @@ NTSTATUS DispSetVisibility(const DXGKARG_SETVIDPNSOURCEVISIBILITY *A)
         LogPrint("boot framebuffer cleared\n");
     }
     if (visible != g_Visible) {
-        /* SM8550: skip SM6225 DSI backlight toggle */                                /* v0.45.6: screen off = backlight off */
+        BlPanel(visible);                                /* v0.45.6: screen off = backlight off */
     }
     g_Visible = visible;
     if (g_Visible) {
@@ -497,7 +573,7 @@ NTSTATUS DispStart(PDXGKRNL_INTERFACE Dxgk)
                                       PAGE_READWRITE | PAGE_WRITECOMBINE);
     }
     LogPrint("framebuffer mapped at %p\n", g_Fb);
-    /* SM8550: skip SM6225 DSI brightness */
+    InitBrightness();                                    /* SM8550 DSI0 DCS 0x51 */
     /* SM8550: skip SM6225 MDP survey */
     if (FALSE && g_Mdp == NULL) { /* SM8550: never map SM6225 0x05E00000 MDP; use UEFI GOP WC copy */
         PHYSICAL_ADDRESS mpa;
@@ -527,10 +603,11 @@ NTSTATUS DispStart(PDXGKRNL_INTERFACE Dxgk)
     g_NextVsync = (LONG64)KeQueryInterruptTime() + VSYNC_PERIOD;
     g_HrTimer = ExAllocateTimer(HrTimerCb, NULL, EX_TIMER_HIGH_RESOLUTION);
     if (g_HrTimer != NULL) {
-        LogPrint("vsync: timer resolution %lu us (requested 1000)\n", ExSetTimerResolution(10000, TRUE) / 10);
-        g_TimerRes = TRUE;
-        ExSetTimer(g_HrTimer, -10000LL, 10000LL, NULL);     /* 1 ms poll, vsync phase in VsyncWork */
-        LogPrint("vsync: 1 ms high-resolution timer, flip done at the MDP latch\n");
+        KeInitializeSpinLock(&g_TimerLock);
+        KeInitializeDpc(&g_KickDpc, KickDpc, NULL);
+        g_TimerRes = FALSE;
+        LogPrint("vsync: on-demand 60 Hz high-resolution timer (stops when display is idle)\n");
+        TimerEnsure();
     } else {
         KeInitializeTimerEx(&g_VsyncTimer, NotificationTimer);
         KeInitializeDpc(&g_VsyncDpc, VsyncDpc, NULL);
@@ -1003,7 +1080,12 @@ NTSTATUS DispCommitVidPn(PDXGKRNL_INTERFACE Dxgk, const DXGKARG_COMMITVIDPN *A)
 
 /* ---------------------------------------------------------------- brightness (DCS 0x51 over DSI0) */
 
-#define DSI0_PA             0x05E94000ULL
+#define DSI0_PA             0x0AE94000ULL   /* SM8550 DSI0 (stock DT qcom,mdss_dsi_ctrl0@ae94000, v2.7) */
+#define DSI_HW_VERSION      0x000
+#define DSI_V27             0x20070000u
+/* Inner panel AC052 P 1 A0002 / P 3 A0003: DCS 0x51 big-endian, 1..0xFFE; normal max 0x700 (A0002) /
+ * 0xBF3 (A0003). 100% maps to 0x700 so neither variant enters its high-brightness range. */
+#define BL_MAX_LEVEL        0x700u
 #define DSI_CTRL            0x004
 #define DSI_CMD_DMA_CTRL    0x03C
 #define DSI_DMA_CMD_OFFSET  0x048
@@ -1018,6 +1100,12 @@ static PUCHAR g_BlVa;
 static PHYSICAL_ADDRESS g_BlPa;
 static UCHAR g_Brightness = 100;
 static KMUTEX g_BlLock;
+
+/* perceptual curve: level = 1 + (max-1) * pct^2 / 100^2 (0% -> 1, 50% -> 0x1C0, 100% -> max) */
+static ULONG BlLevel(UCHAR Pct)
+{
+    return 1u + (BL_MAX_LEVEL - 1u) * (ULONG)Pct * (ULONG)Pct / 10000u;
+}
 
 static ULONG DsiRd(ULONG Off) { return READ_REGISTER_ULONG((volatile ULONG *)(g_Dsi + Off)); }
 static VOID DsiWr(ULONG Off, ULONG V) { WRITE_REGISTER_ULONG((volatile ULONG *)(g_Dsi + Off), V); }
@@ -1039,7 +1127,14 @@ static VOID InitBrightness(VOID)
     if (g_BlVa != NULL) {
         g_BlPa = MmGetPhysicalAddress(g_BlVa);
     }
-    LogPrint("brightness: DSI0 %p ctrl %08x, DMA buffer %llx\n", g_Dsi, g_Dsi ? DsiRd(DSI_CTRL) : 0, g_BlPa.QuadPart);
+    if (g_Dsi != NULL && (DsiRd(DSI_HW_VERSION) & 0xFFFF0000u) != DSI_V27) {
+        LogPrint("brightness: unexpected DSI0 version %08x - disabled\n", DsiRd(DSI_HW_VERSION));
+        MmUnmapIoSpace((PVOID)g_Dsi, 0x400);
+        g_Dsi = NULL;
+    }
+    LogPrint("brightness: DSI0 %p ver %08x ctrl %08x dmactl %08x, DMA buffer %llx\n", g_Dsi,
+             g_Dsi ? DsiRd(DSI_HW_VERSION) : 0, g_Dsi ? DsiRd(DSI_CTRL) : 0, g_Dsi ? DsiRd(DSI_CMD_DMA_CTRL) : 0,
+             g_BlPa.QuadPart);
 }
 
 static BOOLEAN DsiDcsLong(const UCHAR *Payload, ULONG Len)
@@ -1068,7 +1163,7 @@ static BOOLEAN DsiDcsLong(const UCHAR *Payload, ULONG Len)
     DsiWr(DSI_DMA_CMD_OFFSET, g_BlPa.LowPart);
     DsiWr(DSI_DMA_CMD_LENGTH, size);
     dma = DsiRd(DSI_CMD_DMA_CTRL);
-    DsiWr(DSI_CMD_DMA_CTRL, dma & ~(1u << 26));
+    /* keep UEFI's CMD_DMA_CTRL: it sends panel commands in low-power mode (bit 26) */
     DsiWr(DSI_DMA_SW_TRIGGER, 1);
     for (i = 0; i < 50; i++) {
         if (DsiRd(DSI_INT_CTRL) & 1) {
@@ -1119,10 +1214,7 @@ static NTSTATUS APIENTRY BlSet(HANDLE Ctx, UCHAR Pct)
         LogPrint("brightness %u%% stored (screen off)\n", Pct);
         return STATUS_SUCCESS;
     }
-    level = (ULONG)Pct * 0x7FF / 100;
-    if (level < 1) {
-        level = 1;
-    }
+    level = BlLevel(Pct);
     cmd[0] = 0x51;
     cmd[1] = (UCHAR)(level >> 8);
     cmd[2] = (UCHAR)level;
@@ -1138,7 +1230,7 @@ static NTSTATUS APIENTRY BlSet(HANDLE Ctx, UCHAR Pct)
 static VOID BlPanel(BOOLEAN On)
 {
     UCHAR cmd[3];
-    ULONG level = (ULONG)g_Brightness * 0x7FF / 100;
+    ULONG level = BlLevel(g_Brightness);
     BOOLEAN done;
 
     if (g_Dsi == NULL || KeGetCurrentIrql() != PASSIVE_LEVEL) {
@@ -1170,9 +1262,6 @@ static NTSTATUS APIENTRY BlGet(HANDLE Ctx, UCHAR *Pct)
 
 NTSTATUS DispBrightnessQueryInterface(PQUERY_INTERFACE Qi)
 {
-    UNREFERENCED_PARAMETER(Qi);
-    return STATUS_NOT_SUPPORTED;
-
     DXGK_BRIGHTNESS_INTERFACE *b;
 
     if (Qi == NULL || Qi->InterfaceType == NULL ||
