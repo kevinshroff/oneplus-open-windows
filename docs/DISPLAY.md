@@ -49,8 +49,22 @@ scanout at the next boot.
 Result: per-frame CPU cost of presenting drops from ~15-20 ms of copying to a few register writes; no CB4 faults
 observed.
 
+## Step 2 - GPU clock scaling (DCVS)
+
+The GMU firmware only changes the GPU/DDR operating point on an HFI 30 vote; startup voted index 1 (124.8 MHz,
+lowest DDR) and nothing changed it afterwards. The bridge (`a740_wddm_bridge.c`) now runs a governor:
+
+* a 2 ms high-resolution timer samples whether the GPU has unfinished submissions (only while the GPU is active;
+  it parks after ~1 s idle at the floor and the next submit wakes it);
+* every ~48 ms it picks the lowest level that would run the GPU about 65 % busy (>= 90 % busy jumps two levels),
+  steps up at once and down one level after 3 quieter windows; range index 1..8 = 124.8..615 MHz, DDR index
+  follows the GPU index;
+* votes use HFI 30 `{ack, gpu, bw}` through the existing g190 queue code, but with an ops table owned by the
+  driver (own mapping of the GMU core window `0x03D6A000`): the startup sequence's ops report "lease lost"
+  once startup has finished. A self-test at start (220 MHz and back) must pass; the first failed vote turns the
+  governor off. `C:\topaz\gpu.nodcvs` disables it. `HB` log lines show `dcvs idx/busy/votes`.
+
 ## Still to do
 
-* Step 2: GPU DCVS (it idles at 124.8 MHz and the lowest DDR vote).
 * Step 4: 120 Hz panel mode.
 * Step 5: CPU input boost / faster governor ramp.

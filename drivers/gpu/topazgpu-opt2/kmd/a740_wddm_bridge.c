@@ -36,6 +36,9 @@ static KMUTEX g_HwLock;
 static BOOLEAN g_HwLockInit;
 static ULONG g_Wptr = 17;
 static ULONG g_NextFence = 2;
+static VOID DcvsStart(VOID);
+static LONG64 BrNowUs(VOID);
+static VOID DcvsKick(VOID);
 static ULONGLONG g_NextVa = TGPU_VA_USER_START;
 static ULONGLONG g_MaxPa = 0xFFFFFFFFULL; /* raised from CB0 TCR2.PASize at bind */
 static ULONG g_VaFreeCount;
@@ -287,6 +290,7 @@ static VOID A740ExitSecureMode(VOID) {
     volatile ULONG *rb = (volatile ULONG *)g_Ogo->Cp->Run.Buffer[0].Cpu;
     ULONGLONG fenceAddr = g_Ogo->Cp->Run.Layout.Iova[1] + 4ULL;
     ULONG fence = g_NextFence++;
+    DcvsKick();
     uint32_t smHdr = 0, scrHdr = 0, evHdr = 0;
     (void)AdrenoPM4Type7(0x66u, 1u, &smHdr); /* CP_SET_SECURE_MODE */
     (void)AdrenoPM4Type4(0x885u, 1u, &scrHdr);
@@ -384,12 +388,190 @@ NTSTATUS A740BindDevice(PDEVICE_OBJECT Pdo, PCM_RESOURCE_LIST Translated) {
              rootPa,
              ((volatile ULONG *)g_Ogo->Cp->Run.Buffer[1].Cpu)[1],
              ((volatile ULONG *)g_Ogo->Cp->Run.Buffer[1].Cpu)[0]);
+    DcvsStart();
     return STATUS_SUCCESS;
+}
+
+
+/* ---- GPU DCVS (step 2): the GMU firmware only changes GPU/DDR level on an HFI 30 vote, and the startup vote
+   left it at index 1 (124.8 MHz, lowest DDR). A 2 ms high-resolution sampler measures how often the GPU has
+   unfinished work; every ~48 ms the governor picks the lowest level that would run it ~65 % busy, steps up at
+   once and down one level after 3 quiet windows. Index 1..9 = 124.8, 220, 295, 348, 401, 475, 550, 615, 680 MHz;
+   the DDR (bandwidth) index follows the GPU index. C:\topaz\gpu.nodcvs disables it. */
+static const ULONG g_GpuMhz[10] = { 0, 125, 220, 295, 348, 401, 475, 550, 615, 680 };
+#define DCVS_MAX_IDX 8
+static PEX_TIMER g_DcvsTimer;
+static volatile LONG g_DcvsSamples, g_DcvsBusy, g_DcvsTimerOn, g_DcvsStop;
+static KEVENT g_DcvsKickEv;
+static PVOID g_DcvsThread;
+volatile LONG g_DcvsIdx = 1, g_DcvsBusyPm, g_DcvsVotes, g_DcvsFails, g_DcvsOn;
+
+static VOID DcvsSample(PEX_TIMER Timer, PVOID Ctx)
+{
+    UNREFERENCED_PARAMETER(Timer); UNREFERENCED_PARAMETER(Ctx);
+    InterlockedIncrement(&g_DcvsSamples);
+    if (g_CpReady && (LONG)((g_NextFence - 1u) - HwCompletedFence()) > 0) InterlockedIncrement(&g_DcvsBusy);
+}
+
+/* The backend's ops (lease, register access, clock) belong to the one-shot startup sequence and refuse service
+   once it has finished, although the GMU itself stays powered and retained. Votes therefore run with an ops
+   table owned by this driver: its own mapping of the GMU core window (0x03D6A000, the base the backend's
+   register offsets are relative to), a clock that continues the backend's last timestamp, and plain stalls. */
+#define GMU_CORE_PA 0x03D6A000ULL
+#define GMU_CORE_LEN 0x25000u
+static volatile UCHAR *g_GmuIo;
+static uint64_t g_DcvsClk0, g_DcvsQpc0;
+static int DvLease(void *c, uint64_t g) { UNREFERENCED_PARAMETER(c); UNREFERENCED_PARAMETER(g); return g_CpReady ? 0 : 1; }
+static int DvCancelled(void *c) { UNREFERENCED_PARAMETER(c); return 0; }
+static int DvRead(void *c, uint32_t o, uint32_t *v)
+{
+    UNREFERENCED_PARAMETER(c);
+    if (!g_GmuIo || o >= GMU_CORE_LEN || (o & 3)) return 1;
+    *v = READ_REGISTER_ULONG((volatile ULONG *)(g_GmuIo + o));
+    return 0;
+}
+static int DvWrite(void *c, uint32_t o, uint32_t v)
+{
+    UNREFERENCED_PARAMETER(c);
+    if (!g_GmuIo || o >= GMU_CORE_LEN || (o & 3)) return 1;
+    WRITE_REGISTER_ULONG((volatile ULONG *)(g_GmuIo + o), v);
+    return 0;
+}
+static int DvBarrier(void *c, g190_barrier k) { UNREFERENCED_PARAMETER(c); UNREFERENCED_PARAMETER(k); __dsb(_ARM64_BARRIER_SY); return 0; }
+static int DvNow(void *c, uint64_t *t) { UNREFERENCED_PARAMETER(c); *t = g_DcvsClk0 + ((uint64_t)BrNowUs() - g_DcvsQpc0); return 0; }
+static int DvWait(void *c, uint32_t us) { UNREFERENCED_PARAMETER(c); KeStallExecutionProcessor(us); return 0; }
+
+static BOOLEAN DcvsVote(ULONG Gi)
+{
+    g190_backend *b;
+    uint32_t pl[3];
+    g190_reply r;
+    g190_status st;
+    g190_ops saved;
+    if (!g_Ogo || !g_Ogo->Gmu) return FALSE;
+    b = &g_Ogo->Gmu->Core;
+    if (b->phase != G190_STARTUP_COMPLETE && b->phase != G190_HFI_READY) {
+        LogPrint("dcvs: GMU backend phase %d - no votes\n", (int)b->phase);
+        return FALSE;
+    }
+    if (!g_GmuIo) {
+        PHYSICAL_ADDRESS pa;
+        pa.QuadPart = (LONGLONG)GMU_CORE_PA;
+        g_GmuIo = (volatile UCHAR *)MmMapIoSpaceEx(pa, GMU_CORE_LEN, PAGE_READWRITE | PAGE_NOCACHE);
+        if (!g_GmuIo) return FALSE;
+        g_DcvsClk0 = b->last_us + 1000;
+        g_DcvsQpc0 = (uint64_t)BrNowUs();
+    }
+    saved = b->ops;
+    b->ops.cookie = NULL;
+    b->ops.lease = DvLease; b->ops.cancelled = DvCancelled; b->ops.read_reg = DvRead; b->ops.write_reg = DvWrite;
+    b->ops.barrier = DvBarrier; b->ops.now_us = DvNow; b->ops.wait_us = DvWait;
+    pl[0] = 1; pl[1] = Gi; pl[2] = Gi;
+    st = g190_submit(b, b->epoch, 30, pl, 3);
+    if (st == G190_OK) {
+        do {
+            st = g190_poll(b, b->epoch, &r);
+            if (st == G190_PENDING) b->ops.wait_us(b->ops.cookie, 50);
+        } while (st == G190_PENDING);
+    }
+    b->ops = saved;
+    if (st != G190_OK) { LogPrint("dcvs: vote idx %u failed %d\n", Gi, (int)st); return FALSE; }
+    return TRUE;
+}
+
+static VOID DcvsThread(PVOID Ctx)
+{
+    LARGE_INTEGER dt;
+    ULONG quiet = 0, idleWins = 0;
+    UNREFERENCED_PARAMETER(Ctx);
+    while (!g_DcvsStop) {
+        if (!g_DcvsTimerOn) {                                   /* parked: wait for the next submit */
+            KeWaitForSingleObject(&g_DcvsKickEv, Executive, KernelMode, FALSE, NULL);
+            if (g_DcvsStop) break;
+            InterlockedExchange(&g_DcvsSamples, 0); InterlockedExchange(&g_DcvsBusy, 0);
+            InterlockedExchange(&g_DcvsTimerOn, 1);
+            ExSetTimer(g_DcvsTimer, -20000LL, 20000LL, NULL);   /* 2 ms, high resolution */
+            idleWins = 0;
+        }
+        dt.QuadPart = -480000LL;                                /* 48 ms window */
+        KeDelayExecutionThread(KernelMode, FALSE, &dt);
+        {
+            LONG n = InterlockedExchange(&g_DcvsSamples, 0), busy = InterlockedExchange(&g_DcvsBusy, 0);
+            ULONG cur = (ULONG)g_DcvsIdx, want = 1, pm = n ? (ULONG)busy * 1000u / (ULONG)n : 0;
+            ULONGLONG target = (ULONGLONG)g_GpuMhz[cur] * pm / 650u;   /* MHz that would make it ~65 % busy */
+            g_DcvsBusyPm = (LONG)pm;
+            while (want < DCVS_MAX_IDX && g_GpuMhz[want] < target) want++;
+            if (pm >= 900 && want < cur + 2) want = cur + 2 > DCVS_MAX_IDX ? DCVS_MAX_IDX : cur + 2;
+            if (want > cur) quiet = 0;
+            else if (want < cur) { if (++quiet >= 3) { want = cur - 1; quiet = 0; } else want = cur; }
+            else quiet = 0;
+            if (want != cur) {
+                if (DcvsVote(want)) { g_DcvsIdx = (LONG)want; InterlockedIncrement(&g_DcvsVotes); }
+                else if (InterlockedIncrement(&g_DcvsFails) >= 1) { LogPrint("dcvs: disabled after a failed vote\n"); break; }
+            }
+            idleWins = busy == 0 ? idleWins + 1 : 0;
+            if (idleWins >= 20 && g_DcvsIdx == 1) {             /* ~1 s idle at the floor: park the sampler */
+                ExCancelTimer(g_DcvsTimer, NULL);
+                InterlockedExchange(&g_DcvsTimerOn, 0);
+                KeClearEvent(&g_DcvsKickEv);
+            }
+        }
+    }
+    ExCancelTimer(g_DcvsTimer, NULL);
+    InterlockedExchange(&g_DcvsTimerOn, 0);
+    if (g_DcvsIdx != 1 && !g_DcvsFails && DcvsVote(1)) g_DcvsIdx = 1;
+    g_DcvsOn = 0;
+    PsTerminateSystemThread(STATUS_SUCCESS);
+}
+
+static VOID DcvsKick(VOID)
+{
+    if (g_DcvsOn && !g_DcvsTimerOn) KeSetEvent(&g_DcvsKickEv, IO_NO_INCREMENT, FALSE);
+}
+
+static VOID DcvsStart(VOID)
+{
+    UNICODE_STRING nd = RTL_CONSTANT_STRING(L"\\??\\C:\\topaz\\gpu.nodcvs");
+    OBJECT_ATTRIBUTES oa;
+    IO_STATUS_BLOCK iosb;
+    HANDLE h;
+    if (g_DcvsOn || !g_Ogo || !g_Ogo->Gmu) return;
+    InitializeObjectAttributes(&oa, &nd, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
+    if (NT_SUCCESS(ZwCreateFile(&h, FILE_READ_ATTRIBUTES | SYNCHRONIZE, &oa, &iosb, NULL, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ,
+                                FILE_OPEN, FILE_SYNCHRONOUS_IO_NONALERT | FILE_NON_DIRECTORY_FILE, NULL, 0))) {
+        ZwClose(h);
+        LogPrint("dcvs: disabled by gpu.nodcvs\n");
+        return;
+    }
+    {                                                       /* prove the HFI vote path before relying on it */
+        LONG64 t0 = BrNowUs();
+        BOOLEAN up = DcvsVote(2), down = up && DcvsVote(1);
+        LogPrint("dcvs: self-test vote 220 MHz %s, back to 125 MHz %s (%lld us)\n", up ? "ok" : "FAILED",
+                 down ? "ok" : "FAILED", BrNowUs() - t0);
+        if (!up || !down) return;
+    }
+    g_DcvsTimer = ExAllocateTimer(DcvsSample, NULL, EX_TIMER_HIGH_RESOLUTION);
+    if (!g_DcvsTimer) { LogPrint("dcvs: no high-resolution timer\n"); return; }
+    KeInitializeEvent(&g_DcvsKickEv, NotificationEvent, FALSE);
+    g_DcvsStop = 0;
+    g_DcvsOn = 1;
+    if (!NT_SUCCESS(PsCreateSystemThread(&h, THREAD_ALL_ACCESS, NULL, NULL, NULL, DcvsThread, NULL))) { g_DcvsOn = 0; return; }
+    ObReferenceObjectByHandle(h, THREAD_ALL_ACCESS, *PsThreadType, KernelMode, &g_DcvsThread, NULL);
+    ZwClose(h);
+    LogPrint("dcvs: GPU governor on (idx 1..%u, %u..%u MHz)\n", DCVS_MAX_IDX, g_GpuMhz[1], g_GpuMhz[DCVS_MAX_IDX]);
 }
 
 VOID HwInit(VOID) { if (!g_HwLockInit) { KeInitializeMutex(&g_HwLock, 0); g_HwLockInit = TRUE; } }
 BOOLEAN HwStart(VOID) { return g_CpReady; }
-VOID HwStop(VOID) { /* keep GPU/SMMU retained cleanly */ }
+VOID HwStop(VOID) {                                   /* keep GPU/SMMU retained cleanly; GPU back to the floor */
+    if (g_DcvsOn && g_DcvsThread) {
+        g_DcvsStop = 1;
+        KeSetEvent(&g_DcvsKickEv, IO_NO_INCREMENT, FALSE);
+        KeWaitForSingleObject(g_DcvsThread, Executive, KernelMode, FALSE, NULL);
+        ObDereferenceObject(g_DcvsThread);
+        g_DcvsThread = NULL;
+    }
+}
 BOOLEAN HwReady(VOID) { return g_CpReady; }
 BOOLEAN HwRecover(VOID) { return FALSE; }
 BOOLEAN HwWedged(VOID) { return FALSE; }
