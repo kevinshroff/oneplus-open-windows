@@ -31,7 +31,7 @@ The project reuses Windows ARM64 CPU/storage/USB stacks and OEM firmware, develo
 | Crash recovery | **PARTIAL 🟡** | Recovery tools work; automatic reconnection is not reliable after every crash. |
 | Battery reporting | **IN PROGRESS 🛠️** | Raw sensor readings acquired; Windows battery reporting remains unfinished. |
 | Charging | **IN PROGRESS 🛠️** | Charging current measured in bounded WinPE tests; normal Windows charging remains unfinished. |
-| Power management | **PARTIAL 🟡** | Usable while awake; suspend/resume and power-saving integration remain unfinished. |
+| Power management | **PARTIAL 🟡** | Brightness control, display auto-off and an EPSS CPU governor work ([measurements](docs/POWER.md)); deep idle/suspend remain unfinished. |
 | Audio | **NOT WORKING ❌** | Speakers and microphone remain unfinished. |
 | Bluetooth | **NOT WORKING ❌** | Windows radio integration remains unfinished. |
 | Motion / light / proximity sensors | **NOT WORKING ❌** | Windows sensor integration remains unfinished. |
@@ -78,12 +78,12 @@ These [subfeature checklists](docs/STATUS.md) track implementation and future re
 - [ ] Reproducible installation/servicing workflow.
 - [ ] Power-loss and storage-performance qualification.
 
-## Inner display — 3/5 complete
+## Inner display — 4/5 complete
 
 - [x] Windows framebuffer desktop.
 - [x] Usable desktop scaling.
 - [x] Accelerated presentation (Adreno 740 DWM composition, GOP scanout).
-- [ ] Brightness management.
+- [x] Brightness management (DCS 0x51, Windows slider; [power notes](docs/POWER.md)).
 - [ ] Display sleep/wake lifecycle.
 
 ## Cover display / folding — 1/4 complete
@@ -160,12 +160,13 @@ These [subfeature checklists](docs/STATUS.md) track implementation and future re
 - [ ] Reliable USB-C/source negotiation.
 - [ ] Complete safety/thermal/full-charge policy.
 
-## Power management — 1/5 complete
+## Power management — 2/6 complete
 
 - [x] Working awake profile for development.
 - [ ] System suspend/resume.
 - [ ] Display/power-button lifecycle.
-- [ ] Idle clock and rail policies.
+- [x] CPU frequency scaling (EPSS load governor).
+- [ ] Idle clock and rail policies (cluster/system low-power idle).
 - [ ] Thermal/performance policies.
 
 ## Audio — 0/3 complete
@@ -245,7 +246,6 @@ https://github.com/user-attachments/assets/2b834bc3-bc92-4345-a5e6-32ab159f1ff7
   - **Proper battery charging and indicator:** Sustained normal-Windows USB-C/PD charging and Windows battery-class indicator (`percentage`, `rate`, `charging state`).
   - **Cameras:** Camera sensor/ISP bring-up and Windows camera integration.
   - **Accelerometer and other useful sensors:** Motion, orientation, ambient light, proximity, and hinge/fold sensors.
-  - **Brightness control:** Inner OLED panel brightness via DSI DCS commands and Windows brightness-slider integration (`GUID_DEVINTERFACE_BRIGHTNESS`).
 - **Reproducibility:** Turn the source closures and upstream pins into portable local builds using independently obtained platform inputs.
 
 See the [agent handoff](docs/AGENT_HANDOFF.md) for the latest experiment, failed hypotheses, precise next discriminators and preservation rules. The [source map](docs/SOURCE_MAP.md) separates current components from historical experiments. Read [build and publication boundaries](docs/BUILDING.md) before using any tooling.
