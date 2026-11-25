@@ -77,4 +77,9 @@ lowest DDR) and nothing changed it afterwards. The bridge (`a740_wddm_bridge.c`)
 
 ## Still to do
 
-* Step 4: 120 Hz panel mode.
+* Step 4: 120 Hz. The inner panel is "AC052 P 3 A0003 dsc cmd mode panel" (stock `dtbo` overlay). Its 60 and
+  120 Hz `timing-switch-command` sequences differ only in `6D 01` -> `6D 00` and the last parameter of the `35`
+  packet, and all modes use the same DSI bit clock (1.636 Gbps), so the switch is a panel command sequence plus
+  reporting 120 Hz to Windows. Not implemented yet.
+* Caution for research probes: reading MDP blocks that are not in the stock DT (guessed ping-pong offsets) hard-hung
+  the phone. Only read blocks the DT lists.
