@@ -10,6 +10,8 @@
 #include <wdmguid.h>
 #include <devpkey.h>
 
+VOID DispAllocCreated(TGPU_ALLOCATION *Al);
+
 typedef struct _TGPU_ADAPTER {
     PDEVICE_OBJECT       Pdo;
     DXGKRNL_INTERFACE    Dxgk;
@@ -187,11 +189,15 @@ static VOID HbThread(PVOID Ctx)
     ULONG n = 0;
     for (;;) {
         LARGE_INTEGER dt;
-        dt.QuadPart = (n < 60 ? -30000000LL : -300000000LL);       /* 3 s for 3 min, then 30 s */
+        dt.QuadPart = -50000000LL;                                /* every 5 s */
         if (KeWaitForSingleObject(&g_HbStop, Executive, KernelMode, FALSE, &dt) == STATUS_SUCCESS) break;
         n++;
-        LogPrint("HB %u vidsch submitted %u completed %u | gpu fence %u\n", n, a->LastSubmittedFence,
-                 a->LastCompletedFence, HwCompletedFence());
+        {
+            extern volatile LONG64 g_StWaits, g_StWaitUs, g_StWaitMaxUs, g_StSubmits;
+            LogPrint("HB %u vidsch submitted %u completed %u | gpu fence %u submits %lld waits %lld waitUs %lld waitMaxUs %lld\n",
+                     n, a->LastSubmittedFence, a->LastCompletedFence, HwCompletedFence(), g_StSubmits, g_StWaits,
+                     g_StWaitUs, g_StWaitMaxUs);
+        }
         DispLogStats();
     }
     PsTerminateSystemThread(STATUS_SUCCESS);
@@ -645,6 +651,7 @@ static NTSTATUS APIENTRY TgCreateAllocation(const HANDLE hAdapter, DXGKARG_CREAT
                 return STATUS_INVALID_PARAMETER;
             }
         }
+        DispAllocCreated(al);                            /* full-screen BOs: map for zero-copy scanout */
         ai->hAllocation = al;
         ai->Alignment = 0;
         ai->Size = al->Size;

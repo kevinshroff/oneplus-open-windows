@@ -413,8 +413,21 @@ ULONG HwCompletedFence(VOID) {
     return ((volatile ULONG *)g_Ogo->Cp->Run.Buffer[1].Cpu)[1];
 }
 
+volatile LONG64 g_StWaits, g_StWaitUs, g_StWaitMaxUs, g_StSubmits;
+static LONG64 BrNowUs(VOID) { LARGE_INTEGER f, c = KeQueryPerformanceCounter(&f); return c.QuadPart * 1000000LL / f.QuadPart; }
+BOOLEAN HwWaitFenceInner(ULONG Fence, ULONG TimeoutMs);
 BOOLEAN HwWaitFence(ULONG Fence, ULONG TimeoutMs) {
+    LONG64 t0, dt; BOOLEAN r;
     if (!g_CpReady) return Fence == 0;
+    if (HwCompletedFence() >= Fence) return TRUE;
+    t0 = BrNowUs();
+    r = HwWaitFenceInner(Fence, TimeoutMs);
+    dt = BrNowUs() - t0;
+    InterlockedIncrement64(&g_StWaits); InterlockedAdd64(&g_StWaitUs, dt);
+    if (dt > g_StWaitMaxUs) g_StWaitMaxUs = dt;
+    return r;
+}
+BOOLEAN HwWaitFenceInner(ULONG Fence, ULONG TimeoutMs) {
     if (HwCompletedFence() >= Fence) return TRUE;
     ULONG loops = TimeoutMs ? TimeoutMs * 10u : 1u;
     if (loops > 50000u) loops = 50000u;
@@ -631,6 +644,7 @@ NTSTATUS HwSubmit(const ULONGLONG *Ib, const ULONG *Words, ULONG Count, PULONG F
     RbEmit(rb, fence);
     __dsb(_ARM64_BARRIER_OSHST);
     NTSTATUS st = G482GpuWrite(&g_Ogo->Io, 0x807u * 4u, g_Wptr);
+    InterlockedIncrement64(&g_StSubmits);
     __dsb(_ARM64_BARRIER_OSH);
     *Fence = fence;
     if (g_DiagSubmits < 12u) {

@@ -45,16 +45,26 @@ static TGPU_ALLOCATION * volatile g_ScanCur;    /* primary being "scanned out" *
    so VIG0 can fetch any physical address. Flipping to a BO-backed primary = new SRC0_ADDR/YSTRIDE0 +
    CTL flush (double-buffered, latched at the panel vsync): no CPU copy. Allocations without a BO
    (Dxgkrnl's own primaries) go back to the framebuffer + CPU copy. C:\topaz\gpuw.nodirect disables it. */
+/* SM8550 (stock DT qcom,sde-*-off, MDSS 0x0AE00000): UEFI drives the inner panel with VIG0 (left half) and
+   VIG1 (right half, SRC_XY x=1220) from the GOP framebuffer 0xB8000000, stride 9760, CTL0, command mode with
+   autorefresh. The MDSS stream (SID 0x1C00) uses apps-SMMU context bank 4, which UEFI left with translation
+   off; DWM's scanout buffers are scattered pages, so CB4 gets our own page tables (Cb4Enable). */
+#define MDSS_PA             0x0AE00000ULL
+#define MDSS_LEN            0x84000u
 #define MDP_VIG0            0x5000
+#define MDP_VIG1            0x7000
 #define SSPP_SRC0_ADDR      0x14
 #define SSPP_SRC_YSTRIDE0   0x24
-#define MDP_CTL0            0x2000
+#define SSPP_CUR_ADDR       0xA4
+#define MDP_CTL0            0x16000
 #define CTL_FLUSH           0x18
 #define CTL_FLUSH_VIG0      (1u << 0)
+#define CTL_FLUSH_VIG1      (1u << 1)
 #define CTL_FLUSH_CTL       (1u << 17)
 static volatile UCHAR *g_Mdp;
 static BOOLEAN g_DirectOk;                      /* mapped and not disabled */
 static volatile LONG g_DirectActive;            /* VIG0 currently fetches a BO */
+static KMUTEX g_ScanLock;                       /* engine copies vs. DestroyAllocation (defined below) */
 static ULONG g_FbAddr, g_FbStride;              /* bootloader values, restored on fallback/stop */
 static ULONG g_DirectFlips;
 
@@ -62,15 +72,214 @@ static VOID MdpScanFrom(ULONG Pa, ULONG Stride)
 {
     WRITE_REGISTER_ULONG((volatile ULONG *)(g_Mdp + MDP_VIG0 + SSPP_SRC0_ADDR), Pa);
     WRITE_REGISTER_ULONG((volatile ULONG *)(g_Mdp + MDP_VIG0 + SSPP_SRC_YSTRIDE0), Stride);
-    WRITE_REGISTER_ULONG((volatile ULONG *)(g_Mdp + MDP_CTL0 + CTL_FLUSH), CTL_FLUSH_VIG0 | CTL_FLUSH_CTL);
+    WRITE_REGISTER_ULONG((volatile ULONG *)(g_Mdp + MDP_VIG1 + SSPP_SRC0_ADDR), Pa);
+    WRITE_REGISTER_ULONG((volatile ULONG *)(g_Mdp + MDP_VIG1 + SSPP_SRC_YSTRIDE0), Stride);
+    WRITE_REGISTER_ULONG((volatile ULONG *)(g_Mdp + MDP_CTL0 + CTL_FLUSH), CTL_FLUSH_VIG0 | CTL_FLUSH_VIG1 | CTL_FLUSH_CTL);
 }
 
-/* point VIG0 at Al when it is a BO-backed full-screen primary; TRUE = no CPU copy needed. Any IRQL. */
+/* ---- apps-SMMU context bank 4 (MDSS) page tables: identity 2..4 GiB (framebuffer, DSI DMA buffers) with
+   1 GiB blocks; scanout BOs mapped page by page into 0x10000000.. (32 MiB slots) */
+#define SMMU_PA        0x15000000ULL
+#define CB4_PA         (SMMU_PA + 128ULL * 0x1000 + 4ULL * 0x1000)
+#define CB_SCTLR 0x000
+#define CB_TCR2  0x010
+#define CB_TTBR0 0x020
+#define CB_TCR   0x030
+#define CB_MAIR0 0x038
+#define CB_FSR   0x058
+#define CB_FAR   0x060
+#define CB_TLBIALL 0x618
+#define CB_TLBSYNC 0x7F0
+#define CB_TLBSTATUS 0x7F4
+#define SCAN_SLOTS 16
+#define SCAN_SLOT_BYTES 0x2000000ULL
+#define SCAN_IOVA0 0x10000000ULL
+#define PT_MAX 224                                   /* 16 slots x 12 L3 + L2s + L1 */
+typedef struct _SCAN_MAP { TGPU_BO *Bo; ULONG Refs; ULONGLONG Iova; SIZE_T Bytes; } SCAN_MAP;
+static SCAN_MAP g_ScanMap[SCAN_SLOTS];
+static volatile UCHAR *g_Cb4;
+static ULONGLONG *g_Cb4L1;
+static PHYSICAL_ADDRESS g_Cb4L1Pa;
+static ULONGLONG *g_PtVa[PT_MAX];
+static ULONGLONG g_PtPa[PT_MAX];
+static ULONG g_PtN, g_Cb4SctlrOrig;
+static BOOLEAN g_Cb4On;
+static KSPIN_LOCK g_ScanMapLock;
+
+static ULONG CbRd(ULONG o) { return READ_REGISTER_ULONG((volatile ULONG *)(g_Cb4 + o)); }
+static VOID CbWr(ULONG o, ULONG v) { WRITE_REGISTER_ULONG((volatile ULONG *)(g_Cb4 + o), v); }
+
+static VOID Cb4Tlbi(VOID)
+{
+    ULONG i;
+    __dsb(_ARM64_BARRIER_SY);
+    CbWr(CB_TLBIALL, 0);
+    CbWr(CB_TLBSYNC, 0);
+    for (i = 0; i < 1000 && (CbRd(CB_TLBSTATUS) & 1); i++) KeStallExecutionProcessor(1);
+}
+
+static ULONGLONG *PtAlloc(ULONGLONG *Pa)
+{
+    PHYSICAL_ADDRESS lo, hi, sk;
+    PVOID va;
+    if (g_PtN >= PT_MAX) return NULL;
+    lo.QuadPart = 0; hi.QuadPart = 0xFFFFFFFFFULL; sk.QuadPart = 0;
+    va = MmAllocateContiguousMemorySpecifyCache(PAGE_SIZE, lo, hi, sk, MmNonCached);
+    if (va == NULL) return NULL;
+    RtlZeroMemory(va, PAGE_SIZE);
+    g_PtVa[g_PtN] = (ULONGLONG *)va;
+    g_PtPa[g_PtN] = (ULONGLONG)MmGetPhysicalAddress(va).QuadPart;
+    *Pa = g_PtPa[g_PtN];
+    return g_PtVa[g_PtN++];
+}
+
+static ULONGLONG *PtFind(ULONGLONG Pa)
+{
+    ULONG i;
+    for (i = 0; i < g_PtN; i++) if (g_PtPa[i] == Pa) return g_PtVa[i];
+    return NULL;
+}
+
+/* PASSIVE: map/unmap one 4 KiB page at Iova (< 2 GiB) */
+static BOOLEAN Cb4Map(ULONGLONG Iova, ULONGLONG Pa)
+{
+    ULONG i1 = (ULONG)(Iova >> 30) & 511, i2 = (ULONG)(Iova >> 21) & 511, i3 = (ULONG)(Iova >> 12) & 511;
+    ULONGLONG *l2, *l3, tp;
+    if (!(g_Cb4L1[i1] & 1)) { if (!(l2 = PtAlloc(&tp))) return FALSE; g_Cb4L1[i1] = tp | 3; }
+    else l2 = PtFind(g_Cb4L1[i1] & 0xFFFFFFFFF000ULL);
+    if (!l2) return FALSE;
+    if (!(l2[i2] & 1)) { if (!(l3 = PtAlloc(&tp))) return FALSE; l2[i2] = tp | 3; }
+    else l3 = PtFind(l2[i2] & 0xFFFFFFFFF000ULL);
+    if (!l3) return FALSE;
+    l3[i3] = (Pa & 0xFFFFFFFFF000ULL) | 0x443;          /* page | AF | AP=RW | AttrIdx0 (normal NC) */
+    return TRUE;
+}
+
+static VOID Cb4Unmap(ULONGLONG Iova)
+{
+    ULONG i1 = (ULONG)(Iova >> 30) & 511, i2 = (ULONG)(Iova >> 21) & 511, i3 = (ULONG)(Iova >> 12) & 511;
+    ULONGLONG *l2, *l3;
+    if (!(g_Cb4L1[i1] & 1) || !(l2 = PtFind(g_Cb4L1[i1] & 0xFFFFFFFFF000ULL))) return;
+    if (!(l2[i2] & 1) || !(l3 = PtFind(l2[i2] & 0xFFFFFFFFF000ULL))) return;
+    l3[i3] = 0;
+}
+
+/* PASSIVE, once: build identity tables and turn translation on for CB4 without disturbing the live stream */
+static BOOLEAN Cb4Enable(VOID)
+{
+    PHYSICAL_ADDRESS pa;
+    ULONG fsr;
+    ULONGLONG l1pa;
+    KeInitializeSpinLock(&g_ScanMapLock);
+    pa.QuadPart = CB4_PA;
+    g_Cb4 = (volatile UCHAR *)MmMapIoSpaceEx(pa, 0x1000, PAGE_READWRITE | PAGE_NOCACHE);
+    if (g_Cb4 == NULL) return FALSE;
+    g_Cb4SctlrOrig = CbRd(CB_SCTLR);
+    if (g_Cb4SctlrOrig & 1) { LogPrint("cb4: translation already on (%08x) - leaving it\n", g_Cb4SctlrOrig); return FALSE; }
+    g_Cb4L1 = PtAlloc(&l1pa);
+    if (g_Cb4L1 == NULL) return FALSE;
+    g_Cb4L1Pa.QuadPart = (LONGLONG)l1pa;
+    g_Cb4L1[2] = 0x080000000ULL | 0x441;                 /* 1 GiB blocks, identity, normal NC, RW */
+    g_Cb4L1[3] = 0x0C0000000ULL | 0x441;
+    __dsb(_ARM64_BARRIER_SY);
+    /* programmed as Linux arm-smmu does for an AArch64 stage-1 context (cb4_probe: TCR2 without SEP_UPSTREAM|AS
+       translation-faults every fetch on this hypervisor-mediated SMMU; with them the stream translates cleanly) */
+    CbWr(CB_TCR2, (7u << 15) | (1u << 4) | 1u);         /* SEP_UPSTREAM | AS (16-bit ASID) | PASize 36-bit */
+    CbWr(CB_TCR, 25u | (2u << 12) | (1u << 23));        /* T0SZ 25 (39-bit), SH0 outer, NC walks, 4K, EPD1 */
+    WRITE_REGISTER_ULONG64((volatile ULONG64 *)(g_Cb4 + CB_TTBR0), l1pa | (4ULL << 48));   /* ASID 4 */
+    CbWr(CB_MAIR0, 0x00000044);                          /* attr0 = normal non-cacheable */
+    Cb4Tlbi();
+    CbWr(CB_FSR, CbRd(CB_FSR));                          /* clear stale status */
+    CbWr(CB_SCTLR, 0x61);                                /* M | CFRE | CFIE, terminate (no stall) on fault */
+    KeStallExecutionProcessor(50000);                    /* a few frames of real traffic */
+    fsr = CbRd(CB_FSR);
+    LogPrint("cb4: translation on, L1 %llx, SCTLR %08x (was %08x), FSR %08x FAR %08x%08x, VIG0 cur %08x\n", l1pa,
+             CbRd(CB_SCTLR), g_Cb4SctlrOrig, fsr, CbRd(CB_FAR + 4), CbRd(CB_FAR),
+             READ_REGISTER_ULONG((volatile ULONG *)(g_Mdp + MDP_VIG0 + SSPP_CUR_ADDR)));
+    if (fsr & 0x400001FEu) {                             /* fault bits only: FSR[10:9] is FORMAT */
+        CbWr(CB_SCTLR, g_Cb4SctlrOrig);                  /* back to bypass */
+        CbWr(CB_FSR, fsr);
+        LogPrint("cb4: fault after enable - translation off again, direct scanout disabled\n");
+        return FALSE;
+    }
+    g_Cb4On = TRUE;
+    return TRUE;
+}
+
+static VOID Cb4Disable(VOID)
+{
+    if (g_Cb4On) { CbWr(CB_SCTLR, g_Cb4SctlrOrig); Cb4Tlbi(); g_Cb4On = FALSE; }
+}
+
+static ULONGLONG ScanIova(TGPU_BO *Bo)
+{
+    ULONG i;
+    for (i = 0; i < SCAN_SLOTS; i++) if (g_ScanMap[i].Bo == Bo && g_ScanMap[i].Refs) return g_ScanMap[i].Iova;
+    return 0;
+}
+
+/* PASSIVE (CreateAllocation): map full-screen BO-backed allocations into CB4 so a flip needs no copy */
+VOID DispAllocCreated(TGPU_ALLOCATION *Al)
+{
+    ULONG i, free = SCAN_SLOTS;
+    SIZE_T pages, p;
+    PPFN_NUMBER pfn;
+    if (!g_Cb4On || Al == NULL || Al->Bo == NULL || Al->Bo->Mdl == NULL || Al->Desc.width != g_Post.Width ||
+        Al->Desc.height != g_Post.Height || Al->Bo->Size > SCAN_SLOT_BYTES) {
+        return;
+    }
+    KeWaitForSingleObject(&g_ScanLock, Executive, KernelMode, FALSE, NULL);
+    for (i = 0; i < SCAN_SLOTS; i++) {
+        if (g_ScanMap[i].Refs && g_ScanMap[i].Bo == Al->Bo) { g_ScanMap[i].Refs++; goto done; }
+        if (!g_ScanMap[i].Refs && free == SCAN_SLOTS) free = i;
+    }
+    if (free == SCAN_SLOTS) goto done;
+    pages = Al->Bo->Size >> PAGE_SHIFT;
+    pfn = MmGetMdlPfnArray(Al->Bo->Mdl);
+    for (p = 0; p < pages; p++) {
+        if (!Cb4Map(SCAN_IOVA0 + free * SCAN_SLOT_BYTES + (p << PAGE_SHIFT), (ULONGLONG)pfn[p] << PAGE_SHIFT)) {
+            LogPrint("cb4: out of page tables mapping bo %p\n", Al->Bo);
+            while (p--) Cb4Unmap(SCAN_IOVA0 + free * SCAN_SLOT_BYTES + (p << PAGE_SHIFT));
+            goto done;
+        }
+    }
+    __dsb(_ARM64_BARRIER_SY);
+    Cb4Tlbi();
+    g_ScanMap[free].Bo = Al->Bo;
+    g_ScanMap[free].Iova = SCAN_IOVA0 + free * SCAN_SLOT_BYTES;
+    g_ScanMap[free].Bytes = Al->Bo->Size;
+    g_ScanMap[free].Refs = 1;
+    {
+        static ULONG n;
+        if (++n <= 12) LogPrint("cb4: scanout bo %p (%llu KB) -> mdp iova %llx\n", Al->Bo, (ULONGLONG)Al->Bo->Size / 1024,
+                                g_ScanMap[free].Iova);
+    }
+done:
+    KeReleaseMutex(&g_ScanLock, FALSE);
+}
+
+static VOID ScanUnmapLocked(TGPU_BO *Bo)
+{
+    ULONG i;
+    SIZE_T p;
+    for (i = 0; i < SCAN_SLOTS; i++) {
+        if (g_ScanMap[i].Refs && g_ScanMap[i].Bo == Bo && --g_ScanMap[i].Refs == 0) {
+            for (p = 0; p < (g_ScanMap[i].Bytes >> PAGE_SHIFT); p++) Cb4Unmap(g_ScanMap[i].Iova + (p << PAGE_SHIFT));
+            __dsb(_ARM64_BARRIER_SY);
+            Cb4Tlbi();
+            g_ScanMap[i].Bo = NULL;
+        }
+    }
+}
+
+/* point VIG0/VIG1 at Al when it is a CB4-mapped full-screen primary; TRUE = no CPU copy needed. Any IRQL. */
 static BOOLEAN DirectSelect(TGPU_ALLOCATION *Al)
 {
-    if (g_DirectOk && Al != NULL && Al->Bo != NULL && Al->Desc.width == g_Post.Width &&
-        Al->Desc.height == g_Post.Height && Al->Bo->Iova + Al->Desc.bo_offset < 0x100000000ULL) {
-        MdpScanFrom((ULONG)(Al->Bo->Iova + Al->Desc.bo_offset), Al->Desc.pitch);
+    ULONGLONG iova = (g_DirectOk && Al != NULL && Al->Bo != NULL) ? ScanIova(Al->Bo) : 0;
+    if (iova != 0 && Al->Desc.width == g_Post.Width && Al->Desc.height == g_Post.Height &&
+        Al->Desc.pitch >= g_Post.Width * 4 && (Al->Desc.pitch & 63) == 0 &&
+        Al->Desc.bo_offset + (SIZE_T)Al->Desc.pitch * Al->Desc.height <= Al->Bo->Size) {
+        MdpScanFrom((ULONG)(iova + Al->Desc.bo_offset), Al->Desc.pitch);
         InterlockedExchange(&g_DirectActive, 1);
         g_DirectFlips++;
         return TRUE;
@@ -146,6 +355,13 @@ static volatile LONG g_FlipOverrun, g_FlipImm;   /* v0.45.4: flips replacing a p
 static ULONG g_FlipHeld;                         /* flips held back for pacing in the current second */
 
 static volatile LONG64 g_TotCb, g_TotNotify, g_TotFlipDone;   /* cumulative, for DispLogStats */
+/* frame statistics (cumulative; logged by DispLogStats at PASSIVE) */
+static volatile LONG64 g_StFlipReq, g_StCopies, g_StCopyUs, g_StCopyMaxUs, g_StCopyBytes;
+/* Copy-mode frame ordering: every flip gets a sequence number; the scanout copy waits for that frame's GPU
+ * fence, copies it, then publishes g_CopiedSeq. The flip is reported done only once its own copy finished,
+ * so DWM never reuses a buffer that is still being copied and never sees a half-rendered frame. */
+static volatile LONG g_FlipSeq, g_CopiedSeq;
+static KDPC g_CopyDpc;
 static volatile LONG g_LastSyncSt, g_LastSyncRet;
 
 static VOID VsyncNotify(BOOLEAN flip)
@@ -192,15 +408,19 @@ static VOID VsyncWork(BOOLEAN periodicTick)
             InterlockedExchange(&g_Deferred, 0);
             if (!DirectSelect(g_DeferAl)) {
                 InterlockedExchange(&g_ScanDirty, 1);
+                KeInsertQueueDpc(&g_CopyDpc, NULL, NULL);
             }
         }
     }
     if (g_FlipPending && !g_Deferred) {
         if (g_DirectActive && g_Mdp != NULL &&
-            (READ_REGISTER_ULONG((volatile ULONG *)(g_Mdp + MDP_CTL0 + CTL_FLUSH)) & CTL_FLUSH_VIG0)) {
+            (READ_REGISTER_ULONG((volatile ULONG *)(g_Mdp + MDP_CTL0 + CTL_FLUSH)) & (CTL_FLUSH_VIG0 | CTL_FLUSH_VIG1)) &&
+            now - g_LastFlipDone < 4 * VSYNC_PERIOD) {      /* not latched yet (bounded: never stall DWM) */
             if (periodicTick || now >= g_NextVsync) {
                 g_FlipWaits++;
             }
+        } else if (!g_DirectActive && g_CopiedSeq != g_FlipSeq) {
+            /* copy mode: the frame is not on the panel yet */
         } else if (now - g_LastFlipDone < VSYNC_PERIOD - VSYNC_PERIOD / 8) {
             if (!g_HeldThis) {                   /* latched, but the previous flip completed less than a period ago */
                 g_HeldThis = TRUE;
@@ -359,6 +579,22 @@ VOID DispLogStats(VOID)
              g_TotCb, g_TotNotify, g_TotFlipDone, g_FlipCount, g_VsyncOn, g_FlipPending, g_Deferred, g_FlipHeld,
              g_LastSyncSt, g_LastSyncRet, g_ScanPa.QuadPart, g_ShownPa.QuadPart,
              g_TimerRunning ? "on" : "off", g_TimerStarts, g_TimerStops);
+    {
+        ULONG fsr = g_Cb4On ? CbRd(CB_FSR) : 0;
+        LogPrint("FRAME flipsReq %lld flipsDone %lld copies %lld copyUs %lld copyMaxUs %lld copyMB %lld | direct %u active %d "
+                 "cb4 fsr %08x pt %u\n", g_StFlipReq, g_TotFlipDone, g_StCopies, g_StCopyUs, g_StCopyMaxUs,
+                 g_StCopyBytes >> 20, g_DirectFlips, g_DirectActive, fsr, g_PtN);
+        if (fsr & 0x400001FEu) {                         /* runtime fault: fall back to the copy path for good */
+            LogPrint("cb4: fault FAR %08x%08x FSYNR0 %08x - direct scanout off\n", CbRd(CB_FAR + 4), CbRd(CB_FAR),
+                     CbRd(0x68));
+            g_DirectOk = FALSE;
+            InterlockedExchange(&g_DirectActive, 0);
+            MdpScanFrom(g_FbAddr, g_FbStride);
+            CbWr(CB_FSR, fsr);
+            InterlockedExchange(&g_ScanDirty, 1);
+            KeInsertQueueDpc(&g_CopyDpc, NULL, NULL);
+        }
+    }
 }
 
 VOID DispVsyncEnable(BOOLEAN Enable)
@@ -405,26 +641,157 @@ static VOID CopyRectToFb(PUCHAR Src, ULONG SrcPitch, ULONG SrcW, ULONG SrcH, con
     }
 }
 
+
+static KDEFERRED_ROUTINE CopyDpc;
+static VOID CopyDpc(PKDPC Dpc, PVOID Ctx, PVOID A1, PVOID A2)
+{
+    UNREFERENCED_PARAMETER(Dpc); UNREFERENCED_PARAMETER(Ctx);
+    UNREFERENCED_PARAMETER(A1); UNREFERENCED_PARAMETER(A2);
+    if (InterlockedExchange(&g_ScanDirty, 0)) {
+        EngKickScanout();
+    }
+}
+
+/* Parallel copy: reads from the write-combined BO mapping are latency bound per core, so the frame is
+ * split by rows across workers pinned to the performance cores (CPU 4..7). */
+#define COPY_WORKERS 4
+typedef struct _COPY_JOB { PUCHAR Src; ULONG SrcPitch; ULONG Rows; ULONG RowBytes; } COPY_JOB;
+static COPY_JOB g_Job;
+static KEVENT g_CopyGo[COPY_WORKERS], g_CopyDone, g_CopyStop;
+static volatile LONG g_CopyLeft;
+static PKTHREAD g_CopyThr[COPY_WORKERS];
+static BOOLEAN g_CopyPool;
+
+static VOID CopyRows(ULONG W)
+{
+    ULONG y0 = g_Job.Rows * W / COPY_WORKERS, y1 = g_Job.Rows * (W + 1) / COPY_WORKERS, y;
+    for (y = y0; y < y1; y++) {
+        RtlCopyMemory(g_Fb + (SIZE_T)y * g_Post.Pitch, g_Job.Src + (SIZE_T)y * g_Job.SrcPitch, g_Job.RowBytes);
+    }
+}
+
+static KSTART_ROUTINE CopyWorker;
+static VOID CopyWorker(PVOID Ctx)
+{
+    ULONG w = (ULONG)(ULONG_PTR)Ctx;
+    PVOID objs[2] = { &g_CopyGo[w], &g_CopyStop };
+    KAFFINITY aff = (KAFFINITY)1 << (4 + w);
+    KeSetSystemAffinityThreadEx(aff);
+    for (;;) {
+        if (KeWaitForMultipleObjects(2, objs, WaitAny, Executive, KernelMode, FALSE, NULL, NULL) != STATUS_WAIT_0) {
+            break;
+        }
+        CopyRows(w);
+        if (InterlockedDecrement(&g_CopyLeft) == 0) {
+            KeSetEvent(&g_CopyDone, IO_NO_INCREMENT, FALSE);
+        }
+    }
+    PsTerminateSystemThread(STATUS_SUCCESS);
+}
+
+static VOID CopyPoolStart(VOID)
+{
+    ULONG i;
+    HANDLE th;
+    if (g_CopyPool) {
+        return;
+    }
+    KeInitializeEvent(&g_CopyDone, SynchronizationEvent, FALSE);
+    KeInitializeEvent(&g_CopyStop, NotificationEvent, FALSE);
+    for (i = 0; i < COPY_WORKERS; i++) {
+        KeInitializeEvent(&g_CopyGo[i], SynchronizationEvent, FALSE);
+        if (NT_SUCCESS(PsCreateSystemThread(&th, THREAD_ALL_ACCESS, NULL, NULL, NULL, CopyWorker, (PVOID)(ULONG_PTR)i))) {
+            ObReferenceObjectByHandle(th, SYNCHRONIZE, *PsThreadType, KernelMode, (PVOID *)&g_CopyThr[i], NULL);
+            ZwClose(th);
+        }
+    }
+    g_CopyPool = TRUE;
+    for (i = 0; i < COPY_WORKERS; i++) {
+        if (g_CopyThr[i] == NULL) {
+            g_CopyPool = FALSE;                  /* fall back to a single-threaded copy */
+        }
+    }
+    LogPrint("scanout: %u-way parallel copy %s\n", COPY_WORKERS, g_CopyPool ? "ready" : "unavailable");
+}
+
+static VOID CopyPoolStop(VOID)
+{
+    ULONG i;
+    if (!g_CopyThr[0] && !g_CopyThr[1] && !g_CopyThr[2] && !g_CopyThr[3]) {
+        return;
+    }
+    KeSetEvent(&g_CopyStop, IO_NO_INCREMENT, FALSE);
+    for (i = 0; i < COPY_WORKERS; i++) {
+        if (g_CopyThr[i]) {
+            KeWaitForSingleObject(g_CopyThr[i], Executive, KernelMode, FALSE, NULL);
+            ObDereferenceObject(g_CopyThr[i]);
+            g_CopyThr[i] = NULL;
+        }
+    }
+    g_CopyPool = FALSE;
+}
+
+static VOID CopyFrameToFb(PUCHAR Src, ULONG SrcPitch, ULONG W, ULONG H)
+{
+    ULONG i;
+    if (W > g_Post.Width) W = g_Post.Width;
+    if (H > g_Post.Height) H = g_Post.Height;
+    if (!g_CopyPool) {
+        RECT all = { 0, 0, (LONG)W, (LONG)H };
+        CopyRectToFb(Src, SrcPitch, W, H, &all);
+        return;
+    }
+    g_Job.Src = Src;
+    g_Job.SrcPitch = SrcPitch;
+    g_Job.Rows = H;
+    g_Job.RowBytes = W * 4;
+    KeClearEvent(&g_CopyDone);
+    InterlockedExchange(&g_CopyLeft, COPY_WORKERS);
+    for (i = 0; i < COPY_WORKERS; i++) {
+        KeSetEvent(&g_CopyGo[i], IO_NO_INCREMENT, FALSE);
+    }
+    KeWaitForSingleObject(&g_CopyDone, Executive, KernelMode, FALSE, NULL);
+}
+
+static LONG64 NowUs(VOID)
+{
+    LARGE_INTEGER f, c = KeQueryPerformanceCounter(&f);
+    return c.QuadPart * 1000000LL / f.QuadPart;
+}
+
 VOID DispScanoutWork(VOID)
 {
     TGPU_ALLOCATION *al;
     PUCHAR px;
     RECT all;
     static ULONG count;
+    LONG64 t0 = NowUs(), dt;
 
+    LONG seq;
     KeWaitForSingleObject(&g_ScanLock, Executive, KernelMode, FALSE, NULL);
+    seq = g_FlipSeq;
     al = g_ScanCur;
+    UNREFERENCED_PARAMETER(all);
     if (al != NULL && !g_DirectActive && g_Fb != NULL && g_Visible && (px = AllocPixels(al)) != NULL) {
-        all.left = all.top = 0;
-        all.right = al->Desc.width;
-        all.bottom = al->Desc.height;
-        CopyRectToFb(px, al->Desc.pitch, al->Desc.width, al->Desc.height, &all);
+        if (al->Bo != NULL) {
+            HwWaitFence(al->Bo->LastFence, 100);        /* never copy a frame the GPU is still drawing */
+        }
+        CopyFrameToFb(px, al->Desc.pitch, al->Desc.width, al->Desc.height);
+        dt = NowUs() - t0;
+        InterlockedIncrement64(&g_StCopies);
+        InterlockedAdd64(&g_StCopyUs, dt);
+        InterlockedAdd64(&g_StCopyBytes, (LONG64)al->Desc.pitch * al->Desc.height);
+        if (dt > g_StCopyMaxUs) g_StCopyMaxUs = dt;
         if (++count <= 5) {
             LogPrint("scanout: %ux%u pitch %u from %p (%s)\n", al->Desc.width, al->Desc.height, al->Desc.pitch, al,
                      al->Bo != NULL ? "bo" : "vidmm");
         }
     }
+    InterlockedExchange(&g_CopiedSeq, seq);             /* this flip is on the panel (or nothing to show) */
     KeReleaseMutex(&g_ScanLock, FALSE);
+    if (g_FlipPending) {
+        TimerKick();                                     /* complete the flip at the next tick */
+    }
 }
 
 VOID DispPresentRects(TGPU_ALLOCATION *Dst, const RECT *Rects, ULONG Count)
@@ -456,6 +823,13 @@ VOID DispAllocDestroyed(TGPU_ALLOCATION *Al)
         g_ScanCur = NULL;
         LogPrint("scanout: primary %p destroyed while scanned out\n", Al);
     }
+    if (g_Cb4On && Al != NULL && Al->Bo != NULL) {
+        if (g_DirectActive && g_ScanCur != NULL && g_ScanCur->Bo == Al->Bo) {
+            DirectSelect(NULL);
+        }
+        KeStallExecutionProcessor(20000);                /* let the MDP latch away from it */
+        ScanUnmapLocked(Al->Bo);
+    }
     KeReleaseMutex(&g_ScanLock, FALSE);
 }
 
@@ -475,7 +849,9 @@ NTSTATUS DispSetSourceAddress(const DXGKARG_SETVIDPNSOURCEADDRESS *A)
     g_ScanCur = (TGPU_ALLOCATION *)A->hAllocation;
     g_ScanPa = A->PrimaryAddress;
     InterlockedIncrement(&g_FlipCount);
-    if (g_DirectOk && g_ScanCur != NULL && g_ScanCur->Bo != NULL &&
+    InterlockedIncrement64(&g_StFlipReq);
+    InterlockedIncrement(&g_FlipSeq);
+    if (g_DirectOk && g_ScanCur != NULL && g_ScanCur->Bo != NULL && ScanIova(g_ScanCur->Bo) != 0 &&
         (LONG)(HwCompletedFence() - g_ScanCur->Bo->LastFence) < 0) {
         g_DeferAl = g_ScanCur;                           /* GPU still rendering it: flip at fence completion */
         g_DeferFence = g_ScanCur->Bo->LastFence;
@@ -492,6 +868,9 @@ NTSTATUS DispSetSourceAddress(const DXGKARG_SETVIDPNSOURCEADDRESS *A)
     }
     InterlockedExchange(&g_FlipPending, 1);
     TimerKick();
+    if (!direct) {
+        KeInsertQueueDpc(&g_CopyDpc, NULL, NULL);       /* start the copy now, not at the next tick */
+    }
     if (++count <= 60) {
         LogPrint("SetVidPnSourceAddress: src %u alloc %p seg %u pa %llx flags %x%s\n", A->VidPnSourceId, A->hAllocation,
                  A->PrimarySegment, A->PrimaryAddress.QuadPart, A->Flags.Value, direct ? " (direct scanout)" : "");
@@ -575,7 +954,7 @@ NTSTATUS DispStart(PDXGKRNL_INTERFACE Dxgk)
     LogPrint("framebuffer mapped at %p\n", g_Fb);
     InitBrightness();                                    /* SM8550 DSI0 DCS 0x51 */
     /* SM8550: skip SM6225 MDP survey */
-    if (FALSE && g_Mdp == NULL) { /* SM8550: never map SM6225 0x05E00000 MDP; use UEFI GOP WC copy */
+    if (g_Mdp == NULL) {
         PHYSICAL_ADDRESS mpa;
         UNICODE_STRING nd = RTL_CONSTANT_STRING(L"\\??\\C:\\topaz\\gpuw.nodirect");
         OBJECT_ATTRIBUTES oa;
@@ -589,14 +968,18 @@ NTSTATUS DispStart(PDXGKRNL_INTERFACE Dxgk)
             ZwClose(h);
             off = TRUE;
         }
-        mpa.QuadPart = 0x05E00000LL;
-        g_Mdp = (volatile UCHAR *)MmMapIoSpaceEx(mpa, 0x90000, PAGE_READWRITE | PAGE_NOCACHE);
+        mpa.QuadPart = (LONGLONG)MDSS_PA;
+        g_Mdp = (volatile UCHAR *)MmMapIoSpaceEx(mpa, MDSS_LEN, PAGE_READWRITE | PAGE_NOCACHE);
         if (g_Mdp != NULL) {
             g_FbAddr = READ_REGISTER_ULONG((volatile ULONG *)(g_Mdp + MDP_VIG0 + SSPP_SRC0_ADDR));
             g_FbStride = READ_REGISTER_ULONG((volatile ULONG *)(g_Mdp + MDP_VIG0 + SSPP_SRC_YSTRIDE0));
-            g_DirectOk = !off && g_FbAddr == (ULONG)g_Post.PhysicAddress.QuadPart && g_FbStride == g_Post.Pitch;
+            g_DirectOk = !off && g_FbAddr == (ULONG)g_Post.PhysicAddress.QuadPart && g_FbStride == g_Post.Pitch &&
+                         READ_REGISTER_ULONG((volatile ULONG *)(g_Mdp + MDP_VIG1 + SSPP_SRC0_ADDR)) == g_FbAddr;
+            if (g_DirectOk) {
+                g_DirectOk = Cb4Enable();
+            }
         }
-        LogPrint("direct scanout: %s (VIG0 addr %08x stride %u%s)\n", g_DirectOk ? "on" : "off", g_FbAddr, g_FbStride,
+        LogPrint("direct scanout: %s (VIG0/1 addr %08x stride %u%s)\n", g_DirectOk ? "on" : "off", g_FbAddr, g_FbStride,
                  off ? ", gpuw.nodirect" : "");
     }
 
@@ -605,6 +988,7 @@ NTSTATUS DispStart(PDXGKRNL_INTERFACE Dxgk)
     if (g_HrTimer != NULL) {
         KeInitializeSpinLock(&g_TimerLock);
         KeInitializeDpc(&g_KickDpc, KickDpc, NULL);
+        KeInitializeDpc(&g_CopyDpc, CopyDpc, NULL);
         g_TimerRes = FALSE;
         LogPrint("vsync: on-demand 60 Hz high-resolution timer (stops when display is idle)\n");
         TimerEnsure();
@@ -616,11 +1000,18 @@ NTSTATUS DispStart(PDXGKRNL_INTERFACE Dxgk)
         LogPrint("vsync: ExAllocateTimer failed, 16 ms KTIMER\n");
     }
     g_TimerOn = TRUE;
+    CopyPoolStart();
     return STATUS_SUCCESS;
 }
 
 VOID DispStop(VOID)
 {
+    CopyPoolStop();
+    if (g_DirectOk && InterlockedExchange(&g_DirectActive, 0)) {
+        MdpScanFrom(g_FbAddr, g_FbStride);
+        KeStallExecutionProcessor(50000);
+    }
+    Cb4Disable();
     if (g_DirectOk && InterlockedExchange(&g_DirectActive, 0)) {
         MdpScanFrom(g_FbAddr, g_FbStride);               /* hand the panel back on the framebuffer */
         LogPrint("direct scanout: back to the framebuffer (%u direct flips)\n", g_DirectFlips);

@@ -1,0 +1,56 @@
+# Display pipeline and smoothness (OnePlus Open, SM8550)
+
+Goal: OS-wide smooth UI (Explorer drag, Start animations, Edge scroll). This page tracks the display path in
+`topazgpu_opt2.sys` (`drivers/gpu/topazgpu-opt2/kmd/disp.c`).
+
+## Hardware as UEFI leaves it
+
+| Block | Address | State at hand-off |
+|---|---|---|
+| MDSS / MDP | `0x0AE00000` (hw 0x90000001) | command-mode panel, autorefresh, CTL0 |
+| VIG0 / VIG1 source pipes | MDP `+0x5000` / `+0x7000` | each fetches half the 2440x2268 panel (1220 px), `SRC0_ADDR` = `0xB8000000`, stride 9760 |
+| CTL0 | MDP `+0x16000`, flush `+0x18` | flush bits VIG0 (0), VIG1 (1), CTL (17) |
+| MDSS stream `0x1C00` | apps SMMU `0x15000000`, SMR4 -> CB4 | CB4 `SCTLR=0xE0` (translation **off**, bypass) |
+
+Found with the read-only probe `drivers/display/OpenPanelBl/mdp_probe.c`.
+
+## Why it stuttered
+
+DWM rendered on the GPU in 1-2 ms, but every flip was copied by one CPU core from write-combined memory into the
+GOP framebuffer: 22 MB per frame, 20.6 ms average (43 ms worst), unsynchronised with the GPU and the panel. That
+capped the desktop near 45 fps with visible hitches.
+
+## Step 0/1 - measurement and a better copy (fallback path)
+
+* `FRAME` / `HB` lines in `C:\TopazGpuW.log` every 5 s: flips requested/done, copies, copy time, GPU fence waits.
+* A flip is reported done only after its copy finished (no torn or early frames); the copy waits for the
+  buffer's GPU fence first.
+* The copy runs on 4 pinned worker threads (CPUs 4-7): 14.8 ms average instead of 20.6 ms.
+
+## Step 3 - zero-copy direct scanout (default)
+
+Physically contiguous 24 MB buffers below 4 GiB are not available (`contig_probe`), so the display engine reads
+DWM's scattered pages through the SMMU instead:
+
+1. At `DispStart` the driver builds its own stage-1 tables for CB4: an identity map of 2-4 GiB with 1 GiB blocks
+   (keeps the boot framebuffer and DSI command buffers working) and turns translation on. CB4 must be
+   programmed the way Linux `arm-smmu` does it (`TCR2 = SEP_UPSTREAM | AS | PASize`, `TCR` with `SH0`, TTBR0 with
+   ASID): with UEFI's `TCR2` every fetch translation-faults (`cb4_probe.c` shows both cases).
+2. Each full-screen BO DWM creates is mapped page by page into a 32 MB slot at IOVA `0x10000000 + n*32 MB`
+   (`DispAllocCreated`), and unmapped when destroyed (after the pipes have left it).
+3. A flip writes the slot address and the buffer's pitch (9984) to VIG0 and VIG1 and flushes CTL0; the flip
+   completes when the flush bits clear (bounded wait). Flips of buffers the GPU is still rendering are deferred
+   to fence completion.
+
+Safety: if CB4 reports a fault at enable or at any later 5 s check, the driver points the pipes back at the
+framebuffer, turns direct mode off and continues with the copy path. `C:\topaz\gpuw.nodirect` disables direct
+scanout at the next boot.
+
+Result: per-frame CPU cost of presenting drops from ~15-20 ms of copying to a few register writes; no CB4 faults
+observed.
+
+## Still to do
+
+* Step 2: GPU DCVS (it idles at 124.8 MHz and the lowest DDR vote).
+* Step 4: 120 Hz panel mode.
+* Step 5: CPU input boost / faster governor ramp.
