@@ -87,6 +87,10 @@ lowest DDR) and nothing changed it afterwards. The bridge (`a740_wddm_bridge.c`)
     120 Hz timing, then retry.
 * Benchmark (zero-copy, 60 Hz, window drag at 60 moves/s): no CPU copies, GPU 0.26 ms/frame, CPU 5 % total, but
   DWM still averaged 25.8 ms per frame - flips latch on the 120 Hz TE but are completed on the next 60 Hz software
-  vsync tick, so DWM often misses a period. Completing flips at latch time is the next pacing fix.
+  vsync tick, so DWM often misses a period.
+* Pacing fix (v0.51): while a flip is pending or waiting for its GPU fence, the vsync timer polls every 1 ms, so the
+  flip is reported done the moment the MDP latches it and the vsync phase locks to that latch; with nothing pending
+  the timer returns to one tick per period. `PACE` lines in the log count the switches. Re-benchmark pending
+  (needs an unlocked session).
 * Caution for research probes: reading MDP blocks that are not in the stock DT (guessed ping-pong offsets) hard-hung
   the phone. Only read blocks the DT lists.

@@ -480,6 +480,8 @@ static VOID VsyncWork(BOOLEAN periodicTick)
             if (g_NextVsync <= now) {
                 g_NextVsync = now + VSYNC_PERIOD;
             }
+        } else {
+            g_NextVsync = now + VSYNC_PERIOD;            /* keep the phase for a later switch to fast polling */
         }
         g_LastVsync = now;
         if (InterlockedExchange(&g_ScanDirty, 0)) {
@@ -527,6 +529,13 @@ static VOID VsyncDpc(PKDPC Dpc, PVOID Ctx, PVOID A1, PVOID A2)
  * enabled, a flip is pending/deferred, or the scanout copy is dirty) and stops after ~0.5 s idle.
  * Before, a 1 ms high-resolution timer plus a global 1 ms timer resolution woke a CPU 1000x/s forever. */
 static volatile LONG g_TimerRunning;
+/* v0.51 pacing: the timer ran once per period, so a flip the MDP latched on a (120 Hz) panel TE was noticed up to a
+   period late and, if held, another period later: DWM averaged 25.8 ms per frame at "60 Hz". While a flip is
+   pending or deferred the timer now polls every 1 ms (VsyncWork non-periodic path: the flip completes the moment the
+   latch is seen and the vsync phase locks to it); once nothing is pending it returns to one tick per period,
+   phase-aligned to g_NextVsync. */
+static volatile LONG g_FastPoll, g_WantFast;
+static volatile LONG64 g_FastSwitches;
 static KSPIN_LOCK g_TimerLock;
 static KDPC g_KickDpc;
 static ULONG g_IdleTicks;
@@ -553,18 +562,54 @@ static VOID TimerEnsure(VOID)
     KeReleaseSpinLock(&g_TimerLock, irql);
 }
 
+/* DISPATCH: switch the high-resolution timer between 1 ms flip polling and one tick per vsync period */
+static VOID TimerFast(BOOLEAN On)
+{
+    KIRQL irql;
+    if (g_HrTimer == NULL) {
+        return;
+    }
+    KeAcquireSpinLock(&g_TimerLock, &irql);
+    if (On && !g_FastPoll) {
+        InterlockedExchange(&g_FastPoll, 1);
+        InterlockedExchange(&g_TimerRunning, 1);
+        g_IdleTicks = 0;
+        g_CbLast = 0;
+        ExSetTimer(g_HrTimer, -10000LL, 10000LL, NULL);
+        InterlockedIncrement64(&g_FastSwitches);
+    } else if (!On && g_FastPoll) {
+        LONG64 due = g_NextVsync - (LONG64)KeQueryInterruptTime();
+        if (due < 10000LL || due > VSYNC_PERIOD) {
+            due = VSYNC_PERIOD;
+        }
+        InterlockedExchange(&g_FastPoll, 0);
+        ExSetTimer(g_HrTimer, -due, VSYNC_PERIOD, NULL);
+    }
+    KeReleaseSpinLock(&g_TimerLock, irql);
+}
+
 static KDEFERRED_ROUTINE KickDpc;
 static VOID KickDpc(PKDPC Dpc, PVOID Ctx, PVOID A1, PVOID A2)
 {
     UNREFERENCED_PARAMETER(Dpc); UNREFERENCED_PARAMETER(Ctx);
     UNREFERENCED_PARAMETER(A1); UNREFERENCED_PARAMETER(A2);
-    TimerEnsure();
+    if (InterlockedExchange(&g_WantFast, 0) && g_DirectActive) {
+        TimerFast(TRUE);                         /* direct scanout: poll the MDP latch every 1 ms */
+    } else {
+        TimerEnsure();
+    }
 }
 
 /* any IRQL (SetVidPnSourceAddress may run at DIRQL): set the work flag first, then call this */
 static VOID TimerKick(VOID)
 {
-    if (!g_TimerRunning && g_HrTimer != NULL) {
+    if (g_HrTimer == NULL) {
+        return;
+    }
+    if (g_FlipPending && !g_FastPoll) {
+        InterlockedExchange(&g_WantFast, 1);
+        KeInsertQueueDpc(&g_KickDpc, NULL, NULL);
+    } else if (!g_TimerRunning) {
         KeInsertQueueDpc(&g_KickDpc, NULL, NULL);
     }
 }
@@ -597,7 +642,14 @@ static VOID HrTimerCb(PEX_TIMER Timer, PVOID Ctx)
 {
     UNREFERENCED_PARAMETER(Timer);
     UNREFERENCED_PARAMETER(Ctx);
-    VsyncWork(TRUE);                             /* one call per 60 Hz period (copy scanout, no MDP latch) */
+    if (g_FastPoll) {
+        VsyncWork(FALSE);                        /* 1 ms: complete the flip at the MDP latch */
+        if (!g_FlipPending && !g_Deferred) {
+            TimerFast(FALSE);
+        }
+        return;
+    }
+    VsyncWork(TRUE);                             /* one call per vsync period */
     TimerMaybeStop();
 }
 
@@ -609,6 +661,7 @@ VOID DispLogStats(VOID)
              g_TotCb, g_TotNotify, g_TotFlipDone, g_FlipCount, g_VsyncOn, g_FlipPending, g_Deferred, g_FlipHeld,
              g_LastSyncSt, g_LastSyncRet, g_ScanPa.QuadPart, g_ShownPa.QuadPart,
              g_TimerRunning ? "on" : "off", g_TimerStarts, g_TimerStops);
+    LogPrint("PACE fast %ld switches %lld held %u waits %u\n", g_FastPoll, g_FastSwitches, g_FlipHeld, g_FlipWaits);
     {
         ULONG fsr = g_Cb4On ? CbRd(CB_FSR) : 0;
         LogPrint("FRAME flipsReq %lld flipsDone %lld copies %lld copyUs %lld copyMaxUs %lld copyMB %lld | direct %u active %d "
