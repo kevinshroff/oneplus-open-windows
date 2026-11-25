@@ -7,6 +7,12 @@
  * requests the lowest LUT step >= 1.25 x current_freq x busy (schedutil-style), jumps to the cap when a
  * CPU of the cluster is >= 85 % busy, steps up at once and down only after 3 consecutive lower targets.
  *
+ * v2 (UI smoothness): a high-resolution 20 ms tick (the plain kernel wait quantised 40 ms to ~47 ms), 1.4 x
+ * headroom and a 75 % saturation threshold, and a UI boost: the display driver (topazgpu_opt2) signals the
+ * named event \BaseNamedObjects\OpenUiActivity on every flip; while frames are being produced (and 200 ms after)
+ * the performance clusters stay at >= 1.4 GHz and the efficiency cluster at >= 1.0 GHz. Parameter UiBoost=0
+ * turns the boost off.
+ *
  * EPSS (stock DT qcom,cpufreq-epss): domain 0 0x17D91000 CPU0-3, domain 1 0x17D92000 CPU4-6,
  * domain 2 0x17D93000 CPU7; 0x020 state, 0x100 frequency LUT, 0x320 perf-state request (Linux
  * qcom-cpufreq-hw epss layout). Windows processor numbers 0..7 follow the MADT order CPU0..CPU7.
@@ -46,7 +52,20 @@ static DOM g_Dom[NDOM];
 static HANDLE g_Log;
 static KEVENT g_Stop;
 static PKTHREAD g_Thread;
-static ULONG g_PeriodMs = 40;
+static ULONG g_PeriodMs = 20;
+static ULONG g_UiBoost = 1;
+static PKEVENT g_UiEv;
+static HANDLE g_UiEvH;
+static PEX_TIMER g_Tick;
+static KEVENT g_TickEv;
+static const ULONG g_BoostKhz[NDOM] = { 1000000, 1400000, 1400000 };
+static ULONG64 g_BoostTicks;
+
+static VOID TickCb(PEX_TIMER Timer, PVOID Ctx)
+{
+    UNREFERENCED_PARAMETER(Timer); UNREFERENCED_PARAMETER(Ctx);
+    KeSetEvent(&g_TickEv, IO_NO_INCREMENT, FALSE);
+}
 
 static VOID Log(PCSTR Fmt, ...)
 {
@@ -117,8 +136,9 @@ static VOID LogStats(ULONG64 Samples)
         DOM *d = &g_Dom[k];
         ULONG64 tot = 0, wsum = 0;
         for (i = 0; i < d->Rows; i++) { tot += d->Residency[i]; wsum += d->Residency[i] * (d->Khz[i] / 1000); }
-        Log("dom%u: now %u MHz (idx %u, hw %u MHz), avg %llu MHz over %llu samples\n", k, d->Khz[d->Cur] / 1000, d->Cur,
-            (Rd(d->Regs, R_STATE) & 0xFF) * XO_KHZ / 1000, tot ? wsum / tot : 0, tot);
+        Log("dom%u: now %u MHz (idx %u, hw %u MHz), avg %llu MHz over %llu samples, ui-boost samples %llu\n", k,
+            d->Khz[d->Cur] / 1000, d->Cur, (Rd(d->Regs, R_STATE) & 0xFF) * XO_KHZ / 1000, tot ? wsum / tot : 0, tot,
+            g_BoostTicks);
         RtlZeroMemory(d->Residency, sizeof(d->Residency));
     }
     UNREFERENCED_PARAMETER(Samples);
@@ -128,18 +148,31 @@ static KSTART_ROUTINE GovThread;
 static VOID GovThread(PVOID Ctx)
 {
     SPPI prev[NCPU], cur[NCPU];
-    ULONG ret, i, k;
+    ULONG ret, i, k, boostLeft = 0;
     ULONG64 n = 0;
     LARGE_INTEGER dt;
+    PVOID objs[2];
     UNREFERENCED_PARAMETER(Ctx);
 
     RtlZeroMemory(prev, sizeof(prev));
     ZwQuerySystemInformation(SystemProcessorPerformanceInformation, prev, sizeof(prev), &ret);
     dt.QuadPart = -10000LL * g_PeriodMs;
+    objs[0] = &g_Stop; objs[1] = &g_TickEv;
     for (;;) {
-        if (KeWaitForSingleObject(&g_Stop, Executive, KernelMode, FALSE, &dt) == STATUS_SUCCESS) break;
+        if (g_Tick) {
+            if (KeWaitForMultipleObjects(2, objs, WaitAny, Executive, KernelMode, FALSE, NULL, NULL) == STATUS_WAIT_0) break;
+        } else if (KeWaitForSingleObject(&g_Stop, Executive, KernelMode, FALSE, &dt) == STATUS_SUCCESS) {
+            break;
+        }
         if (!NT_SUCCESS(ZwQuerySystemInformation(SystemProcessorPerformanceInformation, cur, sizeof(cur), &ret)))
             continue;
+        if (g_UiEv && KeReadStateEvent(g_UiEv)) {          /* frames were flipped since the last tick */
+            KeClearEvent(g_UiEv);
+            boostLeft = 200 / g_PeriodMs;
+        } else if (boostLeft) {
+            boostLeft--;
+        }
+        if (boostLeft) g_BoostTicks++;
         for (k = 0; k < NDOM; k++) {
             DOM *d = &g_Dom[k];
             ULONG busyPm = 0, target, idx;   /* busiest CPU of the cluster, per mille */
@@ -152,9 +185,10 @@ static VOID GovThread(PVOID Ctx)
                     if (b > (LONG64)busyPm) busyPm = (ULONG)(b < 0 ? 0 : b);
                 }
             }
-            target = (ULONG)((ULONG64)d->Khz[d->Cur] * busyPm * 5 / 4000);   /* 1.25 x f_cur x busy */
+            target = (ULONG)((ULONG64)d->Khz[d->Cur] * busyPm * 7 / 5000);   /* 1.4 x f_cur x busy */
+            if (boostLeft && target < g_BoostKhz[k]) target = g_BoostKhz[k];  /* UI is animating */
             for (idx = 0; idx < d->MaxIdx && d->Khz[idx] < target; idx++) {}
-            if (busyPm >= 850) idx = d->MaxIdx;                               /* saturated: go straight to the cap */
+            if (busyPm >= 750) idx = d->MaxIdx;                               /* saturated: go straight to the cap */
             if (idx > d->Cur) {
                 d->DownVotes = 0;
                 SetIdx(d, idx);
@@ -175,6 +209,7 @@ static VOID Unload(PDRIVER_OBJECT DriverObject)
 {
     ULONG k;
     UNREFERENCED_PARAMETER(DriverObject);
+    if (g_Tick) { ExDeleteTimer(g_Tick, TRUE, FALSE, NULL); g_Tick = NULL; }
     if (g_Thread) {
         KeSetEvent(&g_Stop, IO_NO_INCREMENT, FALSE);
         KeWaitForSingleObject(g_Thread, Executive, KernelMode, FALSE, NULL);
@@ -186,6 +221,7 @@ static VOID Unload(PDRIVER_OBJECT DriverObject)
             MmUnmapIoSpace((PVOID)g_Dom[k].Regs, 0x1000);
         }
     }
+    if (g_UiEvH) ZwClose(g_UiEvH);
     Log("unloaded: all domains back at their cap\n");
     if (g_Log) ZwClose(g_Log);
 }
@@ -204,8 +240,9 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
         if (g_Log) ZwClose(g_Log);
         return STATUS_DEVICE_CONFIGURATION_ERROR;
     }
-    g_PeriodMs = QueryDword(RegistryPath, L"PeriodMs", 40);
-    if (g_PeriodMs < 10 || g_PeriodMs > 1000) g_PeriodMs = 40;
+    g_PeriodMs = QueryDword(RegistryPath, L"PeriodMs", 20);
+    if (g_PeriodMs < 10 || g_PeriodMs > 1000) g_PeriodMs = 20;
+    g_UiBoost = QueryDword(RegistryPath, L"UiBoost", 1);
     if (KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS) != NCPU) {
         Log("unexpected processor count %u - not starting\n", KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS));
         if (g_Log) ZwClose(g_Log);
@@ -235,14 +272,25 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
             d->Khz[d->Rows - 1] / 1000, d->MaxIdx, d->Khz[d->MaxIdx] / 1000, perf);
     }
     KeInitializeEvent(&g_Stop, NotificationEvent, FALSE);
+    KeInitializeEvent(&g_TickEv, SynchronizationEvent, FALSE);
+    if (g_UiBoost) {
+        UNICODE_STRING en = RTL_CONSTANT_STRING(L"\\BaseNamedObjects\\OpenUiActivity");
+        g_UiEv = IoCreateNotificationEvent(&en, &g_UiEvH);   /* opens it if the display driver created it first */
+        if (g_UiEv) KeClearEvent(g_UiEv);
+    }
+    g_Tick = ExAllocateTimer(TickCb, NULL, EX_TIMER_HIGH_RESOLUTION);
+    if (g_Tick) ExSetTimer(g_Tick, -10000LL * g_PeriodMs, 10000LL * g_PeriodMs, NULL);
     st = PsCreateSystemThread(&th, THREAD_ALL_ACCESS, NULL, NULL, NULL, GovThread, NULL);
     if (!NT_SUCCESS(st)) goto fail;
     ObReferenceObjectByHandle(th, SYNCHRONIZE, *PsThreadType, KernelMode, (PVOID *)&g_Thread, NULL);
     ZwClose(th);
     DriverObject->DriverUnload = Unload;
-    Log("governor running, period %u ms\n", g_PeriodMs);
+    Log("governor v2 running, period %u ms (%s tick), ui boost %s\n", g_PeriodMs, g_Tick ? "high-res" : "kernel-wait",
+        g_UiEv ? "on" : "off");
     return STATUS_SUCCESS;
 fail:
+    if (g_Tick) { ExDeleteTimer(g_Tick, TRUE, FALSE, NULL); g_Tick = NULL; }
+    if (g_UiEvH) { ZwClose(g_UiEvH); g_UiEvH = NULL; }
     for (k = 0; k < NDOM; k++) if (g_Dom[k].Regs) MmUnmapIoSpace((PVOID)g_Dom[k].Regs, 0x1000);
     if (g_Log) ZwClose(g_Log);
     return STATUS_DEVICE_CONFIGURATION_ERROR;

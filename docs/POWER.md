@@ -32,3 +32,9 @@ USB-C port. Total power = USB input (ADSP, keeper v4 `usb_in`) + battery (two ZY
 - `meter.ps1` sampling (battery mW, USB mW, temps, CPU %) → `C:\topaz\power.log`.
 - `C:\topaz\cpugov.log` — governor frequency residency every 30 s.
 - Brightness: Settings slider, or `WmiMonitorBrightnessMethods.WmiSetBrightness`.
+
+## CPU governor v2 (2026-11-26)
+
+OpenCpuGov now ticks every 20 ms (high-resolution timer), uses 1.4 x headroom and a UI boost driven by display
+flips (see docs/DISPLAY.md, Step 5). Idle power is unchanged: with no frames being produced all clusters return to
+their lowest step within ~60 ms of the boost window ending.

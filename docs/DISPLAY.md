@@ -64,7 +64,17 @@ lowest DDR) and nothing changed it afterwards. The bridge (`a740_wddm_bridge.c`)
   once startup has finished. A self-test at start (220 MHz and back) must pass; the first failed vote turns the
   governor off. `C:\topaz\gpu.nodcvs` disables it. `HB` log lines show `dcvs idx/busy/votes`.
 
+## Step 5 - CPU governor tuned for UI (OpenCpuGov v2)
+
+`drivers/power/OpenCpuPerf/open_cpu_gov.c`:
+
+* 20 ms high-resolution tick (the old 40 ms kernel wait really ran at ~47 ms), 1.4 x headroom, jump to the cap
+  at >= 75 % busy (was 85 %), down-steps still need 3 quieter ticks;
+* UI boost: `topazgpu_opt2` signals `\BaseNamedObjects\OpenUiActivity` (from its vsync DPC) whenever DWM flipped a
+  frame; while frames are being produced and for 200 ms after, the performance clusters are held at >= 1.4 GHz
+  and the efficiency cluster at >= 1.0 GHz. Idle behaviour is unchanged (all clusters at their lowest step).
+  Registry `Parameters\UiBoost=0` turns it off; `cpugov.log` reports `ui-boost samples`.
+
 ## Still to do
 
 * Step 4: 120 Hz panel mode.
-* Step 5: CPU input boost / faster governor ramp.

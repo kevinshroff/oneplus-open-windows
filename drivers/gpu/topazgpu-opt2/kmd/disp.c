@@ -67,6 +67,9 @@ static volatile LONG g_DirectActive;            /* VIG0 currently fetches a BO *
 static KMUTEX g_ScanLock;                       /* engine copies vs. DestroyAllocation (defined below) */
 static ULONG g_FbAddr, g_FbStride;              /* bootloader values, restored on fallback/stop */
 static ULONG g_DirectFlips;
+static PKEVENT g_UiEv;                          /* \BaseNamedObjects\OpenUiActivity: CPU governor UI boost */
+static HANDLE g_UiEvH;
+static volatile LONG g_UiFlips;
 
 static VOID MdpScanFrom(ULONG Pa, ULONG Stride)
 {
@@ -379,6 +382,9 @@ static VOID VsyncNotify(BOOLEAN flip)
 
 static VOID VsyncWork(BOOLEAN periodicTick)
 {
+    if (g_UiEv && g_UiFlips && InterlockedExchange(&g_UiFlips, 0)) {
+        KeSetEvent(g_UiEv, IO_NO_INCREMENT, FALSE);
+    }
     LONG64 now = (LONG64)KeQueryInterruptTime();
     BOOLEAN flip = FALSE, tick = FALSE;
     LONG64 slack = 0;
@@ -850,6 +856,7 @@ NTSTATUS DispSetSourceAddress(const DXGKARG_SETVIDPNSOURCEADDRESS *A)
     g_ScanPa = A->PrimaryAddress;
     InterlockedIncrement(&g_FlipCount);
     InterlockedIncrement64(&g_StFlipReq);
+    InterlockedExchange(&g_UiFlips, 1);                   /* signalled from the vsync DPC (may be at DIRQL here) */
     InterlockedIncrement(&g_FlipSeq);
     if (g_DirectOk && g_ScanCur != NULL && g_ScanCur->Bo != NULL && ScanIova(g_ScanCur->Bo) != 0 &&
         (LONG)(HwCompletedFence() - g_ScanCur->Bo->LastFence) < 0) {
@@ -954,6 +961,10 @@ NTSTATUS DispStart(PDXGKRNL_INTERFACE Dxgk)
     LogPrint("framebuffer mapped at %p\n", g_Fb);
     InitBrightness();                                    /* SM8550 DSI0 DCS 0x51 */
     /* SM8550: skip SM6225 MDP survey */
+    if (g_UiEv == NULL) {
+        UNICODE_STRING en = RTL_CONSTANT_STRING(L"\\BaseNamedObjects\\OpenUiActivity");
+        g_UiEv = IoCreateNotificationEvent(&en, &g_UiEvH);
+    }
     if (g_Mdp == NULL) {
         PHYSICAL_ADDRESS mpa;
         UNICODE_STRING nd = RTL_CONSTANT_STRING(L"\\??\\C:\\topaz\\gpuw.nodirect");
