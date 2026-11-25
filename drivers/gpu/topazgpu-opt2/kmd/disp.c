@@ -145,11 +145,16 @@ static ULONG g_Notifies, g_Done;
 static volatile LONG g_FlipOverrun, g_FlipImm;   /* v0.45.4: flips replacing a pending one / FlipImmediate flips */
 static ULONG g_FlipHeld;                         /* flips held back for pacing in the current second */
 
+static volatile LONG64 g_TotCb, g_TotNotify, g_TotFlipDone;   /* cumulative, for DispLogStats */
+static volatile LONG g_LastSyncSt, g_LastSyncRet;
+
 static VOID VsyncNotify(BOOLEAN flip)
 {
-    BOOLEAN ret;
+    BOOLEAN ret = FALSE;
     if (g_Dxgk != NULL && (g_VsyncOn || flip)) {
-        g_Dxgk->DxgkCbSynchronizeExecution(g_Dxgk->DeviceHandle, VsyncSync, NULL, 0, &ret);
+        g_LastSyncSt = g_Dxgk->DxgkCbSynchronizeExecution(g_Dxgk->DeviceHandle, VsyncSync, NULL, 0, &ret);
+        g_LastSyncRet = ret;
+        InterlockedIncrement64(&g_TotNotify);
         if (++g_VsyncCount <= 3 || (flip && g_VsyncCount < 50)) {
             LogPrint("vsync %u%s pa %llx\n", g_VsyncCount, flip ? " (flip done)" : "", g_ScanPa.QuadPart);
         }
@@ -161,6 +166,8 @@ static VOID VsyncWork(BOOLEAN periodicTick)
     LONG64 now = (LONG64)KeQueryInterruptTime();
     BOOLEAN flip = FALSE, tick = FALSE;
     LONG64 slack = 0;
+
+    InterlockedIncrement64(&g_TotCb);
 
     if (!periodicTick) {
         if (g_CbLast != 0) {
@@ -208,6 +215,7 @@ static VOID VsyncWork(BOOLEAN periodicTick)
             g_ShownPa = g_ScanPa;
             g_LastFlipDone = now;
             flip = TRUE;
+            InterlockedIncrement64(&g_TotFlipDone);
             g_HeldThis = FALSE;
             if (g_DirectActive) {
                 g_NextVsync = now + VSYNC_PERIOD;        /* the latch happened at the panel vsync: lock phase */
@@ -271,6 +279,15 @@ static VOID HrTimerCb(PEX_TIMER Timer, PVOID Ctx)
     UNREFERENCED_PARAMETER(Timer);
     UNREFERENCED_PARAMETER(Ctx);
     VsyncWork(FALSE);
+}
+
+/* PASSIVE: one line of display/vsync state for the heartbeat in ddi.c */
+VOID DispLogStats(VOID)
+{
+    LogPrint("DISP cb %lld notify %lld flipsDone %lld flipsReq %ld | vsyncOn %ld flipPending %ld deferred %ld held %u "
+             "| sync st %08x ret %ld | scanPa %llx shownPa %llx\n",
+             g_TotCb, g_TotNotify, g_TotFlipDone, g_FlipCount, g_VsyncOn, g_FlipPending, g_Deferred, g_FlipHeld,
+             g_LastSyncSt, g_LastSyncRet, g_ScanPa.QuadPart, g_ShownPa.QuadPart);
 }
 
 VOID DispVsyncEnable(BOOLEAN Enable)

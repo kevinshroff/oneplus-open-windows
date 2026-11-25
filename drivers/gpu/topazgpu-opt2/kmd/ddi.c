@@ -37,6 +37,10 @@ typedef struct _NOTIFY_CTX {
     ULONG         Fence;
 } NOTIFY_CTX;
 
+struct _TGPU_ADAPTER;
+static VOID HbStart(struct _TGPU_ADAPTER *a);
+static VOID HbStop(VOID);
+
 static BOOLEAN NotifyRoutine(PVOID Ctx)
 {
     NOTIFY_CTX *n = (NOTIFY_CTX *)Ctx;
@@ -163,6 +167,7 @@ static NTSTATUS TgStartDevice(const PVOID Ctx, PDXGK_START_INFO StartInfo, PDXGK
     }
     /* Open/A740 starts as render-only; donor DPU/IRQ paths remain unused. */
     DispStart(&a->Dxgk);
+    HbStart(a);
     *NumSources = 1;                                     /* Step 2A: UEFI GOP inner panel */
     *NumChildren = 1;
     a->Started = TRUE;
@@ -170,10 +175,53 @@ static NTSTATUS TgStartDevice(const PVOID Ctx, PDXGK_START_INFO StartInfo, PDXGK
     return STATUS_SUCCESS;
 }
 
+/* Heartbeat: VidSch/GPU/display counters at PASSIVE (DPC-context logs only reach DbgPrint). */
+VOID DispLogStats(VOID);
+ULONG HwCompletedFence(VOID);
+static KEVENT g_HbStop;
+static PKTHREAD g_HbThread;
+static KSTART_ROUTINE HbThread;
+static VOID HbThread(PVOID Ctx)
+{
+    TGPU_ADAPTER *a = (TGPU_ADAPTER *)Ctx;
+    ULONG n = 0;
+    for (;;) {
+        LARGE_INTEGER dt;
+        dt.QuadPart = (n < 60 ? -30000000LL : -300000000LL);       /* 3 s for 3 min, then 30 s */
+        if (KeWaitForSingleObject(&g_HbStop, Executive, KernelMode, FALSE, &dt) == STATUS_SUCCESS) break;
+        n++;
+        LogPrint("HB %u vidsch submitted %u completed %u | gpu fence %u\n", n, a->LastSubmittedFence,
+                 a->LastCompletedFence, HwCompletedFence());
+        DispLogStats();
+    }
+    PsTerminateSystemThread(STATUS_SUCCESS);
+}
+static VOID HbStart(struct _TGPU_ADAPTER *ap)
+{
+    TGPU_ADAPTER *a = (TGPU_ADAPTER *)ap;
+    HANDLE th;
+    if (g_HbThread) return;
+    KeInitializeEvent(&g_HbStop, NotificationEvent, FALSE);
+    if (NT_SUCCESS(PsCreateSystemThread(&th, THREAD_ALL_ACCESS, NULL, NULL, NULL, HbThread, a))) {
+        if (!NT_SUCCESS(ObReferenceObjectByHandle(th, SYNCHRONIZE, *PsThreadType, KernelMode, (PVOID *)&g_HbThread, NULL)))
+            g_HbThread = NULL;
+        ZwClose(th);
+    }
+}
+static VOID HbStop(VOID)
+{
+    if (!g_HbThread) return;
+    KeSetEvent(&g_HbStop, IO_NO_INCREMENT, FALSE);
+    KeWaitForSingleObject(g_HbThread, Executive, KernelMode, FALSE, NULL);
+    ObDereferenceObject(g_HbThread);
+    g_HbThread = NULL;
+}
+
 static NTSTATUS TgStopDevice(const PVOID Ctx)
 {
     UNREFERENCED_PARAMETER(Ctx);
     LogPrint("StopDevice\n");
+    HbStop();
     DispStop();
     EngStop();
 
@@ -1118,6 +1166,7 @@ static NTSTATUS TgStopDeviceAndReleasePostDisplayOwnership(PVOID Ctx, D3DDDI_VID
     UNREFERENCED_PARAMETER(Ctx);
     LogPrint("StopDeviceAndReleasePostDisplayOwnership: target %u\n", TargetId);
     DispGetPostInfo(Info);
+    HbStop();
     DispStop();
     EngStop();
     return STATUS_SUCCESS;

@@ -1,6 +1,13 @@
 # Agent handoff — Wi-Fi and GPU development
 
-Latest update (Boot177):
+Latest update (2026-11-25, Option 2 — accelerated desktop):
+
+- `topazgpu_opt2.sys` + `ogpu_d3d10.dll` run DWM, Explorer and inbox D3D11 apps on the Adreno 740; installed permanently via the `OnePlus-Open-Adreno740-Init` boot task with a crash guard (`C:\topaz\gpu.disable`). See [drivers/gpu/topazgpu-opt2](../drivers/gpu/topazgpu-opt2/README.md).
+- Fixes that made it work: ZAP shader + `CP_SET_SECURE_MODE(0)`; BOs/page tables above 4 GiB (CB0 `TCR2.PASize` read live); GPU VA free list; 512-IB submits with ring-space wait; Mesa `CreateResource` NULL check.
+- Wi-Fi (`OpenWcnSleepClk`, G1355), Turnip/Zink/DXVK (G1353/G1354) and charging (`OpenChargerKeeper`) are complete; the sections below describe the Nov 3 state and are historical.
+- Remote automation note: console programs launched into the user session are handed to Windows Terminal; use `conhost.exe --headless` for hidden helpers.
+
+Older update (Boot177):
 
 - [G1348 hardware result](../experiments/G1348/HARDWARE-RESULT.md): one SID0 instruction-translation query matched the expected MDL page, with result8/status1, restored controls and uncertainty0. GMU/HFI startup succeeded. Windows remained responsive; native calls returned and future Starts4/once0 were verified. No SQE start, packet, command fence or WDDM execution occurred.
 - The timer’s required output pointer and CB0 writable-mapping defects are corrected. The broad diagnostic mapping remains read-only; owner and TCU-vote firmware were reused. Continue toward first command/fence only under a new conditional owner profile with fresh same-run authority checks.

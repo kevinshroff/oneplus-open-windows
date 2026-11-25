@@ -9,8 +9,8 @@ The project reuses Windows ARM64 CPU/storage/USB stacks and OEM firmware, develo
 > [!IMPORTANT]
 > **Research source snapshot.** Development is active. Captured firmware, Windows binaries, signing certificates, credentials and private operator infrastructure are excluded; this repository does not provide a ready-to-flash installation bundle.
 
-**Demonstrated:** Windows 11 default boot • inner framebuffer • native touchscreen • internal-storage boot • **Wi-Fi (WCN7850 802.11ax, WPA2/DHCP/DNS/HTTPS)** • **Adreno 740 WDDM 1.3 + Mesa Turnip (Vulkan 1.3) + Mesa Zink (OpenGL 4.6) + DXVK 3.1.1 (DirectX 11)** • USB debugging/control • black cover framebuffer.  
-**Still unfinished:** Accelerated DWM desktop presentation • Bluetooth/audio/cameras • everyday battery/charging • complete buttons, folding and suspend/resume.
+**Demonstrated:** Windows 11 default boot • **GPU-accelerated desktop (DWM + Explorer + apps on Adreno 740 via native D3D11 UMD)** • native touchscreen • internal-storage boot • **Wi-Fi (WCN7850 802.11ax, WPA2/DHCP/DNS/HTTPS)** • **Adreno 740 WDDM 1.3 + Mesa Turnip (Vulkan 1.3) + Mesa Zink (OpenGL 4.6) + DXVK 3.1.1 (DirectX 11)** • USB debugging/control • black cover framebuffer.  
+**Still unfinished:** Bluetooth/audio/cameras • everyday battery/charging • complete buttons, folding and suspend/resume.
 
 ## Status
 
@@ -20,10 +20,10 @@ The project reuses Windows ARM64 CPU/storage/USB stacks and OEM firmware, develo
 | CPU | **WORKS ✅** | Native ARM64 execution; all eight logical processors available. |
 | RAM | **WORKS ✅** | Working Windows memory and native allocations. |
 | UFS / installation | **WORKS ✅** | Windows installed on and booting from internal storage. |
-| Inner display | **WORKS ✅** | Usable Windows desktop with scaling; currently framebuffer presentation. |
+| Inner display | **WORKS ✅** | Usable Windows desktop with scaling, presented through the Adreno 740 WDDM display driver (VidPN on the UEFI GOP framebuffer). |
 | Touch | **WORKS ✅** | Native touchscreen input; sustained everyday use demonstrated. |
 | Wi-Fi | **WORKS ✅** | WCN7850 802.11ax WPA2/DHCP/DNS/HTTPS sustained live via [`OpenWcnSleepClk`](drivers/wlan/OpenWcnSleepClk/) (enabling PMK8550 GPIO3 32.768 kHz `sleep_clk`) + stock `qcwlanhmt8380.sys`. |
-| GPU / WDDM acceleration | **WORKS ✅** | Adreno 740 WDDM 1.3 bridge (`topazgpu_v12.sys`) + [Mesa Turnip Vulkan 1.3 + Mesa Zink OpenGL 4.6 + DXVK 3.1.1 D3D11](drivers/gpu/turnip-wddm/) live-verified on hardware; DWM desktop presentation remains framebuffer. |
+| GPU / WDDM acceleration | **WORKS ✅** | Adreno 740 WDDM 1.3 bridge (`topazgpu_v12.sys`) + [Mesa Turnip Vulkan 1.3 + Mesa Zink OpenGL 4.6 + DXVK 3.1.1 D3D11](drivers/gpu/turnip-wddm/) live-verified on hardware; **DWM, Explorer and D3D11 apps render on the Adreno 740** via [`ogpu_d3d10.dll`](drivers/gpu/topazgpu-opt2/) (Option 2). |
 | USB debugging / control | **WORKS ✅** | Kernel debugging and remote control over USB. |
 | Cover display / folding | **PARTIAL 🟡** | Cover image can be cleared to black; panel switching and folding remain unfinished. |
 | Physical buttons | **IN PROGRESS 🛠️** | Hardware reader implemented; power-button behavior awaits a physical test. |
@@ -78,11 +78,11 @@ These [subfeature checklists](docs/STATUS.md) track implementation and future re
 - [ ] Reproducible installation/servicing workflow.
 - [ ] Power-loss and storage-performance qualification.
 
-## Inner display — 2/5 complete
+## Inner display — 3/5 complete
 
 - [x] Windows framebuffer desktop.
 - [x] Usable desktop scaling.
-- [ ] Accelerated presentation.
+- [x] Accelerated presentation (Adreno 740 DWM composition, GOP scanout).
 - [ ] Brightness management.
 - [ ] Display sleep/wake lifecycle.
 
@@ -107,7 +107,7 @@ These [subfeature checklists](docs/STATUS.md) track implementation and future re
 - [ ] Physical power-button display-off test.
 - [ ] Physical second-press wake test.
 
-## GPU / WDDM — 8/9 complete
+## GPU / WDDM — 9/9 complete
 
 - [x] Kernel resource/ownership foundations.
 - [x] GMU firmware and HFI acknowledgements.
@@ -117,7 +117,7 @@ These [subfeature checklists](docs/STATUS.md) track implementation and future re
 - [x] Repeatable submission, interrupts and completion.
 - [x] A740 WDDM memory/scheduling/DDI integration (`topazgpu_v12.sys`).
 - [x] Hardware-backed userspace graphics integration (Mesa Turnip Vulkan 1.3 + Mesa Zink OpenGL 4.6 + DXVK 3.1.1 D3D11).
-- [ ] Accelerated DWM desktop presentation.
+- [x] Accelerated DWM desktop presentation (`topazgpu_opt2.sys` + Mesa `d3d10umd`/freedreno `ogpu_d3d10.dll`).
 
 ## Wi-Fi — 6/6 complete
 
@@ -226,14 +226,16 @@ https://github.com/user-attachments/assets/2b834bc3-bc92-4345-a5e6-32ab159f1ff7
 ## Permanent driver & graphics stack
 
 - **Wi-Fi (WCN7850):** [`drivers/wlan/OpenWcnSleepClk/`](drivers/wlan/OpenWcnSleepClk/) installs as a `SYSTEM_START` kernel driver (`Group = "System Bus Extender"`) that configures PMK8550 GPIO3 (`SID=0, PPID=0xBA`) as `func1` 32.768 kHz `sleep_clk` output before `NDIS` starts stock `qcwlanhmt8380.sys`.
-- **Adreno 740 Kernel Bridge (Option 1 — Desktop-Safe Coexistence):** `OpenSmmuD0` (GPU SMMU bootstrap) + `OpenGpuStart` ([`topazgpu_wdm.c`](drivers/gpu/turnip-wddm/topazgpu_wdm.c)) start automatically on Windows 11 boot and expose `\\.\TopazGpu` (`IOCTL_TOPAZ_ESCAPE = 0x222000`) without registering a competing WDDM display adapter, keeping `Microsoft Basic Display Driver` (`BasicDisplay`) and `dwm.exe` 100% undisturbed.
-- **Userspace Graphics Stack (Option A):** [`drivers/gpu/turnip-wddm/`](drivers/gpu/turnip-wddm/) provides:
-  - **Vulkan 1.3 (Mesa Turnip):** Registered globally in `HKLM\SOFTWARE\Khronos\Vulkan\Drivers` (`freedreno_icd.aarch64.json` -> `vulkan_freedreno.dll`) so all Vulkan apps use `Turnip Adreno (TM) 740` automatically via `C:\Windows\System32\vulkan-1.dll` (prefers `\\.\TopazGpu` with fallback to `D3DKMT`).
-  - **OpenGL 4.6 (Mesa Zink)** & **DirectX 8/9/10/11 (DXVK 3.1.1):** Staged in `C:\Program Files\Adreno740-Graphics\{zink,dxvk}\` for per-application drop-in next to target executables (leaving inbox `System32\d3d11.dll` and `dxgi.dll` untouched for DWM stability).
+- **Adreno 740 display + render (Option 2):** [`drivers/gpu/topazgpu-opt2/`](drivers/gpu/topazgpu-opt2/) — `topazgpu_opt2.sys` (WDDM 1.3 display+render KMD: GOP-framebuffer VidPN, 60 Hz VSync, ZAP/secure-mode exit, SMMU CB0 BO mapping) and `ogpu_d3d10.dll` (Mesa `d3d10umd` + Gallium freedreno FD740, `UserModeDriverName`). DWM, Explorer, Start/Search, Settings, Notepad, Edge and other inbox D3D11 apps render on the Adreno 740.
+  - Started at boot by the SYSTEM task `OnePlus-Open-Adreno740-Init` ([`install/init_adreno740.ps1`](drivers/gpu/topazgpu-opt2/install/init_adreno740.ps1)) with a crash guard: an unfinished GPU start or a DWM crash loop writes `C:\topaz\gpu.disable` and the next boot stays on Microsoft Basic Display (delete the file to re-arm).
+  - `C:\topaz\umd.enable` opts processes into the Adreno UMD; `C:\topaz\umd.dwmonly` limits it to DWM (apps fall back to WARP).
+- **Userspace graphics (Option A):** [`drivers/gpu/turnip-wddm/`](drivers/gpu/turnip-wddm/) — Vulkan 1.3 (Mesa Turnip, global ICD), OpenGL 4.6 (Mesa Zink) and DirectX 8–11 via DXVK 3.1.1 (per-app drop-in from `C:\Program Files\Adreno740-Graphics\{zink,dxvk}\`).
+
+<img src="docs/media/option2-apps-adreno740.jpg" alt="Edge, Notepad and Settings composed by DWM on the Adreno 740" width="320">
 
 ## The next useful work
 
-- **TODO (Option 2 — Full DWM / System UI GPU Acceleration):** Wire VidPN framebuffer presentation in `topazgpu` alongside a native Windows D3D11 User-Mode Driver (`UserModeDriverName`, e.g., Mesa `d3d10umd` + Gallium `freedreno` `FD740` or Zink/Turnip) so Windows DWM, Explorer, UWP/WinUI apps, and browsers also render directly on Adreno 740 instead of `BasicDisplay` + WARP.
+- **GPU follow-ups:** direct MDP scanout instead of the CPU copy into the GOP framebuffer, D3D12 (`d3d12umddi`), GPU interrupts instead of fence polling, GPU recovery/TDR, GPU power management (GMU idle/DCVS).
 - **Post-GPU Roadmap (unordered):**
   - **Sound:** Speakers, microphone, and Windows audio endpoint integration.
   - **Bluetooth:** WCN7850 Bluetooth radio bring-up, pairing, and peripheral traffic.

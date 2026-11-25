@@ -6,7 +6,7 @@ instead of `BasicDisplay` + WARP.
 | Step | Component | Status |
 |---|---|---|
 | 2A | `topazgpu_opt2.sys` WDDM 1.3 Display+Render KMD driving the inner panel via the UEFI GOP framebuffer (VidPN source/target, 60 Hz timer VSync, scanout copy) | **Works** — `AcquirePostDisplayOwnership 2440x2268 pitch 9760 pa b8000000`, `CommitVidPn`, `SetVidPnSourceAddress`, scanout; `dwm.exe`/`explorer.exe` stable |
-| 2B | `ogpu_d3d10.dll` — Mesa 24.3 `d3d10umd` frontend + Gallium `freedreno` (FD740) over the Topaz `msm` escape, registered as `UserModeDriverName` | **DWM composes the Windows 11 desktop on the Adreno 740** (UMD enabled for `dwm.exe`); inbox D3D11 apps render real pixels |
+| 2B | `ogpu_d3d10.dll` — Mesa 24.3 `d3d10umd` frontend + Gallium `freedreno` (FD740) over the Topaz `msm` escape, registered as `UserModeDriverName` | **Works** — DWM, Explorer, Start/Search, TextInputHost, Settings, Notepad, ApplicationFrameHost and Edge load `ogpu_d3d10.dll`; permanent at boot |
 
 ![Windows 11 desktop composed by DWM through ogpu_d3d10.dll on Adreno 740](../../../docs/media/option2-dwm-adreno740.jpg)
 
@@ -53,6 +53,37 @@ Enabling the UMD for DWM exposed the remaining blockers, all in GPU memory manag
 4. **Mesa `d3d10umd` bug.** `CreateResource` tested `if (!pResource)` instead of
    `if (!pResource->resource)`, turning an allocation failure into an access violation inside DWM.
 
+## Permanent installation and verification (2026-11-25)
+
+`install/init_adreno740.ps1` runs as the SYSTEM startup task `OnePlus-Open-Adreno740-Init`:
+
+1. forces `OpenSmmuD0`/`OpenGpuStart` back to `Start=4` (PnP never starts the GPU on its own);
+2. skips the GPU and keeps Microsoft Basic Display if `C:\topaz\gpu.disable` exists, or converts a leftover
+   `gpu.boot.pending` (a previous start that never finished) into `gpu.disable`;
+3. re-enumerates the clock parent (`ACPI\OPEN0182\1`) and starts `OpenSmmuD0` + `topazgpu_opt2.sys`;
+4. watches DWM for 45 s — three or more DWM exits write `gpu.disable` and reboot to the safe desktop.
+
+Hands-off cold reboot (no manual steps):
+
+```
+boot.log: OPEN0515 status OK; OpenGpuStart Running / GPU start OK (DWM exits 0)
+services: OpenWcnSleepClk, qcwlan, OpenSmmuD0, OpenGpuStart, OpenChargerKeeper = Running
+ogpu_d3d10.dll loaded by: dwm, explorer, SearchHost, StartMenuExperienceHost, TextInputHost
+Wi-Fi: VIRUS-1 connected (802.11ax, 6 GHz)
+regression on the same boot:
+  Turnip Vulkan 1.3 vkCmdFillBuffer readback 0xdeadbeef            PASS
+  inbox D3D11 (ogpu_d3d10) blit 0xdeadbeef / clear 0xffcc8033       PASS
+  Zink GL 4.6 "zink Vulkan 1.3(Turnip Adreno (TM) 740)"             PASS
+  DXVK 3.1.1 D3D11CreateDevice FL 11_0 on Turnip                    PASS
+KMD heartbeat: ~60 vsync notifications/s, flips completing, no SMMU/CP faults, no ring stalls
+```
+
+![Edge, Notepad and Settings on the Adreno 740](../../../docs/media/option2-apps-adreno740.jpg)
+
+Known limits: scanout is a CPU copy of the primary into the UEFI GOP framebuffer (no MDP programming yet),
+no D3D12 UMD, GPU completion is polled (interrupts masked), no TDR/GPU reset, no GPU power management.
+The KMD writes a heartbeat (`HB`/`DISP` lines) to `C:\TopazGpuW.log` every 3 s for 3 min, then every 30 s.
+
 ## Contents
 
 - `kmd/` — Option 2 sources that differ from `drivers/gpu/gpu-wddm-bridge-G779` / G1352:
@@ -62,6 +93,7 @@ Enabling the UMD for DWM exposed the remaining blockers, all in GPU memory manag
 - `mesa/` — full working-tree diff against Mesa `62f1e49` (24.3-devel) used for `vulkan_freedreno.dll`,
   Zink and `ogpu_d3d10.dll`, plus the new `fd_wddm.c` (freedreno DRM backend over the escape) and
   `topaz_wddm.cpp` (d3d10umd ↔ KMD glue).
+- `install/` — `init_adreno740.ps1` boot task script.
 - `tests/` — `test_inbox_d3d11.c` (inbox runtime blit + clear readback), `test_dxvk_pixel.c`.
 
 ## UMD opt-in gate

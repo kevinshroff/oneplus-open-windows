@@ -33,11 +33,11 @@ These counts describe the checklists below, not elapsed effort or a compatibilit
 - [ ] Reproducible installation/servicing workflow.
 - [ ] Power-loss and storage-performance qualification.
 
-## Inner display — 2/5 complete
+## Inner display — 3/5 complete
 
 - [x] Windows framebuffer desktop.
 - [x] Usable desktop scaling.
-- [ ] Accelerated presentation.
+- [x] Accelerated presentation (Adreno 740 DWM composition, GOP scanout).
 - [ ] Brightness management.
 - [ ] Display sleep/wake lifecycle.
 
@@ -62,7 +62,7 @@ These counts describe the checklists below, not elapsed effort or a compatibilit
 - [ ] Physical power-button display-off test.
 - [ ] Physical second-press wake test.
 
-## GPU / WDDM — 8/9 complete
+## GPU / WDDM — 9/9 complete
 
 - [x] Kernel resource/ownership foundations.
 - [x] GMU firmware and HFI acknowledgements.
@@ -72,7 +72,7 @@ These counts describe the checklists below, not elapsed effort or a compatibilit
 - [x] Repeatable submission, interrupts and completion.
 - [x] A740 WDDM memory/scheduling/DDI integration (`topazgpu_v12.sys`).
 - [x] Hardware-backed userspace graphics integration (Mesa Turnip Vulkan 1.3 + Mesa Zink OpenGL 4.6 + DXVK 3.1.1 D3D11).
-- [ ] Accelerated DWM desktop presentation.
+- [x] Accelerated DWM desktop presentation (`topazgpu_opt2.sys` + `ogpu_d3d10.dll`, 2026-11-25).
 
 ## Wi-Fi — 6/6 complete
 
@@ -171,7 +171,7 @@ These counts describe the checklists below, not elapsed effort or a compatibilit
 
 ## Important limits
 
-- The working display is a framebuffer path; GPU acceleration is not working.
+- The desktop is composed by DWM on the Adreno 740 and copied by the CPU into the UEFI GOP framebuffer at 60 Hz; direct MDP scanout, D3D12, GPU interrupts and GPU recovery remain unfinished.
 - Black cover pixels do not establish electrical panel-off.
 - Firmware readiness, scan notifications and a visible Wi-Fi adapter do not establish connectivity. Earlier experiments observed AP beacons, but reliable networking remains unfinished.
 - Raw battery sensing and a bounded charging experiment do not establish safe everyday Windows charging. The latest GPU dependency parent is clock-only; older continuously sampling sensor results are historical.
