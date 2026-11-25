@@ -4370,7 +4370,7 @@ index a0262da..fa3706d 100644
 +   topaz_upload_fs_scissor(pipe);
  }
 diff --git a/src/gallium/frontends/d3d10umd/Resource.cpp b/src/gallium/frontends/d3d10umd/Resource.cpp
-index 24131e5..00a2024 100644
+index 24131e5..ffd11e1 100644
 --- a/src/gallium/frontends/d3d10umd/Resource.cpp
 +++ b/src/gallium/frontends/d3d10umd/Resource.cpp
 @@ -32,6 +32,11 @@
@@ -4424,7 +4424,7 @@ index 24131e5..00a2024 100644
  
     if (templat.target != PIPE_BUFFER) {
        if (!screen->is_format_supported(screen,
-@@ -313,9 +339,13 @@ CreateResource(D3D10DDI_HDEVICE hDevice,                                // IN
+@@ -313,16 +339,22 @@ CreateResource(D3D10DDI_HDEVICE hDevice,                                // IN
                                         templat.target,
                                         templat.nr_samples,
                                         templat.nr_storage_samples,
@@ -4439,7 +4439,17 @@ index 24131e5..00a2024 100644
           SetError(hDevice, E_OUTOFMEMORY);
           goto unlock;
        }
-@@ -332,6 +362,12 @@ CreateResource(D3D10DDI_HDEVICE hDevice,                                // IN
+    }
+ 
+    pResource->resource = screen->resource_create(screen, &templat);
+-   if (!pResource) {
++   if (!pResource->resource) {
++      TopazWddmLogf("  resource_create failed %ux%u fmt %s bind 0x%x\n", templat.width0, templat.height0,
++                    util_format_name(templat.format), templat.bind);
+       DebugPrintf("%s: failed to create resource\n", __func__);
+       SetError(hDevice, E_OUTOFMEMORY);
+       goto unlock;
+@@ -332,6 +364,12 @@ CreateResource(D3D10DDI_HDEVICE hDevice,                                // IN
     pResource->transfers = (struct pipe_transfer **)calloc(pResource->NumSubResources,
                                                            sizeof *pResource->transfers);
  
@@ -4452,7 +4462,7 @@ index 24131e5..00a2024 100644
     if (pCreateResource->pInitialDataUP) {
        if (pResource->buffer) {
           assert(pResource->NumSubResources == 1);
-@@ -441,6 +477,8 @@ OpenResource(D3D10DDI_HDEVICE hDevice,                            // IN
+@@ -441,6 +479,8 @@ OpenResource(D3D10DDI_HDEVICE hDevice,                            // IN
     LOG_ENTRYPOINT();
     
     Device *pDevice = CastDevice(hDevice);
@@ -4461,7 +4471,7 @@ index 24131e5..00a2024 100644
     if (!pDevice->screen->resource_from_handle) {
        SetError(hDevice, E_OUTOFMEMORY);
        return;
-@@ -457,6 +495,9 @@ OpenResource(D3D10DDI_HDEVICE hDevice,                            // IN
+@@ -457,6 +497,9 @@ OpenResource(D3D10DDI_HDEVICE hDevice,                            // IN
     whandle.type = WINSYS_HANDLE_TYPE_WIN32_HANDLE;
     whandle.handle = (HANDLE)pOpenResource->hKMResource.handle;
     
@@ -4471,7 +4481,7 @@ index 24131e5..00a2024 100644
     pResource->resource =
        pDevice->screen->resource_from_handle(pDevice->screen, NULL, &whandle, 0);
     
-@@ -518,6 +559,7 @@ DestroyResource(D3D10DDI_HDEVICE hDevice,       // IN
+@@ -518,6 +561,7 @@ DestroyResource(D3D10DDI_HDEVICE hDevice,       // IN
     }
     free(pResource->transfers);
  
@@ -4479,7 +4489,7 @@ index 24131e5..00a2024 100644
     pipe_resource_reference(&pResource->resource, NULL);
  }
  
-@@ -559,6 +601,12 @@ ResourceMap(D3D10DDI_HDEVICE hDevice,                                // IN
+@@ -559,6 +603,12 @@ ResourceMap(D3D10DDI_HDEVICE hDevice,                                // IN
        break;
     case D3D10_DDI_MAP_WRITE_DISCARD:
        usage = PIPE_MAP_WRITE;
@@ -4492,7 +4502,7 @@ index 24131e5..00a2024 100644
        if (resource->last_level == 0 && resource->array_size == 1) {
           usage |= PIPE_MAP_DISCARD_WHOLE_RESOURCE;
        } else {
-@@ -567,6 +615,28 @@ ResourceMap(D3D10DDI_HDEVICE hDevice,                                // IN
+@@ -567,6 +617,28 @@ ResourceMap(D3D10DDI_HDEVICE hDevice,                                // IN
        break;
     case D3D10_DDI_MAP_WRITE_NOOVERWRITE:
        usage = PIPE_MAP_WRITE | PIPE_MAP_UNSYNCHRONIZED;
@@ -4521,7 +4531,7 @@ index 24131e5..00a2024 100644
        break;
     default:
        assert(0);
-@@ -575,6 +645,20 @@ ResourceMap(D3D10DDI_HDEVICE hDevice,                                // IN
+@@ -575,6 +647,20 @@ ResourceMap(D3D10DDI_HDEVICE hDevice,                                // IN
  
     assert(SubResource < pResource->NumSubResources);
  
@@ -4542,7 +4552,7 @@ index 24131e5..00a2024 100644
     unsigned level;
     struct pipe_box box;
     subResourceBox(resource, SubResource, &level, &box);
-@@ -603,6 +687,12 @@ ResourceMap(D3D10DDI_HDEVICE hDevice,                                // IN
+@@ -603,6 +689,12 @@ ResourceMap(D3D10DDI_HDEVICE hDevice,                                // IN
        return;
     }
  
@@ -4555,7 +4565,7 @@ index 24131e5..00a2024 100644
     pMappedSubResource->pData = map;
     pMappedSubResource->RowPitch = pResource->transfers[SubResource]->stride;
     pMappedSubResource->DepthPitch = pResource->transfers[SubResource]->layer_stride;
-@@ -716,6 +806,7 @@ ResourceCopy(D3D10DDI_HDEVICE hDevice,          // IN
+@@ -716,6 +808,7 @@ ResourceCopy(D3D10DDI_HDEVICE hDevice,          // IN
     LOG_ENTRYPOINT();
  
     Device *pDevice = CastDevice(hDevice);
@@ -4563,7 +4573,7 @@ index 24131e5..00a2024 100644
     if (!CheckPredicate(pDevice)) {
        return;
     }
-@@ -723,6 +814,12 @@ ResourceCopy(D3D10DDI_HDEVICE hDevice,          // IN
+@@ -723,6 +816,12 @@ ResourceCopy(D3D10DDI_HDEVICE hDevice,          // IN
     struct pipe_context *pipe = pDevice->pipe;
     Resource *pDstResource = CastResource(hDstResource);
     Resource *pSrcResource = CastResource(hSrcResource);
@@ -4576,7 +4586,7 @@ index 24131e5..00a2024 100644
     struct pipe_resource *dst_resource = pDstResource->resource;
     struct pipe_resource *src_resource = pSrcResource->resource;
     bool compatible;
-@@ -790,6 +887,7 @@ ResourceCopyRegion(D3D10DDI_HDEVICE hDevice,                // IN
+@@ -790,6 +889,7 @@ ResourceCopyRegion(D3D10DDI_HDEVICE hDevice,                // IN
     LOG_ENTRYPOINT();
  
     Device *pDevice = CastDevice(hDevice);
@@ -4584,7 +4594,7 @@ index 24131e5..00a2024 100644
     if (!CheckPredicate(pDevice)) {
        return;
     }
-@@ -797,6 +895,12 @@ ResourceCopyRegion(D3D10DDI_HDEVICE hDevice,                // IN
+@@ -797,6 +897,12 @@ ResourceCopyRegion(D3D10DDI_HDEVICE hDevice,                // IN
     struct pipe_context *pipe = pDevice->pipe;
     Resource *pDstResource = CastResource(hDstResource);
     Resource *pSrcResource = CastResource(hSrcResource);
@@ -4597,7 +4607,7 @@ index 24131e5..00a2024 100644
     struct pipe_resource *dst_resource = pDstResource->resource;
     struct pipe_resource *src_resource = pSrcResource->resource;
  
-@@ -822,6 +926,17 @@ ResourceCopyRegion(D3D10DDI_HDEVICE hDevice,                // IN
+@@ -822,6 +928,17 @@ ResourceCopyRegion(D3D10DDI_HDEVICE hDevice,                // IN
        src_box.depth  = u_minify(src_resource->depth0,  src_level);
     }
  
@@ -4615,7 +4625,7 @@ index 24131e5..00a2024 100644
     if (areResourcesCompatible(src_resource, dst_resource)) {
        pipe->resource_copy_region(pipe,
                                   dst_resource, dst_level,
-@@ -835,6 +950,7 @@ ResourceCopyRegion(D3D10DDI_HDEVICE hDevice,                // IN
+@@ -835,6 +952,7 @@ ResourceCopyRegion(D3D10DDI_HDEVICE hDevice,                // IN
                                  src_resource, src_level,
                                  &src_box);
     }
@@ -4623,7 +4633,7 @@ index 24131e5..00a2024 100644
  }
  
  
-@@ -958,6 +1074,24 @@ ResourceUpdateSubResourceUP(D3D10DDI_HDEVICE hDevice,                // IN
+@@ -958,6 +1076,24 @@ ResourceUpdateSubResourceUP(D3D10DDI_HDEVICE hDevice,                // IN
  
     struct pipe_transfer *transfer;
     void *map;
@@ -4648,7 +4658,7 @@ index 24131e5..00a2024 100644
     if (pDstResource->buffer) {
        map = pipe->buffer_map(pipe,
                                dst_resource,
-@@ -969,7 +1103,7 @@ ResourceUpdateSubResourceUP(D3D10DDI_HDEVICE hDevice,                // IN
+@@ -969,7 +1105,7 @@ ResourceUpdateSubResourceUP(D3D10DDI_HDEVICE hDevice,                // IN
        map = pipe->texture_map(pipe,
                                dst_resource,
                                level,

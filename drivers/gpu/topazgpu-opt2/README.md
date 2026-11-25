@@ -6,7 +6,9 @@ instead of `BasicDisplay` + WARP.
 | Step | Component | Status |
 |---|---|---|
 | 2A | `topazgpu_opt2.sys` WDDM 1.3 Display+Render KMD driving the inner panel via the UEFI GOP framebuffer (VidPN source/target, 60 Hz timer VSync, scanout copy) | **Works** — `AcquirePostDisplayOwnership 2440x2268 pitch 9760 pa b8000000`, `CommitVidPn`, `SetVidPnSourceAddress`, scanout; `dwm.exe`/`explorer.exe` stable |
-| 2B | `ogpu_d3d10.dll` — Mesa 24.3 `d3d10umd` frontend + Gallium `freedreno` (FD740) over the Topaz `msm` escape, registered as `UserModeDriverName` | **Renders real pixels** through the *inbox* Windows D3D11 runtime (see below); DWM enablement in progress |
+| 2B | `ogpu_d3d10.dll` — Mesa 24.3 `d3d10umd` frontend + Gallium `freedreno` (FD740) over the Topaz `msm` escape, registered as `UserModeDriverName` | **DWM composes the Windows 11 desktop on the Adreno 740** (UMD enabled for `dwm.exe`); inbox D3D11 apps render real pixels |
+
+![Windows 11 desktop composed by DWM through ogpu_d3d10.dll on Adreno 740](../../../docs/media/option2-dwm-adreno740.jpg)
 
 ## Key fix: leave GPU secure mode (ZAP shader)
 
@@ -34,6 +36,22 @@ test_inbox_d3d11 (System32 dxgi.dll + d3d11.dll -> ogpu_d3d10.dll):
   BLIT_PIXEL[0,0] = 0xdeadbeef   PIXEL[0,0] = 0xffcc8033 (ClearRenderTargetView)   PASS
 DIAG submit#1..3: rbbm=00000001 hwf=0 cpint=0 prot=0 fsr=00000400 (no faults)
 ```
+
+## DWM bring-up fixes (2026-11-25)
+
+With the KMD as primary display but no usable UMD, DWM crash-looped (`0x889800b0` in `dwmcore.dll`).
+Enabling the UMD for DWM exposed the remaining blockers, all in GPU memory management:
+
+1. **Low-memory exhaustion.** All BOs and SMMU page tables were allocated below 4 GiB, where SM8550 has
+   only ~2 GiB of mostly reserved RAM, so DWM's 2440×2268 (24 MiB) surfaces failed. The bridge now reads
+   CB0 `TCR2.PASize` live (`TCR2=0x00038071` → 42-bit, VA64) and allocates BOs ≥ 2 MiB and fallback
+   page tables anywhere below 64 GiB.
+2. **GPU VA leak.** `VaFree` was a no-op; every DWM restart leaked address space. Added a coalescing
+   free list.
+3. **Submit limits.** `HwSubmit` rejected > 64 IBs (DWM submits 66+) and never checked ring space. Now up
+   to 512 IBs with a wait on `CP_RB_RPTR` before overwriting unfetched ring dwords.
+4. **Mesa `d3d10umd` bug.** `CreateResource` tested `if (!pResource)` instead of
+   `if (!pResource->resource)`, turning an allocation failure into an access violation inside DWM.
 
 ## Contents
 

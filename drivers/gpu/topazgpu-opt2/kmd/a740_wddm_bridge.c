@@ -20,7 +20,7 @@ NTSTATUS HwSubmit(const ULONGLONG *Ib, const ULONG *Words, ULONG Count, PULONG F
 
 #define CB0_BASE 0x20000u
 #define RB_DWORDS 0x2000u /* 32 KiB ringbuffer at 0x200000 */
-#define MAX_PT_PAGES 512
+#define MAX_PT_PAGES 8192 /* 4 KiB L2/L3 table pages; each L3 maps 2 MiB */
 
 typedef struct _PT_PAGE {
     ULONGLONG Pa;
@@ -37,6 +37,8 @@ static BOOLEAN g_HwLockInit;
 static ULONG g_Wptr = 17;
 static ULONG g_NextFence = 2;
 static ULONGLONG g_NextVa = TGPU_VA_USER_START;
+static ULONGLONG g_MaxPa = 0xFFFFFFFFULL; /* raised from CB0 TCR2.PASize at bind */
+static ULONG g_VaFreeCount;
 
 /* Dynamic CB0 page-table tracking */
 static ULONGLONG *g_L1Cpu;
@@ -68,8 +70,12 @@ static ULONGLONG *FindOrMapTable(ULONGLONG Pa) {
 static ULONGLONG *AllocTablePage(ULONGLONG *OutPa) {
     if (g_PtCount >= MAX_PT_PAGES) return NULL;
     PHYSICAL_ADDRESS low = {0}, high, skip = {0};
-    high.QuadPart = 0xFFFFFFFFULL; /* < 4 GiB, well inside 36-bit OAS */
+    high.QuadPart = 0xFFFFFFFFULL; /* prefer < 4 GiB; fall back to the CB0 output range */
     PMDL mdl = MmAllocatePagesForMdlEx(low, high, skip, PAGE_SIZE, MmNonCached, MM_ALLOCATE_FULLY_REQUIRED);
+    if (!mdl && g_MaxPa > 0xFFFFFFFFULL) {
+        high.QuadPart = (LONGLONG)g_MaxPa;
+        mdl = MmAllocatePagesForMdlEx(low, high, skip, PAGE_SIZE, MmNonCached, MM_ALLOCATE_FULLY_REQUIRED);
+    }
     if (!mdl) return NULL;
     PVOID va = MmMapLockedPagesSpecifyCache(mdl, KernelMode, MmNonCached, NULL, FALSE,
                                             NormalPagePriority | MdlMappingNoExecute);
@@ -359,6 +365,19 @@ NTSTATUS A740BindDevice(PDEVICE_OBJECT Pdo, PCM_RESOURCE_LIST Translated) {
     g_Wptr = 17;
     g_NextFence = 2;
     g_NextVa = TGPU_VA_USER_START;
+    g_VaFreeCount = 0;
+    if (g_Ogo->Cp->Smmu) {
+        static const UCHAR PaBits[8] = {32, 36, 40, 42, 44, 48, 52, 32};
+        PUCHAR sb = (PUCHAR)g_Ogo->Cp->Smmu;
+        ULONG tcr  = READ_REGISTER_ULONG((PULONG)(sb + CB0_BASE + 0x30));
+        ULONG tcr2 = READ_REGISTER_ULONG((PULONG)(sb + CB0_BASE + 0x10));
+        ULONG cba2 = READ_REGISTER_ULONG((PULONG)(sb + 0x1800));    /* CBA2R0: VA64 */
+        UCHAR bits = PaBits[(tcr2 >> 16) & 7u];
+        /* only trust a >32-bit PASize when the context is in AArch64 (VA64) format; all SM8550 DRAM
+         * lies below 64 GiB, so cap the allocation range at 36 bits */
+        if ((cba2 & 1u) && bits >= 36) g_MaxPa = (1ULL << 36) - 1ULL;
+        LogPrint("A740BindDevice: CB0 TCR=%08x TCR2=%08x CBA2R=%08x -> PA limit %llx\n", tcr, tcr2, cba2, g_MaxPa);
+    }
     g_CpReady = TRUE;
     A740ExitSecureMode();
     LogPrint("A740BindDevice: READY! rootPa=%llx fence1=%u rptr=%u\n",
@@ -407,14 +426,73 @@ BOOLEAN HwWaitFence(ULONG Fence, ULONG TimeoutMs) {
     return HwCompletedFence() >= Fence;
 }
 
+/* GPU VA allocator: bump pointer plus a first-fit free list so BOs freed by
+ * restarting processes (DWM) give their address space back. */
+#define VA_FREE_MAX 1024
+typedef struct _VA_RANGE { ULONGLONG Va; SIZE_T Bytes; } VA_RANGE;
+static VA_RANGE g_VaFree[VA_FREE_MAX];
+static KSPIN_LOCK g_VaLock;
+static BOOLEAN g_VaLockInit;
+
+static VOID VaLockInit(VOID) { if (!g_VaLockInit) { KeInitializeSpinLock(&g_VaLock); g_VaLockInit = TRUE; } }
+
 ULONGLONG VaAlloc(SIZE_T Bytes) {
     if (!Bytes || (Bytes & (PAGE_SIZE - 1)) || Bytes > TGPU_VA_KERNEL - TGPU_VA_USER_START) return 0;
-    ULONGLONG va = g_NextVa;
-    if (va > TGPU_VA_KERNEL - Bytes - PAGE_SIZE) return 0;
-    g_NextVa += Bytes + PAGE_SIZE;
+    SIZE_T need = Bytes + PAGE_SIZE; /* keep one guard page between BOs */
+    KIRQL irql;
+    VaLockInit();
+    KeAcquireSpinLock(&g_VaLock, &irql);
+    ULONGLONG va = 0;
+    ULONG best = MAXULONG;
+    for (ULONG i = 0; i < g_VaFreeCount; i++) {
+        if (g_VaFree[i].Bytes >= need && (best == MAXULONG || g_VaFree[i].Bytes < g_VaFree[best].Bytes))
+            best = i;
+    }
+    if (best != MAXULONG) {
+        va = g_VaFree[best].Va;
+        if (g_VaFree[best].Bytes > need) {
+            g_VaFree[best].Va += need;
+            g_VaFree[best].Bytes -= need;
+        } else {
+            g_VaFree[best] = g_VaFree[--g_VaFreeCount];
+        }
+    } else if (g_NextVa <= TGPU_VA_KERNEL - need) {
+        va = g_NextVa;
+        g_NextVa += need;
+    }
+    KeReleaseSpinLock(&g_VaLock, irql);
     return va;
 }
-VOID VaFree(ULONGLONG Va, SIZE_T Bytes) { UNREFERENCED_PARAMETER(Va); UNREFERENCED_PARAMETER(Bytes); }
+
+VOID VaFree(ULONGLONG Va, SIZE_T Bytes) {
+    if (!Va || !Bytes) return;
+    SIZE_T len = Bytes + PAGE_SIZE;
+    KIRQL irql;
+    VaLockInit();
+    KeAcquireSpinLock(&g_VaLock, &irql);
+    /* merge with neighbours */
+    for (ULONG i = 0; i < g_VaFreeCount; ) {
+        if (g_VaFree[i].Va + g_VaFree[i].Bytes == Va) {
+            Va = g_VaFree[i].Va; len += g_VaFree[i].Bytes;
+            g_VaFree[i] = g_VaFree[--g_VaFreeCount];
+            continue;
+        }
+        if (Va + len == g_VaFree[i].Va) {
+            len += g_VaFree[i].Bytes;
+            g_VaFree[i] = g_VaFree[--g_VaFreeCount];
+            continue;
+        }
+        i++;
+    }
+    if (Va + len == g_NextVa) {
+        g_NextVa = Va;                      /* give the tail back to the bump pointer */
+    } else if (g_VaFreeCount < VA_FREE_MAX) {
+        g_VaFree[g_VaFreeCount].Va = Va;
+        g_VaFree[g_VaFreeCount].Bytes = len;
+        g_VaFreeCount++;
+    }                                       /* else: leak the range (bounded) */
+    KeReleaseSpinLock(&g_VaLock, irql);
+}
 
 NTSTATUS MmuMap(ULONGLONG Va, PMDL Mdl, SIZE_T Bytes) {
     if (!g_CpReady || !Mdl || !Bytes || (Bytes & 0xFFF)) return STATUS_INVALID_PARAMETER;
@@ -442,20 +520,48 @@ VOID MmuUnmap(ULONGLONG Va, SIZE_T Bytes) {
     KeReleaseMutex(&g_HwLock, FALSE);
 }
 
+static volatile LONG g_HighAllocLogged;
+
+static PMDL AllocWcPages(ULONGLONG HighPa, SIZE_T Bytes) {
+    PHYSICAL_ADDRESS low = {0}, high, skip = {0};
+    high.QuadPart = (LONGLONG)HighPa;
+    return MmAllocatePagesForMdlEx(low, high, skip, Bytes, MmWriteCombined, MM_ALLOCATE_FULLY_REQUIRED);
+}
+
 PMDL TgAllocPages(SIZE_T Bytes, PULONGLONG Iova, PVOID *KernelVa) {
     if (!g_CpReady || !Iova || !KernelVa || !Bytes || Bytes > 0x40000000u || (Bytes & (PAGE_SIZE - 1)))
         return NULL;
-    PHYSICAL_ADDRESS low = {0}, high, skip = {0};
-    high.QuadPart = 0xFFFFFFFFULL; /* < 4 GiB */
-    PMDL mdl = MmAllocatePagesForMdlEx(low, high, skip, Bytes, MmWriteCombined, MM_ALLOCATE_FULLY_REQUIRED);
-    if (!mdl) return NULL;
+    /* Prefer < 4 GiB (proven path); only ~2 GiB of RAM sits below 4 GiB on SM8550 and most of it is
+     * reserved, so large scanout-sized BOs (DWM) fall back to the full range the CB0 context can
+     * output (TCR2.PASize, read live at bind). */
+    static volatile LONG failLogs;
+    /* Large BOs (render targets, scanout copies) go to high memory first so the scarce
+     * < 4 GiB pool stays available for page tables and small BOs. */
+    BOOLEAN highFirst = (Bytes >= 0x200000u) && g_MaxPa > 0xFFFFFFFFULL;
+    PMDL mdl = AllocWcPages(highFirst ? g_MaxPa : 0xFFFFFFFFULL, Bytes);
+    if (!mdl && !highFirst && g_MaxPa > 0xFFFFFFFFULL) {
+        mdl = AllocWcPages(g_MaxPa, Bytes);
+        if (mdl && InterlockedCompareExchange(&g_HighAllocLogged, 1, 0) == 0)
+            LogPrint("TgAllocPages: %llu KB from full PA range (max %llx), first pfn %llx\n",
+                     (ULONGLONG)Bytes / 1024, g_MaxPa, (ULONGLONG)MmGetMdlPfnArray(mdl)[0]);
+    }
+    if (!mdl) {
+        if (InterlockedIncrement(&failLogs) <= 20) LogPrint("TgAllocPages: no pages for %llu KB\n", (ULONGLONG)Bytes / 1024);
+        return NULL;
+    }
+    if (MmGetMdlByteCount(mdl) < Bytes) { MmFreePagesFromMdl(mdl); ExFreePool(mdl); return NULL; }
     PVOID va = MmMapLockedPagesSpecifyCache(mdl, KernelMode, MmWriteCombined, NULL, FALSE,
                                             NormalPagePriority | MdlMappingNoExecute);
     if (!va) { MmFreePagesFromMdl(mdl); ExFreePool(mdl); return NULL; }
     RtlZeroMemory(va, Bytes);
     __dsb(_ARM64_BARRIER_OSHST);
     ULONGLONG gpu = VaAlloc(Bytes);
-    if (!gpu || !NT_SUCCESS(MmuMap(gpu, mdl, Bytes))) {
+    NTSTATUS mst = gpu ? MmuMap(gpu, mdl, Bytes) : STATUS_NO_MEMORY;
+    if (!NT_SUCCESS(mst)) {
+        if (InterlockedIncrement(&failLogs) <= 20)
+            LogPrint("TgAllocPages: %llu KB va %llx map %08x (pt pages %u, free ranges %u, next va %llx)\n",
+                     (ULONGLONG)Bytes / 1024, gpu, mst, g_PtCount, g_VaFreeCount, g_NextVa);
+        if (gpu) { MmuUnmap(gpu, Bytes); VaFree(gpu, Bytes); }
         MmUnmapLockedPages(va, mdl); MmFreePagesFromMdl(mdl); ExFreePool(mdl);
         return NULL;
     }
@@ -465,7 +571,7 @@ PMDL TgAllocPages(SIZE_T Bytes, PULONGLONG Iova, PVOID *KernelVa) {
 }
 
 VOID TgFreePages(PMDL Mdl, PVOID Va, SIZE_T Bytes, ULONGLONG Iova) {
-    if (Iova && Bytes) MmuUnmap(Iova, Bytes);
+    if (Iova && Bytes) { MmuUnmap(Iova, Bytes); VaFree(Iova, Bytes); }
     if (Va && Mdl) MmUnmapLockedPages(Va, Mdl);
     if (Mdl) { MmFreePagesFromMdl(Mdl); ExFreePool(Mdl); }
 }
@@ -479,9 +585,27 @@ static ULONG g_DiagSubmits;
 
 NTSTATUS HwSubmit(const ULONGLONG *Ib, const ULONG *Words, ULONG Count, PULONG Fence) {
     if (!g_CpReady || !g_Ogo || !g_Ogo->Cp || !Fence) return STATUS_DEVICE_NOT_READY;
-    if (Count > 64) return STATUS_INVALID_PARAMETER;
+    if (!Count || Count > 512) return STATUS_INVALID_PARAMETER;
     KeWaitForSingleObject(&g_HwLock, Executive, KernelMode, FALSE, NULL);
     volatile ULONG *rb = (volatile ULONG *)g_Ogo->Cp->Run.Buffer[0].Cpu;
+    /* Never overwrite ring dwords the CP has not fetched yet. */
+    {
+        ULONG need = 2u + Count * 4u + 5u + 8u;
+        ULONG k;
+        for (k = 0; k < 40000u; k++) {   /* up to ~4 s */
+            ULONG rp = 0;
+            (void)G482GpuRead(&g_Ogo->Io, 0x806u * 4u, &rp);
+            ULONG freeDw = (rp + RB_DWORDS - g_Wptr - 1u) & (RB_DWORDS - 1u);
+            if (freeDw >= need) break;
+            LARGE_INTEGER dt; dt.QuadPart = -1000; /* 100 us */
+            KeDelayExecutionThread(KernelMode, FALSE, &dt);
+        }
+        if (k == 40000u) {
+            LogPrint("HwSubmit: ring full (wptr %u, need %u) - GPU not progressing\n", g_Wptr, need);
+            KeReleaseMutex(&g_HwLock, FALSE);
+            return STATUS_IO_TIMEOUT;
+        }
+    }
     ULONGLONG fenceAddr = g_Ogo->Cp->Run.Layout.Iova[1] + 4ULL;
     ULONG fence = g_NextFence++;
     /* Ensure A7xx BR+BV threads are enabled (g433 init left THREAD=0!) */
