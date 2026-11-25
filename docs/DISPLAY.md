@@ -90,7 +90,14 @@ lowest DDR) and nothing changed it afterwards. The bridge (`a740_wddm_bridge.c`)
   vsync tick, so DWM often misses a period.
 * Pacing fix (v0.51): while a flip is pending or waiting for its GPU fence, the vsync timer polls every 1 ms, so the
   flip is reported done the moment the MDP latches it and the vsync phase locks to that latch; with nothing pending
-  the timer returns to one tick per period. `PACE` lines in the log count the switches. Re-benchmark pending
-  (needs an unlocked session).
+  the timer returns to one tick per period. `PACE` lines in the log count the switches.
+
+| Window drag, 10 s at 60 moves/s (zero-copy, 60 Hz) | DWM frame interval | flips completed |
+|---|---|---|
+| before pacing fix | 25.8 ms (~39 fps) | 341 |
+| after pacing fix (v0.51) | 18.1-19.5 ms (~53 fps) | 592 |
+
+  The drag script itself caps this test at 60 updates/s; for comparison the original CPU-copy path needed 20.6 ms
+  just to copy each frame.
 * Caution for research probes: reading MDP blocks that are not in the stock DT (guessed ping-pong offsets) hard-hung
   the phone. Only read blocks the DT lists.
