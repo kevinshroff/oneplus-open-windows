@@ -37,6 +37,17 @@ typedef struct {
     uint64_t GlinkTxFrames;
     uint64_t GlinkRxFrames;
     CK_TELEMETRY Telemetry;
+    /* appended (offsets above unchanged): ADSP USB input telemetry, raw units uV / uA */
+    uint32_t UsbVoltNow;
+    uint32_t UsbCurrNow;
+    uint32_t UsbCurrMax;
+    uint32_t UsbInputLimit;
+    uint32_t UsbRejectedMask;   /* bit n = USB GET n rejected by the ADSP service */
+    /* appended: last physical-gauge (G104) attempt */
+    uint32_t GaugeCode, GaugeStage, PreCode, PreReady, PreClock, PrePins;
+    uint32_t PreClocks[2][8];   /* QUP SE clock vote/CBCR snapshot before the transfer */
+    uint32_t GaugeQueryMask;
+    uint32_t GaugeWords[2][10]; /* raw words per gauge: type, fw, hw, temp, mV, flags, rem, full, curr, soc */
 } CK_STATUS_SNAPSHOT;
 
 #endif

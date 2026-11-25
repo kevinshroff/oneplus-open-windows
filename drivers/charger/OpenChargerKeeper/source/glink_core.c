@@ -350,7 +350,8 @@ int CkGlPoll(CK_GL_STATE *s, const CK_GL_IO *io, uint64_t now_us){
                 } else {
                     s->LastBattery = s->Working;
                     s->LastCompletedOp = s->OpKind;
-                    s->LastOpOk = (s->Working.ServiceRejectedMask == 0u) ? 1u : 0u;
+                    /* optional USB telemetry GETs (10..13) never fail a sample */
+                    s->LastOpOk = ((s->Working.ServiceRejectedMask & ~(0xFu << CL_USB_GET_FIRST)) == 0u) ? 1u : 0u;
                     s->OpActive = 0u;
                     s->OpsCompleted++;
                 }

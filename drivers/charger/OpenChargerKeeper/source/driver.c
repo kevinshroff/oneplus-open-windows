@@ -184,7 +184,9 @@ static int ReadPhysicalGauges(CK_OWNER *o, CK_TELEMETRY *t){
     }
     for(unsigned i=0;i<2;i++){
         const uint32_t *w = o->GaugeScratch.Values[i];
-        if(w[0] != 0x6002u || w[1] != 0x0602u || w[2] != 0x0200u || !w[7] || w[6] > w[7] || w[9] > 100u){
+        /* w[0] is the control-status word: bits 13-14 (0x6000) are fixed, the low bits are live status
+         * flags (seen 0x6002 and 0x6000), so only the fixed part identifies the gauge. */
+        if((w[0] & 0xFFF0u) != 0x6000u || w[1] != 0x0602u || w[2] != 0x0200u || !w[7] || w[6] > w[7] || w[9] > 100u){
             o->GaugeReadsFail++;
             t->Valid = 0;
             return 0;
@@ -418,6 +420,20 @@ VOID CkControl(WDFQUEUE queue, WDFREQUEST request, size_t outBytes, size_t inByt
             out->SafetyTrips    = Owner->Policy.SafetyTrips;
             out->GaugeReadsOk   = Owner->GaugeReadsOk;
             out->GaugeReadsFail = Owner->GaugeReadsFail;
+            out->UsbVoltNow     = Owner->Glink.LastBattery.UsbVoltNow;
+            out->UsbCurrNow     = Owner->Glink.LastBattery.UsbCurrNow;
+            out->UsbCurrMax     = Owner->Glink.LastBattery.UsbCurrMax;
+            out->UsbInputLimit  = Owner->Glink.LastBattery.UsbInputLimit;
+            out->UsbRejectedMask = (Owner->Glink.LastBattery.ServiceRejectedMask >> CL_USB_GET_FIRST) & 0xFu;
+            out->GaugeCode  = Owner->GaugeScratch.Code;
+            out->GaugeStage = Owner->GaugeScratch.Stage;
+            out->PreCode    = Owner->GaugeScratch.Before.Code;
+            out->PreReady   = Owner->GaugeScratch.Before.ReadyMask;
+            out->PreClock   = Owner->GaugeScratch.Before.PostClockMask;
+            out->PrePins    = Owner->GaugeScratch.Before.PinStableMask;
+            RtlCopyMemory(out->PreClocks, Owner->GaugeScratch.Before.Before, sizeof(out->PreClocks));
+            out->GaugeQueryMask = Owner->GaugeScratch.QueryMask;
+            RtlCopyMemory(out->GaugeWords, Owner->GaugeScratch.Values, sizeof(out->GaugeWords));
             out->NowUs          = NowUs();
             out->TimerTicks     = Owner->TimerTicks;
             out->GlinkTxFrames  = Owner->Glink.TxFrames;

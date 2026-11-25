@@ -3,7 +3,10 @@
 static const CL_QUERY Queries[CL_QUERY_COUNT]={
  {0x30,8,24,24},{1,0,16,44},{0x30,6,24,24},{0,0,16,16},
  {0x30,7,24,24},{0x30,9,24,24},{0x30,12,24,24},{0x30,4,24,24},
- {0x32,0,24,24},{0x32,6,24,24},{0x31,8,24,24},
+ {0x32,0,24,24},{0x32,6,24,24},
+ /* USB_PROPERTY_GET (Linux qcom_battmgr): 1 VOLT_NOW, 3 CURR_NOW, 4 CURR_MAX, 5 INPUT_CURR_LIMIT */
+ {0x32,1,24,24},{0x32,3,24,24},{0x32,4,24,24},{0x32,5,24,24},
+ {0x31,8,24,24},
  {0x31,24,24,24},{0x31,24,24,24},{0x31,24,24,24}
 };
 static uint32_t U32(const uint8_t*b){return(uint32_t)b[0]|(uint32_t)b[1]<<8|(uint32_t)b[2]<<16|(uint32_t)b[3]<<24;}
@@ -36,7 +39,9 @@ int CLDecodeReply(uint32_t index,const uint8_t*b,uint32_t n,CL_BATTERY*out)
   case 0:out->VoltageMax=value;break;case 2:out->OpenCircuitVoltage=value;break;case 4:out->VoltageNow=value;break;
   case 5:out->CurrentNow=value;break;case 6:out->TemperatureProperty=value;break;
   case 7:out->CapacityProperty=value;break;case 8:out->UsbOnline=value;break;
-  case 9:out->UsbType=value;break;default:return 0;
+  case 9:out->UsbType=value;break;
+  case 10:out->UsbVoltNow=value;break;case 11:out->UsbCurrNow=value;break;
+  case 12:out->UsbCurrMax=value;break;case 13:out->UsbInputLimit=value;break;default:return 0;
   }
  }else if(index==1){
   out->BatteryState=U32(b+12);out->RemainingCapacity=U32(b+16);out->Rate=U32(b+20);

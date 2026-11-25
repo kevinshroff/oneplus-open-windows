@@ -183,6 +183,35 @@ func queryDriver(ioctl uint32) {
 			"flags":      []uint32{u32(tOff + 60), u32(tOff + 64)},
 		},
 	}
+	if got >= 192 {
+		uOff := 172 // appended USB fields follow the 68-byte telemetry block
+		out["usb_in"] = map[string]any{
+			"volt_uv":      u32(uOff),
+			"curr_ua":      i32(uOff + 4),
+			"curr_max_ua":  u32(uOff + 8),
+			"input_lim_ua": u32(uOff + 12),
+			"rejected":     u32(uOff + 16),
+		}
+	}
+	if got >= 280 {
+		g := 192
+		clk := []string{}
+		for i := 0; i < 16; i++ {
+			clk = append(clk, fmt.Sprintf("%08x", u32(g+24+4*i)))
+		}
+		out["gauge_diag"] = map[string]any{
+			"code": u32(g), "stage": u32(g + 4), "pre_code": u32(g + 8),
+			"pre_ready": u32(g + 12), "pre_clock": u32(g + 16), "pre_pins": u32(g + 20), "pre_clocks": clk,
+		}
+		if got >= 364 {
+			w := []string{}
+			for i := 0; i < 20; i++ {
+				w = append(w, fmt.Sprintf("%04x", u32(284+4*i)))
+			}
+			out["gauge_diag"].(map[string]any)["query_mask"] = fmt.Sprintf("%05x", u32(280))
+			out["gauge_diag"].(map[string]any)["words"] = w
+		}
+	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(out)

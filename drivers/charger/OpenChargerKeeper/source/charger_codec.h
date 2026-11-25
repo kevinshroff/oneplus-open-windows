@@ -4,17 +4,19 @@
 #ifndef CL_CODEC_H
 #define CL_CODEC_H
 #include <stdint.h>
-#define CL_GET_COUNT 10u
-#define CL_FV_QUERY 10u
-#define CL_ENABLE_QUERY 11u
-#define CL_DISABLE_QUERY 12u
-#define CL_RESTART_OFF_QUERY 13u
-#define CL_QUERY_COUNT 14u
+#define CL_GET_COUNT 14u
+#define CL_CORE_GET_MASK 0x3FFu  /* GETs 0..9: a rejection fails the sample */
+#define CL_USB_GET_FIRST 10u     /* GETs 10..13: optional USB input telemetry (opcode 0x32) */
+#define CL_FV_QUERY 14u
+#define CL_ENABLE_QUERY 15u
+#define CL_DISABLE_QUERY 16u
+#define CL_RESTART_OFF_QUERY 17u
+#define CL_QUERY_COUNT 18u
 #define CL_REPLY_LIMIT 1024u
 typedef struct {uint32_t Opcode,Property,RequestBytes,ReplyBytes;}CL_QUERY;
 typedef struct {
  uint32_t WireValidMask,ValueValidMask,ServiceRejectedMask;
- uint32_t VoltageMax,ControlAckMask,Reserved2,Reserved3,Reserved4,Reserved5;
+ uint32_t VoltageMax,ControlAckMask,UsbVoltNow,UsbCurrNow,UsbCurrMax,UsbInputLimit; /* USB: uV / uA */
  uint32_t BatteryState,RemainingCapacity,Rate,Voltage,PowerState,ChargingSource,TemperatureRaw,CurrentRaw;
  uint32_t OpenCircuitVoltage,VoltageNow,CurrentNow,TemperatureProperty,CapacityProperty,UsbOnline,UsbType,LegacyBatteryId;
  uint32_t ServiceResult[CL_QUERY_COUNT];
