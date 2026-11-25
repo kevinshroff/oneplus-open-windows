@@ -77,9 +77,16 @@ lowest DDR) and nothing changed it afterwards. The bridge (`a740_wddm_bridge.c`)
 
 ## Still to do
 
-* Step 4: 120 Hz. The inner panel is "AC052 P 3 A0003 dsc cmd mode panel" (stock `dtbo` overlay). Its 60 and
-  120 Hz `timing-switch-command` sequences differ only in `6D 01` -> `6D 00` and the last parameter of the `35`
-  packet, and all modes use the same DSI bit clock (1.636 Gbps), so the switch is a panel command sequence plus
-  reporting 120 Hz to Windows. Not implemented yet.
+* Step 4: 120 Hz - **experimental, opt-in** (`C:\topaz\panel.120hz`).
+  * The panel is already at 120 Hz: the bootloader leaves the AC052 P panel in its 120 Hz mode and MDP autorefresh
+    pushes a frame per panel TE. INTF1 frame counter `+0x0AC` against the 19.2 MHz counter `+0x214` measures
+    120 Hz; the driver logs `refresh: panel measured ...` at start.
+  * Reporting 120 Hz to Windows broke DWM: the EDID detailed timing cannot describe 2440x2268 at 120 Hz (above the
+    655.35 MHz DTD limit) so it stays 60 Hz, Windows re-validated the VidPN in a loop, DWM recreated swapchains
+    until ~3.9 GB of BOs were allocated and crash-looped (`0xC00001AD`). Next: an EDID DisplayID extension with a
+    120 Hz timing, then retry.
+* Benchmark (zero-copy, 60 Hz, window drag at 60 moves/s): no CPU copies, GPU 0.26 ms/frame, CPU 5 % total, but
+  DWM still averaged 25.8 ms per frame - flips latch on the 120 Hz TE but are completed on the next 60 Hz software
+  vsync tick, so DWM often misses a period. Completing flips at latch time is the next pacing fix.
 * Caution for research probes: reading MDP blocks that are not in the stock DT (guessed ping-pong offsets) hard-hung
   the phone. Only read blocks the DT lists.

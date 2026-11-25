@@ -25,12 +25,20 @@ static const GUID g_BrightnessGuid = { 0xFDE5BBA4, 0xB3F9, 0x46FB, { 0xBD, 0xAA,
 
 
 
-/* panel timing (stock DT, m7 38 0c 0a): h fp/pw/bp 120/28/120, v fp/pw/bp 20/2/10, 60 Hz */
+/* panel timing reported to Windows (blanking is nominal: command-mode panel) */
 #define H_ACTIVE    (g_Post.Width ? g_Post.Width : 2440u)
 #define V_ACTIVE    (g_Post.Height ? g_Post.Height : 2268u)
 #define H_TOTAL     (H_ACTIVE + 160u)
 #define V_TOTAL     (V_ACTIVE + 32u)
-#define REFRESH     60
+/* v0.50: the bootloader leaves the inner panel (AC052 P) in its 120 Hz mode and MDP autorefresh pushes a frame on
+   every panel TE (INTF1 frame counter +0x0AC counts 120/s). Reporting 120 Hz to Windows is EXPERIMENTAL and opt-in
+   (C:\topaz\panel.120hz, needs zero-copy scanout and a measured >= 100 Hz panel): with the 60 Hz-only EDID, Windows
+   re-validated the VidPN in a loop, DWM leaked swapchains to ~3.9 GB and crash-looped (0xC00001AD). Needs an EDID
+   that can describe 120 Hz (DisplayID extension) first. */
+static ULONG g_Refresh = 60;
+#define REFRESH     g_Refresh
+#define INTF1_FRAME_COUNT 0x360ACu
+#define INTF_XO_COUNTER   0x36214u              /* free-running 19.2 MHz */
 
 static PDXGKRNL_INTERFACE g_Dxgk;
 static DXGK_DISPLAY_INFORMATION g_Post;
@@ -70,6 +78,22 @@ static ULONG g_DirectFlips;
 static PKEVENT g_UiEv;                          /* \BaseNamedObjects\OpenUiActivity: CPU governor UI boost */
 static HANDLE g_UiEvH;
 static volatile LONG g_UiFlips;
+
+static BOOLEAN FileExists(PCWSTR Path)
+{
+    UNICODE_STRING n;
+    OBJECT_ATTRIBUTES oa;
+    IO_STATUS_BLOCK iosb;
+    HANDLE h;
+    RtlInitUnicodeString(&n, Path);
+    InitializeObjectAttributes(&oa, &n, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
+    if (!NT_SUCCESS(ZwCreateFile(&h, FILE_READ_ATTRIBUTES | SYNCHRONIZE, &oa, &iosb, NULL, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ,
+                                 FILE_OPEN, FILE_SYNCHRONOUS_IO_NONALERT | FILE_NON_DIRECTORY_FILE, NULL, 0))) {
+        return FALSE;
+    }
+    ZwClose(h);
+    return TRUE;
+}
 
 static VOID MdpScanFrom(ULONG Pa, ULONG Stride)
 {
@@ -993,6 +1017,21 @@ NTSTATUS DispStart(PDXGKRNL_INTERFACE Dxgk)
         LogPrint("direct scanout: %s (VIG0/1 addr %08x stride %u%s)\n", g_DirectOk ? "on" : "off", g_FbAddr, g_FbStride,
                  off ? ", gpuw.nodirect" : "");
     }
+    if (g_Mdp != NULL) {
+        ULONG f0, f1, x0, x1, hz;
+        LARGE_INTEGER dt;
+        BOOLEAN force60 = !FileExists(L"\\??\\C:\\topaz\\panel.120hz");
+        f0 = READ_REGISTER_ULONG((volatile ULONG *)(g_Mdp + INTF1_FRAME_COUNT));
+        x0 = READ_REGISTER_ULONG((volatile ULONG *)(g_Mdp + INTF_XO_COUNTER));
+        dt.QuadPart = -2500000LL;                        /* 250 ms */
+        KeDelayExecutionThread(KernelMode, FALSE, &dt);
+        f1 = READ_REGISTER_ULONG((volatile ULONG *)(g_Mdp + INTF1_FRAME_COUNT));
+        x1 = READ_REGISTER_ULONG((volatile ULONG *)(g_Mdp + INTF_XO_COUNTER));
+        hz = (x1 - x0) ? (ULONG)((ULONGLONG)(f1 - f0) * 19200000ULL / (ULONG)(x1 - x0)) : 0;
+        g_Refresh = (hz >= 100 && g_DirectOk && !force60) ? 120 : 60;
+        LogPrint("refresh: panel measured %u Hz (%u frames / %u us) -> reporting %u Hz%s\n", hz, f1 - f0,
+                 (ULONG)((ULONGLONG)(x1 - x0) * 1000000ULL / 19200000ULL), g_Refresh, force60 ? " (120 Hz is opt-in: panel.120hz)" : "");
+    }
 
     g_NextVsync = (LONG64)KeQueryInterruptTime() + VSYNC_PERIOD;
     g_HrTimer = ExAllocateTimer(HrTimerCb, NULL, EX_TIMER_HIGH_RESOLUTION);
@@ -1001,7 +1040,7 @@ NTSTATUS DispStart(PDXGKRNL_INTERFACE Dxgk)
         KeInitializeDpc(&g_KickDpc, KickDpc, NULL);
         KeInitializeDpc(&g_CopyDpc, CopyDpc, NULL);
         g_TimerRes = FALSE;
-        LogPrint("vsync: on-demand 60 Hz high-resolution timer (stops when display is idle)\n");
+        LogPrint("vsync: on-demand %u Hz high-resolution timer (stops when display is idle)\n", REFRESH);
         TimerEnsure();
     } else {
         KeInitializeTimerEx(&g_VsyncTimer, NotificationTimer);
@@ -1140,7 +1179,9 @@ static VOID BuildEdid(UCHAR *e)
     const ULONG hActive = H_ACTIVE, hFp = 80, hSync = 20, hBp = 60;
     const ULONG vActive = V_ACTIVE, vFp = 16, vSync = 4, vBp = 12;
     const ULONG hBlank = hFp + hSync + hBp, vBlank = vFp + vSync + vBp;
-    const ULONG clk10k = (hActive + hBlank) * (vActive + vBlank) * 60 / 10000;
+    const ULONG clk10k = (hActive + hBlank) * (vActive + vBlank) * 60 / 10000;   /* DTD stays 60 Hz: 120 Hz exceeds
+                                                                                  the 655.35 MHz DTD limit; the
+                                                                                  120 Hz mode is added by the driver */
     const ULONG wMm = 70, hMm = 155;
     UCHAR *d;
     ULONG i, sum = 0;
