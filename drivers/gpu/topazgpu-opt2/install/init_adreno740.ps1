@@ -8,6 +8,9 @@ function Log($m) { "$(Get-Date -f s) $m" | Out-File -Append -Encoding ascii $log
 $svc = "HKLM:\SYSTEM\CurrentControlSet\Services"
 function Disarm { Set-ItemProperty "$svc\OpenSmmuD0" Start 4 -Type DWord; Set-ItemProperty "$svc\OpenGpuStart" Start 4 -Type DWord }
 Disarm   # never let PnP start the GPU on its own at a later boot
+# The system partition is small (~22 GB): drop dxgkrnl live dumps (1.7 GB each) left by earlier sessions.
+Get-ChildItem C:\Windows\LiveKernelReports -Recurse -File -Filter *.dmp -EA SilentlyContinue |
+    ForEach-Object { Log "removing live dump  ( MB)"; Remove-Item $_.FullName -Force -EA SilentlyContinue }
 if (Test-Path $disable) { Log "gpu.disable present - staying on Basic Display"; exit 0 }
 if (Test-Path $pending) {
     Log "previous GPU start never completed - disabling GPU path (delete $disable to re-arm)"
