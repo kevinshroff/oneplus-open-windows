@@ -171,7 +171,7 @@ These counts describe the checklists below, not elapsed effort or a compatibilit
 
 ## Important limits
 
-- The desktop is composed by DWM on the Adreno 740 and scanned out **zero-copy**: the display engine (MDP VIG0+VIG1, CTL0) fetches DWM's buffers directly through apps-SMMU context bank 4, which the driver now translates with its own page tables (see docs/DISPLAY.md). The CPU copy into the GOP framebuffer (now fence-ordered and 4-way parallel, ~15 ms/frame) remains as the automatic fallback. Panel refresh is still 60 Hz; D3D12, GPU interrupts and GPU recovery remain unfinished.
+- The desktop is composed by DWM on the Adreno 740 and scanned out **zero-copy**: the display engine (MDP VIG0+VIG1, CTL0) fetches DWM's buffers directly through apps-SMMU context bank 4, which the driver now translates with its own page tables (see docs/DISPLAY.md). The CPU copy into the GOP framebuffer (now fence-ordered and 4-way parallel, ~15 ms/frame) remains as the automatic fallback. 120 Hz is available (opt-in, see docs/DISPLAY.md); D3D12, GPU interrupts and GPU recovery remain unfinished.
 - Black cover pixels do not establish electrical panel-off.
 - Firmware readiness, scan notifications and a visible Wi-Fi adapter do not establish connectivity. Earlier experiments observed AP beacons, but reliable networking remains unfinished.
 - Raw battery sensing and a bounded charging experiment do not establish safe everyday Windows charging. The latest GPU dependency parent is clock-only; older continuously sampling sensor results are historical.

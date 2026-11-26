@@ -31,11 +31,15 @@ static const GUID g_BrightnessGuid = { 0xFDE5BBA4, 0xB3F9, 0x46FB, { 0xBD, 0xAA,
 #define H_TOTAL     (H_ACTIVE + 160u)
 #define V_TOTAL     (V_ACTIVE + 32u)
 /* v0.50: the bootloader leaves the inner panel (AC052 P) in its 120 Hz mode and MDP autorefresh pushes a frame on
-   every panel TE (INTF1 frame counter +0x0AC counts 120/s). Reporting 120 Hz to Windows is EXPERIMENTAL and opt-in
-   (C:\topaz\panel.120hz, needs zero-copy scanout and a measured >= 100 Hz panel): with the 60 Hz-only EDID, Windows
-   re-validated the VidPN in a loop, DWM leaked swapchains to ~3.9 GB and crash-looped (0xC00001AD). Needs an EDID
-   that can describe 120 Hz (DisplayID extension) first. */
-static ULONG g_Refresh = 60;
+   every panel TE (INTF1 frame counter +0x0AC counts 120/s).
+   v0.52: when that is measured at start and zero-copy scanout is active, the driver offers BOTH 60 and 120 Hz
+   (target and monitor modes, EDID + DisplayID 1.3 extension for the 120 Hz timing) and follows whatever refresh
+   Windows commits. STILL EXPERIMENTAL and opt-in (C:\topaz\panel.120hz): once Windows commits 120 Hz, DWM
+   allocates new full-screen buffers continuously (~400 x 24 MB in a minute vs 18 per boot at 60 Hz) and they
+   are only freed when its device goes away, so it runs out of memory and crash-loops (0xC00001AD). */
+static ULONG g_Refresh = 60;                    /* refresh of the committed mode */
+static BOOLEAN g_Panel120;                      /* 120 Hz is offered */
+ULONG DispRefreshHz(VOID) { return g_Refresh; }
 #define REFRESH     g_Refresh
 #define INTF1_FRAME_COUNT 0x360ACu
 #define INTF_XO_COUNTER   0x36214u              /* free-running 19.2 MHz */
@@ -373,6 +377,9 @@ static ULONG g_Shown;                            /* vsyncs with a new picture in
    was reported done as soon as the CTL flush bit read clear, which can happen sooner than one panel period after
    the previous one. Complete at most one flip per vsync period so DWM is paced to 60 Hz. */
 static LONG64 g_LastFlipDone;
+/* per-flip timing (100 ns units) for the PACE line */
+static LONG64 g_PresLast, g_PresT, g_PresIntSum, g_LatSum, g_LatMax, g_DoneLast, g_DoneIntSum;
+static LONG g_PresN, g_LatN, g_DoneN, g_TickN;
 static BOOLEAN g_HeldThis;
 /* v0.45.5: the stats window was 60 *ticks*, but a completed flip re-locks the tick phase, so while DWM flips ticks
    are rare and "60 vsyncs/s" was true by construction. Use a 1 s wall-clock window and count what DxgKrnl gets. */
@@ -463,6 +470,13 @@ static VOID VsyncWork(BOOLEAN periodicTick)
             }
             g_Done++;
             g_ShownPa = g_ScanPa;
+            if (g_PresT != 0) {
+                LONG64 lat = now - g_PresT;
+                g_LatSum += lat; g_LatN++;
+                if (lat > g_LatMax) g_LatMax = lat;
+            }
+            if (g_DoneLast != 0 && now - g_DoneLast < 2000000) { g_DoneIntSum += now - g_DoneLast; g_DoneN++; }
+            g_DoneLast = now;
             g_LastFlipDone = now;
             flip = TRUE;
             InterlockedIncrement64(&g_TotFlipDone);
@@ -475,6 +489,7 @@ static VOID VsyncWork(BOOLEAN periodicTick)
     if (periodicTick || now + slack >= g_NextVsync) {
         tick = TRUE;
         g_Ticks++;
+        g_TickN++;
         if (!periodicTick) {
             g_NextVsync += VSYNC_PERIOD;
             if (g_NextVsync <= now) {
@@ -535,6 +550,7 @@ static volatile LONG g_TimerRunning;
    latch is seen and the vsync phase locks to it); once nothing is pending it returns to one tick per period,
    phase-aligned to g_NextVsync. */
 static volatile LONG g_FastPoll, g_WantFast;
+static volatile LONG g_Stopping;                 /* DispStop in progress: nothing may re-arm g_HrTimer */
 static volatile LONG64 g_FastSwitches;
 static KSPIN_LOCK g_TimerLock;
 static KDPC g_KickDpc;
@@ -549,11 +565,11 @@ static BOOLEAN DispBusy(VOID)
 static VOID TimerEnsure(VOID)
 {
     KIRQL irql;
-    if (g_HrTimer == NULL || g_TimerRunning) {
+    if (g_HrTimer == NULL || g_TimerRunning || g_Stopping) {
         return;
     }
     KeAcquireSpinLock(&g_TimerLock, &irql);
-    if (!g_TimerRunning && g_HrTimer != NULL) {
+    if (!g_TimerRunning && g_HrTimer != NULL && !g_Stopping) {
         g_IdleTicks = 0;
         InterlockedExchange(&g_TimerRunning, 1);
         ExSetTimer(g_HrTimer, -VSYNC_PERIOD, VSYNC_PERIOD, NULL);
@@ -566,10 +582,14 @@ static VOID TimerEnsure(VOID)
 static VOID TimerFast(BOOLEAN On)
 {
     KIRQL irql;
-    if (g_HrTimer == NULL) {
+    if (g_HrTimer == NULL || g_Stopping) {
         return;
     }
     KeAcquireSpinLock(&g_TimerLock, &irql);
+    if (g_HrTimer == NULL || g_Stopping) {
+        KeReleaseSpinLock(&g_TimerLock, irql);
+        return;
+    }
     if (On && !g_FastPoll) {
         InterlockedExchange(&g_FastPoll, 1);
         InterlockedExchange(&g_TimerRunning, 1);
@@ -603,7 +623,7 @@ static VOID KickDpc(PKDPC Dpc, PVOID Ctx, PVOID A1, PVOID A2)
 /* any IRQL (SetVidPnSourceAddress may run at DIRQL): set the work flag first, then call this */
 static VOID TimerKick(VOID)
 {
-    if (g_HrTimer == NULL) {
+    if (g_HrTimer == NULL || g_Stopping) {
         return;
     }
     if (g_FlipPending && !g_FastPoll) {
@@ -625,11 +645,11 @@ static VOID TimerMaybeStop(VOID)
         return;
     }
     KeAcquireSpinLock(&g_TimerLock, &irql);
-    if (!DispBusy()) {
+    if (!DispBusy() && g_HrTimer != NULL) {
         InterlockedExchange(&g_TimerRunning, 0);
         ExCancelTimer(g_HrTimer, NULL);
         InterlockedIncrement64(&g_TimerStops);
-        if (DispBusy()) {                        /* work raced in after the check: keep ticking */
+        if (DispBusy() && !g_Stopping) {         /* work raced in after the check: keep ticking */
             InterlockedExchange(&g_TimerRunning, 1);
             ExSetTimer(g_HrTimer, -VSYNC_PERIOD, VSYNC_PERIOD, NULL);
         }
@@ -661,7 +681,11 @@ VOID DispLogStats(VOID)
              g_TotCb, g_TotNotify, g_TotFlipDone, g_FlipCount, g_VsyncOn, g_FlipPending, g_Deferred, g_FlipHeld,
              g_LastSyncSt, g_LastSyncRet, g_ScanPa.QuadPart, g_ShownPa.QuadPart,
              g_TimerRunning ? "on" : "off", g_TimerStarts, g_TimerStops);
-    LogPrint("PACE fast %ld switches %lld held %u waits %u\n", g_FastPoll, g_FastSwitches, g_FlipHeld, g_FlipWaits);
+    LogPrint("PACE %u Hz fast %ld switches %lld waits %u | presents %ld avg %lld us | done %ld avg %lld us | present->done avg %lld "
+             "max %lld us | vsync ticks %ld\n", REFRESH, g_FastPoll, g_FastSwitches, g_FlipWaits,
+             g_PresN, g_PresN ? g_PresIntSum / g_PresN / 10 : 0, g_DoneN, g_DoneN ? g_DoneIntSum / g_DoneN / 10 : 0,
+             g_LatN ? g_LatSum / g_LatN / 10 : 0, g_LatMax / 10, g_TickN);
+    g_PresN = 0; g_PresIntSum = 0; g_LatN = 0; g_LatSum = 0; g_LatMax = 0; g_DoneN = 0; g_DoneIntSum = 0; g_TickN = 0;
     {
         ULONG fsr = g_Cb4On ? CbRd(CB_FSR) : 0;
         LogPrint("FRAME flipsReq %lld flipsDone %lld copies %lld copyUs %lld copyMaxUs %lld copyMB %lld | direct %u active %d "
@@ -933,6 +957,12 @@ NTSTATUS DispSetSourceAddress(const DXGKARG_SETVIDPNSOURCEADDRESS *A)
     g_ScanPa = A->PrimaryAddress;
     InterlockedIncrement(&g_FlipCount);
     InterlockedIncrement64(&g_StFlipReq);
+    {
+        LONG64 t = (LONG64)KeQueryInterruptTime();
+        if (g_PresLast != 0 && t - g_PresLast < 2000000) { g_PresIntSum += t - g_PresLast; g_PresN++; }
+        g_PresLast = t;
+        g_PresT = t;
+    }
     InterlockedExchange(&g_UiFlips, 1);                   /* signalled from the vsync DPC (may be at DIRQL here) */
     InterlockedIncrement(&g_FlipSeq);
     if (g_DirectOk && g_ScanCur != NULL && g_ScanCur->Bo != NULL && ScanIova(g_ScanCur->Bo) != 0 &&
@@ -1016,6 +1046,7 @@ NTSTATUS DispStart(PDXGKRNL_INTERFACE Dxgk)
     LARGE_INTEGER due;
 
     g_Dxgk = Dxgk;
+    InterlockedExchange(&g_Stopping, 0);
     KeInitializeMutex(&g_ScanLock, 0);
     RtlZeroMemory(&g_Post, sizeof(g_Post));
     st = Dxgk->DxgkCbAcquirePostDisplayOwnership(Dxgk->DeviceHandle, &g_Post);
@@ -1081,9 +1112,10 @@ NTSTATUS DispStart(PDXGKRNL_INTERFACE Dxgk)
         f1 = READ_REGISTER_ULONG((volatile ULONG *)(g_Mdp + INTF1_FRAME_COUNT));
         x1 = READ_REGISTER_ULONG((volatile ULONG *)(g_Mdp + INTF_XO_COUNTER));
         hz = (x1 - x0) ? (ULONG)((ULONGLONG)(f1 - f0) * 19200000ULL / (ULONG)(x1 - x0)) : 0;
-        g_Refresh = (hz >= 100 && g_DirectOk && !force60) ? 120 : 60;
-        LogPrint("refresh: panel measured %u Hz (%u frames / %u us) -> reporting %u Hz%s\n", hz, f1 - f0,
-                 (ULONG)((ULONGLONG)(x1 - x0) * 1000000ULL / 19200000ULL), g_Refresh, force60 ? " (120 Hz is opt-in: panel.120hz)" : "");
+        g_Panel120 = hz >= 100 && g_DirectOk && !force60;
+        LogPrint("refresh: panel measured %u Hz (%u frames / %u us) -> offering %s\n", hz, f1 - f0,
+                 (ULONG)((ULONGLONG)(x1 - x0) * 1000000ULL / 19200000ULL), g_Panel120 ? "60 + 120 Hz" : "60 Hz",
+                 force60 ? " (120 Hz is opt-in: panel.120hz)" : "");
     }
 
     g_NextVsync = (LONG64)KeQueryInterruptTime() + VSYNC_PERIOD;
@@ -1109,6 +1141,8 @@ NTSTATUS DispStart(PDXGKRNL_INTERFACE Dxgk)
 
 VOID DispStop(VOID)
 {
+    InterlockedExchange(&g_Stopping, 1);
+    KeFlushQueuedDpcs();                                 /* kick/copy DPCs queued before the flag see it now */
     CopyPoolStop();
     if (g_DirectOk && InterlockedExchange(&g_DirectActive, 0)) {
         MdpScanFrom(g_FbAddr, g_FbStride);
@@ -1122,9 +1156,16 @@ VOID DispStop(VOID)
     if (g_TimerOn) {
         if (g_HrTimer != NULL) {
             EXT_DELETE_PARAMETERS dp;
+            PEX_TIMER t;
+            KIRQL irql;
+            KeAcquireSpinLock(&g_TimerLock, &irql);
+            t = g_HrTimer;
+            g_HrTimer = NULL;                            /* no re-arm can reach it from here on */
+            InterlockedExchange(&g_TimerRunning, 0);
+            InterlockedExchange(&g_FastPoll, 0);
+            KeReleaseSpinLock(&g_TimerLock, irql);
             ExInitializeDeleteTimerParameters(&dp);
-            ExDeleteTimer(g_HrTimer, TRUE, TRUE, &dp);   /* cancel + wait for a running callback */
-            g_HrTimer = NULL;
+            ExDeleteTimer(t, TRUE, TRUE, &dp);           /* cancel + wait for a running callback */
             if (g_TimerRes) {
                 ExSetTimerResolution(0, FALSE);
                 g_TimerRes = FALSE;
@@ -1276,22 +1317,67 @@ static VOID BuildEdid(UCHAR *e)
     RtlCopyMemory(&d[5], name, sizeof(name));
     e[90 + 3] = 0x10;
     e[108 + 3] = 0x10;
+    if (g_Panel120) {
+        e[126] = 1;                                   /* one extension: DisplayID with the 120 Hz timing */
+    }
     for (i = 0; i < 127; i++) {
         sum += e[i];
     }
     e[127] = (UCHAR)(256 - (sum & 0xFF));
 }
 
+/* EDID extension block: DisplayID 1.3 section with one Type I detailed timing (24-bit pixel clock in 10 kHz units,
+   so 2440x2268 @ 120 Hz fits; an EDID DTD tops out at 655.35 MHz). Fields are stored minus one. */
+static VOID BuildDisplayIdExt(UCHAR *x)
+{
+    const ULONG hA = H_ACTIVE, vA = V_ACTIVE, hB = 160, vB = 32, hFp = 80, hSw = 20, vFp = 16, vSw = 4;
+    const ULONG clk10k = (hA + hB) * (vA + vB) * 120 / 10000;
+    UCHAR *t;
+    ULONG i, sum = 0;
+
+    RtlZeroMemory(x, 128);
+    x[0] = 0x70;                                      /* EDID extension tag: DisplayID */
+    x[1] = 0x13;                                      /* DisplayID 1.3 */
+    x[2] = 3 + 20;                                    /* section payload: one data block */
+    x[3] = 0x00;                                      /* extension section */
+    x[4] = 0x00;
+    x[5] = 0x03;                                      /* Type I detailed timing block */
+    x[6] = 0x00;
+    x[7] = 20;
+    t = &x[8];
+    t[0] = (UCHAR)((clk10k - 1) & 0xFF); t[1] = (UCHAR)((clk10k - 1) >> 8); t[2] = (UCHAR)((clk10k - 1) >> 16);
+    t[3] = 0x00;                                      /* not preferred (the base EDID's 60 Hz is), progressive */
+    t[4] = (UCHAR)((hA - 1) & 0xFF);  t[5] = (UCHAR)((hA - 1) >> 8);
+    t[6] = (UCHAR)((hB - 1) & 0xFF);  t[7] = (UCHAR)((hB - 1) >> 8);
+    t[8] = (UCHAR)((hFp - 1) & 0xFF); t[9] = (UCHAR)((hFp - 1) >> 8);       /* +sync polarity bit 15 = 0 */
+    t[10] = (UCHAR)((hSw - 1) & 0xFF); t[11] = (UCHAR)((hSw - 1) >> 8);
+    t[12] = (UCHAR)((vA - 1) & 0xFF); t[13] = (UCHAR)((vA - 1) >> 8);
+    t[14] = (UCHAR)((vB - 1) & 0xFF); t[15] = (UCHAR)((vB - 1) >> 8);
+    t[16] = (UCHAR)((vFp - 1) & 0xFF); t[17] = (UCHAR)((vFp - 1) >> 8);
+    t[18] = (UCHAR)((vSw - 1) & 0xFF); t[19] = (UCHAR)((vSw - 1) >> 8);
+    for (i = 1; i < 28; i++) {                        /* DisplayID section checksum: bytes 1..28 */
+        sum += x[i];
+    }
+    x[28] = (UCHAR)(256 - (sum & 0xFF));
+    for (i = 0, sum = 0; i < 127; i++) {
+        sum += x[i];
+    }
+    x[127] = (UCHAR)(256 - (sum & 0xFF));
+}
+
 NTSTATUS DispQueryDeviceDescriptor(ULONG Uid, PDXGK_DEVICE_DESCRIPTOR Desc)
 {
-    UCHAR edid[128];
-    ULONG n;
+    UCHAR edid[256];
+    ULONG n, len = g_Panel120 ? 256u : 128u;
 
-    if (Uid != 0 || Desc->DescriptorOffset >= sizeof(edid)) {
+    if (Uid != 0 || Desc->DescriptorOffset >= len) {
         return STATUS_MONITOR_NO_MORE_DESCRIPTOR_DATA;
     }
     BuildEdid(edid);
-    n = sizeof(edid) - Desc->DescriptorOffset;
+    if (g_Panel120) {
+        BuildDisplayIdExt(edid + 128);
+    }
+    n = len - Desc->DescriptorOffset;
     if (n > Desc->DescriptorLength) {
         n = Desc->DescriptorLength;
     }
@@ -1301,18 +1387,18 @@ NTSTATUS DispQueryDeviceDescriptor(ULONG Uid, PDXGK_DEVICE_DESCRIPTOR Desc)
 
 /* ---------------------------------------------------------------- VidPN */
 
-static VOID FillSignal(D3DKMDT_VIDEO_SIGNAL_INFO *S)
+static VOID FillSignalHz(D3DKMDT_VIDEO_SIGNAL_INFO *S, ULONG Hz)
 {
     S->VideoStandard = D3DKMDT_VSS_OTHER;
     S->TotalSize.cx = H_TOTAL;
     S->TotalSize.cy = V_TOTAL;
     S->ActiveSize.cx = H_ACTIVE;
     S->ActiveSize.cy = V_ACTIVE;
-    S->VSyncFreq.Numerator = REFRESH;
+    S->VSyncFreq.Numerator = Hz;
     S->VSyncFreq.Denominator = 1;
-    S->HSyncFreq.Numerator = V_TOTAL * REFRESH;
+    S->HSyncFreq.Numerator = V_TOTAL * Hz;
     S->HSyncFreq.Denominator = 1;
-    S->PixelRate = (SIZE_T)H_TOTAL * V_TOTAL * REFRESH;
+    S->PixelRate = (SIZE_T)H_TOTAL * V_TOTAL * Hz;
     S->ScanLineOrdering = D3DDDI_VSSLO_PROGRESSIVE;
 }
 
@@ -1340,7 +1426,8 @@ static NTSTATUS AddSourceMode(const DXGK_VIDPNSOURCEMODESET_INTERFACE *If, D3DKM
     return STATUS_SUCCESS;
 }
 
-static NTSTATUS AddTargetMode(const DXGK_VIDPNTARGETMODESET_INTERFACE *If, D3DKMDT_HVIDPNTARGETMODESET Set)
+static NTSTATUS AddTargetModeHz(const DXGK_VIDPNTARGETMODESET_INTERFACE *If, D3DKMDT_HVIDPNTARGETMODESET Set, ULONG Hz,
+                                BOOLEAN Preferred)
 {
     D3DKMDT_VIDPN_TARGET_MODE *m = NULL;
     NTSTATUS st = If->pfnCreateNewModeInfo(Set, &m);
@@ -1348,8 +1435,8 @@ static NTSTATUS AddTargetMode(const DXGK_VIDPNTARGETMODESET_INTERFACE *If, D3DKM
     if (!NT_SUCCESS(st)) {
         return st;
     }
-    FillSignal(&m->VideoSignalInfo);
-    m->Preference = D3DKMDT_MP_PREFERRED;
+    FillSignalHz(&m->VideoSignalInfo, Hz);
+    m->Preference = Preferred ? D3DKMDT_MP_PREFERRED : D3DKMDT_MP_NOTPREFERRED;
     st = If->pfnAddMode(Set, m);
     if (!NT_SUCCESS(st)) {
         If->pfnReleaseModeInfo(Set, m);
@@ -1358,7 +1445,16 @@ static NTSTATUS AddTargetMode(const DXGK_VIDPNTARGETMODESET_INTERFACE *If, D3DKM
     return STATUS_SUCCESS;
 }
 
-NTSTATUS DispRecommendMonitorModes(const DXGKARG_RECOMMENDMONITORMODES *A)
+static NTSTATUS AddTargetMode(const DXGK_VIDPNTARGETMODESET_INTERFACE *If, D3DKMDT_HVIDPNTARGETMODESET Set)
+{
+    NTSTATUS st = AddTargetModeHz(If, Set, 60, TRUE);          /* 60 Hz stays preferred: boots are safe */
+    if (NT_SUCCESS(st) && g_Panel120) {
+        st = AddTargetModeHz(If, Set, 120, FALSE);
+    }
+    return st;
+}
+
+static NTSTATUS AddMonitorModeHz(const DXGKARG_RECOMMENDMONITORMODES *A, ULONG Hz, BOOLEAN Preferred)
 {
     D3DKMDT_MONITOR_SOURCE_MODE *m = NULL;
     NTSTATUS st = A->pMonitorSourceModeSetInterface->pfnCreateNewModeInfo(A->hMonitorSourceModeSet, &m);
@@ -1366,9 +1462,9 @@ NTSTATUS DispRecommendMonitorModes(const DXGKARG_RECOMMENDMONITORMODES *A)
     if (!NT_SUCCESS(st)) {
         return st;
     }
-    FillSignal(&m->VideoSignalInfo);
+    FillSignalHz(&m->VideoSignalInfo, Hz);
     m->Origin = D3DKMDT_MCO_DRIVER;
-    m->Preference = D3DKMDT_MP_PREFERRED;
+    m->Preference = Preferred ? D3DKMDT_MP_PREFERRED : D3DKMDT_MP_NOTPREFERRED;
     m->ColorBasis = D3DKMDT_CB_SRGB;
     m->ColorCoeffDynamicRanges.FirstChannel = 8;
     m->ColorCoeffDynamicRanges.SecondChannel = 8;
@@ -1380,6 +1476,15 @@ NTSTATUS DispRecommendMonitorModes(const DXGKARG_RECOMMENDMONITORMODES *A)
         return st == STATUS_GRAPHICS_MODE_ALREADY_IN_MODESET ? STATUS_SUCCESS : st;
     }
     return STATUS_SUCCESS;
+}
+
+NTSTATUS DispRecommendMonitorModes(const DXGKARG_RECOMMENDMONITORMODES *A)
+{
+    NTSTATUS st = AddMonitorModeHz(A, 60, TRUE);
+    if (NT_SUCCESS(st) && g_Panel120) {
+        st = AddMonitorModeHz(A, 120, FALSE);
+    }
+    return st;
 }
 
 NTSTATUS DispEnumCofuncModality(PDXGKRNL_INTERFACE Dxgk, const DXGKARG_ENUMVIDPNCOFUNCMODALITY *A)
@@ -1564,6 +1669,30 @@ NTSTATUS DispCommitVidPn(PDXGKRNL_INTERFACE Dxgk, const DXGKARG_COMMITVIDPN *A)
         }
     } else {
         LogPrint("CommitVidPn: %08x\n", st);
+    }
+    if (NT_SUCCESS(st) && g_Committed && vi != NULL) {        /* follow the refresh Windows committed */
+        D3DKMDT_HVIDPNTARGETMODESET tset = 0;
+        const DXGK_VIDPNTARGETMODESET_INTERFACE *tgi = NULL;
+        const D3DKMDT_VIDPN_TARGET_MODE *tpin = NULL;
+        if (NT_SUCCESS(vi->pfnAcquireTargetModeSet(A->hFunctionalVidPn, 0, &tset, &tgi))) {
+            if (NT_SUCCESS(tgi->pfnAcquirePinnedModeInfo(tset, &tpin)) && tpin != NULL) {
+                const D3DDDI_RATIONAL *f = &tpin->VideoSignalInfo.VSyncFreq;
+                ULONG hz = f->Denominator ? (f->Numerator + f->Denominator / 2) / f->Denominator : 60;
+                ULONG want = (hz >= 100 && g_Panel120) ? 120 : 60;
+                if (want != g_Refresh) {
+                    KIRQL irql;
+                    g_Refresh = want;
+                    KeAcquireSpinLock(&g_TimerLock, &irql);
+                    if (g_TimerRunning && !g_FastPoll && g_HrTimer != NULL && !g_Stopping) {
+                        ExSetTimer(g_HrTimer, -VSYNC_PERIOD, VSYNC_PERIOD, NULL);
+                    }
+                    KeReleaseSpinLock(&g_TimerLock, irql);
+                }
+                LogPrint("CommitVidPn: target %u Hz -> vsync %u Hz\n", hz, g_Refresh);
+                tgi->pfnReleaseModeInfo(tset, tpin);
+            }
+            vi->pfnReleaseTargetModeSet(A->hFunctionalVidPn, tset);
+        }
     }
     if (pin != NULL) {
         si->pfnReleaseModeInfo(sset, pin);
@@ -1858,3 +1987,6 @@ VOID DispSurveyMdp(VOID)
     }
     MmUnmapIoSpace((PVOID)smmu, 0x2000);
 }
+
+/* GPU governor UI floor: interrupt time of the last completed flip */
+LONG64 DispLastFlipTime(VOID) { return g_LastFlipDone; }

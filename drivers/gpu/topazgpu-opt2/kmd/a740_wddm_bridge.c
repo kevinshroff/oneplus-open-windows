@@ -290,7 +290,6 @@ static VOID A740ExitSecureMode(VOID) {
     volatile ULONG *rb = (volatile ULONG *)g_Ogo->Cp->Run.Buffer[0].Cpu;
     ULONGLONG fenceAddr = g_Ogo->Cp->Run.Layout.Iova[1] + 4ULL;
     ULONG fence = g_NextFence++;
-    DcvsKick();
     uint32_t smHdr = 0, scrHdr = 0, evHdr = 0;
     (void)AdrenoPM4Type7(0x66u, 1u, &smHdr); /* CP_SET_SECURE_MODE */
     (void)AdrenoPM4Type4(0x885u, 1u, &scrHdr);
@@ -400,6 +399,8 @@ NTSTATUS A740BindDevice(PDEVICE_OBJECT Pdo, PCM_RESOURCE_LIST Translated) {
    the DDR (bandwidth) index follows the GPU index. C:\topaz\gpu.nodcvs disables it. */
 static const ULONG g_GpuMhz[10] = { 0, 125, 220, 295, 348, 401, 475, 550, 615, 680 };
 #define DCVS_MAX_IDX 8
+#define DCVS_UI_IDX 5                                  /* 401 MHz floor while DWM flips frames (+200 ms) */
+LONG64 DispLastFlipTime(VOID);
 static PEX_TIMER g_DcvsTimer;
 static volatile LONG g_DcvsSamples, g_DcvsBusy, g_DcvsTimerOn, g_DcvsStop;
 static KEVENT g_DcvsKickEv;
@@ -501,6 +502,9 @@ static VOID DcvsThread(PVOID Ctx)
             ULONGLONG target = (ULONGLONG)g_GpuMhz[cur] * pm / 650u;   /* MHz that would make it ~65 % busy */
             g_DcvsBusyPm = (LONG)pm;
             while (want < DCVS_MAX_IDX && g_GpuMhz[want] < target) want++;
+            if ((LONG64)KeQueryInterruptTime() - DispLastFlipTime() < 2000000LL && want < DCVS_UI_IDX) {
+                want = DCVS_UI_IDX;                            /* UI is animating: DWM latency matters more than busy % */
+            }
             if (pm >= 900 && want < cur + 2) want = cur + 2 > DCVS_MAX_IDX ? DCVS_MAX_IDX : cur + 2;
             if (want > cur) quiet = 0;
             else if (want < cur) { if (++quiet >= 3) { want = cur - 1; quiet = 0; } else want = cur; }
@@ -803,6 +807,7 @@ NTSTATUS HwSubmit(const ULONGLONG *Ib, const ULONG *Words, ULONG Count, PULONG F
     }
     ULONGLONG fenceAddr = g_Ogo->Cp->Run.Layout.Iova[1] + 4ULL;
     ULONG fence = g_NextFence++;
+    DcvsKick();                                   /* wake the GPU busy sampler (DCVS) */
     /* Ensure A7xx BR+BV threads are enabled (g433 init left THREAD=0!) */
     uint32_t tcHdr = 0;
     if (!AdrenoPM4Type7(0x17u, 1u, &tcHdr)) {

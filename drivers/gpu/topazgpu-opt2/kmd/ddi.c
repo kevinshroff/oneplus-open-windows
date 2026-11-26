@@ -11,6 +11,7 @@
 #include <devpkey.h>
 
 VOID DispAllocCreated(TGPU_ALLOCATION *Al);
+ULONG DispRefreshHz(VOID);
 
 typedef struct _TGPU_ADAPTER {
     PDEVICE_OBJECT       Pdo;
@@ -701,7 +702,10 @@ static NTSTATUS APIENTRY TgDescribeAllocation(const HANDLE hAdapter, DXGKARG_DES
     A->Format = al->Desc.format != 0 ? (D3DDDIFORMAT)al->Desc.format : D3DDDIFMT_X8R8G8B8;
     A->MultisampleMethod.NumSamples = 0;
     A->MultisampleMethod.NumQualityLevels = 0;
-    A->RefreshRate.Numerator = 60;
+    /* v0.52: the committed mode's refresh. Dxgkrnl compares a primary's described mode with the current one; a
+       hard-coded 60 made every DWM primary look stale at 120 Hz, so DXGI rebuilt the swapchain in a loop until
+       memory ran out (DWM 0xC00001AD). */
+    A->RefreshRate.Numerator = DispRefreshHz();
     A->RefreshRate.Denominator = 1;
     A->PrivateDriverFormatAttribute = 0;
     A->Rotation = D3DDDI_ROTATION_IDENTITY;

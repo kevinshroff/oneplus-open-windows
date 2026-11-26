@@ -77,14 +77,26 @@ lowest DDR) and nothing changed it afterwards. The bridge (`a740_wddm_bridge.c`)
 
 ## Still to do
 
-* Step 4: 120 Hz - **experimental, opt-in** (`C:\topaz\panel.120hz`).
-  * The panel is already at 120 Hz: the bootloader leaves the AC052 P panel in its 120 Hz mode and MDP autorefresh
-    pushes a frame per panel TE. INTF1 frame counter `+0x0AC` against the 19.2 MHz counter `+0x214` measures
-    120 Hz; the driver logs `refresh: panel measured ...` at start.
-  * Reporting 120 Hz to Windows broke DWM: the EDID detailed timing cannot describe 2440x2268 at 120 Hz (above the
-    655.35 MHz DTD limit) so it stays 60 Hz, Windows re-validated the VidPN in a loop, DWM recreated swapchains
-    until ~3.9 GB of BOs were allocated and crash-looped (`0xC00001AD`). Next: an EDID DisplayID extension with a
-    120 Hz timing, then retry.
+* Step 4: 120 Hz - **works, opt-in** (`C:\topaz\panel.120hz`; then pick 120 Hz in Settings > Display >
+  Advanced display, or any SetDisplayConfig caller).
+  * The panel already runs at 120 Hz: the bootloader leaves the AC052 P panel in its 120 Hz mode and MDP
+    autorefresh pushes a frame per panel TE (INTF1 frame counter `+0x0AC` vs the 19.2 MHz counter `+0x214`; logged
+    as `refresh: panel measured ...` at start). No panel commands or link-clock changes are needed.
+  * With the flag file the driver offers 60 Hz (preferred) and 120 Hz target/monitor modes, adds an EDID DisplayID
+    1.3 extension with a Type I 120 Hz timing (a base-EDID DTD cannot exceed 655.35 MHz), and follows the refresh
+    Windows commits (vsync timer, `GetScanLine`).
+  * Root cause of the earlier DWM crash loop (`0xC00001AD`, ~400 x 24 MB swapchain buffers a minute):
+    `DxgkDdiDescribeAllocation` reported every allocation as 60 Hz, so at 120 Hz Dxgkrnl saw each new DWM primary
+    as belonging to another mode and DXGI rebuilt the swapchain in a loop. It now reports the committed refresh.
+  * Shutdown at 120 Hz hung once: the vsync timer could be re-armed by the 1 ms flip-poll kick DPC or by
+    `CommitVidPn` while `DispStop` deleted it. Teardown now sets a stop flag checked by every re-arm path, drains
+    DPCs and deletes the timer under its lock; a reboot from 120 Hz then shut down cleanly and booted back at 120.
+  * Recovery if a display build ever crash-loops: delete `C:\topaz\panel.120hz` (60 Hz only) and, if Windows
+    insists on a saved mode, remove the subkeys of `HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers\
+    Configuration` and `...\Connectivity` (Windows rebuilds them).
+* GPU governor fix: the DCVS sampler was woken from the one-time init submit instead of `HwSubmit`, so it never ran
+  and the GPU sat at 124.8 MHz. It is now kicked per submit, and while DWM is flipping frames (+200 ms) the GPU is
+  held at >= 401 MHz (index 5) because the sampler under-reads DWM's short bursts.
 * Benchmark (zero-copy, 60 Hz, window drag at 60 moves/s): no CPU copies, GPU 0.26 ms/frame, CPU 5 % total, but
   DWM still averaged 25.8 ms per frame - flips latch on the 120 Hz TE but are completed on the next 60 Hz software
   vsync tick, so DWM often misses a period.
@@ -96,6 +108,17 @@ lowest DDR) and nothing changed it afterwards. The bridge (`a740_wddm_bridge.c`)
 |---|---|---|
 | before pacing fix | 25.8 ms (~39 fps) | 341 |
 | after pacing fix (v0.51) | 18.1-19.5 ms (~53 fps) | 592 |
+
+120 Hz, window drag at 120 moves/s (zero-copy), per-flip `PACE` statistics:
+
+| Build | DWM present interval | flips in the run | present -> flip done |
+|---|---|---|---|
+| 120 Hz, GPU governor not running | 17.4 ms (~57 fps) | 673 | 10.3 ms |
+| + DCVS kicked per submit | 14.1 ms (~71 fps) | 800 | 8.1 ms |
+| + 401 MHz GPU floor while flipping | 12.5-13.5 ms (~77 fps) | 903 | 5.9 ms |
+
+The remaining gap to 8.3 ms: with one flip in flight DWM alternates between frames that make the next panel TE and
+frames that miss it. Next: allow a queued second flip.
 
   The drag script itself caps this test at 60 updates/s; for comparison the original CPU-copy path needed 20.6 ms
   just to copy each frame.
