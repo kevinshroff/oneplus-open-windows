@@ -10,10 +10,29 @@
 #define CK_MAGIC    0x4B43504Fu /* "OPCK" */
 #define CK_ABI_VER  1u
 
-#define IOCTL_CK_STATUS 0x00226000u /* METHOD_BUFFERED, FILE_READ_ACCESS */
-#define IOCTL_CK_PAUSE  0x0022A004u /* METHOD_BUFFERED, FILE_WRITE_ACCESS */
-#define IOCTL_CK_RESUME 0x0022A008u /* METHOD_BUFFERED, FILE_WRITE_ACCESS */
-#define IOCTL_CK_ACCEL  0x0022600Cu /* METHOD_BUFFERED, FILE_READ_ACCESS */
+#define IOCTL_CK_STATUS    0x00226000u /* METHOD_BUFFERED, FILE_READ_ACCESS */
+#define IOCTL_CK_PAUSE     0x0022A004u /* METHOD_BUFFERED, FILE_WRITE_ACCESS */
+#define IOCTL_CK_RESUME    0x0022A008u /* METHOD_BUFFERED, FILE_WRITE_ACCESS */
+#define IOCTL_CK_ACCEL     0x0022600Cu /* METHOD_BUFFERED, FILE_READ_ACCESS */
+#define IOCTL_CK_QRTR_SEND 0x0022A010u /* METHOD_BUFFERED, FILE_WRITE_ACCESS */
+#define IOCTL_CK_QRTR_RECV 0x00226014u /* METHOD_BUFFERED, FILE_READ_ACCESS */
+#define IOCTL_CK_AUDIO     0x00226018u /* METHOD_BUFFERED, FILE_READ_ACCESS */
+
+typedef struct {
+    uint32_t Size;
+    uint32_t Version;
+    uint32_t Magic;
+    uint32_t OpenAcked;
+    uint32_t RemoteOpen;
+    uint32_t SpfQuerySent;
+    uint32_t SpfRspReceived;
+    uint32_t SpfRspOpcode;
+    uint32_t SpfState;
+    uint32_t SpfRspLen;
+    uint8_t  SpfRaw[64];
+    uint32_t ChanCount;
+    char     ChanNames[16][24];
+} CK_AUDIO_SNAPSHOT;
 
 typedef struct {
     uint32_t Size;

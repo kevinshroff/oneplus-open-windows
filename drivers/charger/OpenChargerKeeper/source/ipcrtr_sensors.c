@@ -42,6 +42,29 @@ void CkIpcPopTx(CK_IPC_STATE *ipc){
     ipc->TxPackets++;
 }
 
+int CkIpcEnqueueRawTx(CK_IPC_STATE *ipc, const uint8_t *data, uint32_t len){
+    return EnqueueTx(ipc, data, len);
+}
+
+static void EnqueueRx(CK_IPC_STATE *ipc, const uint8_t *data, uint32_t len){
+    if(!ipc || !data || !len || len > CK_IPC_RXQ_MAX) return;
+    uint32_t next = (ipc->RxHead + 1u) % CK_IPC_RXQ_SLOTS;
+    if(next == ipc->RxTail){ ipc->RxDrops++; return; }
+    ipc->RxQ[ipc->RxHead].Len = len;
+    for(uint32_t i=0; i<len; i++) ipc->RxQ[ipc->RxHead].Data[i] = data[i];
+    ipc->RxHead = next;
+}
+
+int CkIpcPopRx(CK_IPC_STATE *ipc, uint8_t *out, uint32_t cap, uint32_t *out_len){
+    if(!ipc || !out || !out_len || ipc->RxHead == ipc->RxTail) return 0;
+    uint32_t len = ipc->RxQ[ipc->RxTail].Len;
+    if(len > cap) len = cap;
+    for(uint32_t i=0; i<len; i++) out[i] = ipc->RxQ[ipc->RxTail].Data[i];
+    *out_len = len;
+    ipc->RxTail = (ipc->RxTail + 1u) % CK_IPC_RXQ_SLOTS;
+    return 1;
+}
+
 static void EnqueueQrtr(CK_IPC_STATE *ipc, uint32_t type, uint32_t src_port,
                         uint32_t dst_node, uint32_t dst_port,
                         const uint8_t *payload, uint32_t plen){
@@ -280,6 +303,11 @@ void CkIpcOnQrtrPacket(CK_IPC_STATE *ipc, const uint8_t *pkt, uint32_t len){
     uint32_t dst_port = R32(pkt + 28);
     if(ver != 1u || 32u + psize > len) return;
     ipc->RxPackets++;
+
+    /* Forward non-SNS-client QRTR packets to userspace RX ring (for tqftpserv, etc.) */
+    if(!(type == 1u && dst_port == QRTR_CLIENT_PORT)){
+        EnqueueRx(ipc, pkt, len);
+    }
 
     const uint8_t *pay = pkt + 32u;
 

@@ -1,0 +1,57 @@
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = HIDClass
+ClassGuid   = {745a17a0-74d3-11d0-b6fe-00a0c90f57da}
+Provider    = %MfgName%
+CatalogFile = OpenAccelHid.cat
+DriverVer   = 11/27/2026,1.0.0.1
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+OpenAccelHid.sys = 1,,
+
+[Manufacturer]
+%MfgName% = Standard,NTARM64
+
+[Standard.NTARM64]
+%DeviceDesc% = OpenAccelHid_Install, ROOT\OPENACCELHID
+
+[OpenAccelHid_Install.NT]
+CopyFiles = Drivers_Dir
+
+[Drivers_Dir]
+OpenAccelHid.sys
+
+[OpenAccelHid_Install.NT.HW]
+AddReg = OpenAccelHid_HW_AddReg
+
+[OpenAccelHid_HW_AddReg]
+HKR,,"LowerFilters",0x00010000,"vhf"
+
+[OpenAccelHid_Install.NT.Wdf]
+KmdfService = OpenAccelHid, OpenAccelHid_Wdf
+
+[OpenAccelHid_Wdf]
+KmdfLibraryVersion = 1.15
+
+[OpenAccelHid_Install.NT.Services]
+AddService = OpenAccelHid, 0x00000002, OpenAccelHid_Service_Inst
+
+[OpenAccelHid_Service_Inst]
+DisplayName    = %ServiceDesc%
+ServiceType    = 1
+StartType      = 3
+ErrorControl   = 1
+ServiceBinary  = %13%\OpenAccelHid.sys
+
+[Strings]
+MfgName     = "OnePlus Open Windows Project"
+DiskName    = "OpenAccelHid Installation Disk"
+DeviceDesc  = "OnePlus Open 3D Accelerometer (VHF HID Sensor)"
+ServiceDesc = "OnePlus Open VHF HID Accelerometer Driver"

@@ -356,8 +356,9 @@ static void Pump(void){
     }
 
     if(Owner->Running && !Owner->Stopped){
-        LONG ms = (Owner->Glink.OpActive || Owner->Glink.Phase != CK_GL_READY) ? 10 :
-                  (Owner->Policy.State == CK_ST_GAP_WAIT || Owner->Glink.Ipc.OpenAcked) ? 100 : 500;
+        LONG ms = (Owner->Glink.OpActive || Owner->Glink.Phase != CK_GL_READY ||
+                   Owner->Glink.Ipc.TxHead != Owner->Glink.Ipc.TxTail) ? 10 :
+                  (Owner->Policy.State == CK_ST_GAP_WAIT || Owner->Glink.Ipc.OpenAcked) ? 50 : 500;
         WdfTimerStart(Timer, WDF_REL_TIMEOUT_IN_MS(ms));
     }
 }
@@ -424,6 +425,64 @@ VOID CkControl(WDFQUEUE queue, WDFREQUEST request, size_t outBytes, size_t inByt
                 aout->SuidLow       = ipc->SuidLow;
                 aout->SuidHigh      = ipc->SuidHigh;
                 RtlCopyMemory(aout->Services, ipc->Services, sizeof(aout->Services));
+                info = sizeof(*aout);
+            }
+        } else {
+            status = STATUS_BUFFER_TOO_SMALL;
+        }
+        goto done;
+    } else if(code == IOCTL_CK_QRTR_SEND){
+        if(Owner && inBytes >= 32u && inBytes <= CK_IPC_TXQ_MAX){
+            PVOID inBuf = NULL;
+            status = WdfRequestRetrieveInputBuffer(request, inBytes, &inBuf, NULL);
+            if(NT_SUCCESS(status) && inBuf){
+                if(CkIpcEnqueueRawTx(&Owner->Glink.Ipc, (const uint8_t*)inBuf, (uint32_t)inBytes)){
+                    Pump();
+                } else {
+                    status = STATUS_DEVICE_BUSY;
+                }
+            }
+        } else {
+            status = STATUS_INVALID_PARAMETER;
+        }
+        goto done;
+    } else if(code == IOCTL_CK_QRTR_RECV){
+        if(Owner && outBytes >= 32u){
+            PVOID outBuf = NULL;
+            status = WdfRequestRetrieveOutputBuffer(request, outBytes, &outBuf, NULL);
+            if(NT_SUCCESS(status) && outBuf){
+                uint32_t got = 0;
+                Pump();
+                if(CkIpcPopRx(&Owner->Glink.Ipc, (uint8_t*)outBuf, (uint32_t)outBytes, &got)){
+                    info = got;
+                } else {
+                    info = 0;
+                }
+            }
+        } else {
+            status = STATUS_BUFFER_TOO_SMALL;
+        }
+        goto done;
+    } else if(code == IOCTL_CK_AUDIO){
+        if(Owner && outBytes >= sizeof(CK_AUDIO_SNAPSHOT)){
+            CK_AUDIO_SNAPSHOT *aout = NULL;
+            status = WdfRequestRetrieveOutputBuffer(request, sizeof(*aout), (PVOID*)&aout, NULL);
+            if(NT_SUCCESS(status) && aout){
+                const CK_AUD_STATE *aud = &Owner->Glink.Aud;
+                RtlZeroMemory(aout, sizeof(*aout));
+                aout->Size           = sizeof(*aout);
+                aout->Version        = CK_ABI_VER;
+                aout->Magic          = CK_MAGIC;
+                aout->OpenAcked      = aud->OpenAcked;
+                aout->RemoteOpen     = aud->RemoteOpen;
+                aout->SpfQuerySent   = aud->SpfQuerySent;
+                aout->SpfRspReceived = aud->SpfRspReceived;
+                aout->SpfRspOpcode   = aud->SpfRspOpcode;
+                aout->SpfState       = aud->SpfState;
+                aout->SpfRspLen      = aud->SpfRspLen;
+                RtlCopyMemory(aout->SpfRaw, aud->SpfRaw, sizeof(aout->SpfRaw));
+                aout->ChanCount      = Owner->Glink.ChanCount;
+                RtlCopyMemory(aout->ChanNames, Owner->Glink.ChanNames, sizeof(aout->ChanNames));
                 info = sizeof(*aout);
             }
         } else {

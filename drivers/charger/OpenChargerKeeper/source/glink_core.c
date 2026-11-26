@@ -26,6 +26,25 @@ static int IsIpcRtrName(const uint8_t *b, uint32_t n){
     return 1;
 }
 
+static int IsAdspAppsName(const uint8_t *b, uint32_t n){
+    static const char target[]="adsp_apps";
+    if(n!=9u && !(n==10u && b[9]==0))return 0;
+    for(uint32_t i=0;i<9u;i++)if(b[i]!=(uint8_t)target[i])return 0;
+    return 1;
+}
+
+static void RecordChanName(CK_GL_STATE *s, const uint8_t *b, uint32_t n){
+    if(s->ChanCount >= CK_MAX_CHANS) return;
+    uint32_t idx = s->ChanCount++;
+    uint32_t m = (n < 23u) ? n : 23u;
+    for(uint32_t i=0;i<m;i++){
+        uint8_t c = b[i];
+        s->ChanNames[idx][i] = (c >= 0x20u && c < 0x7Fu) ? (char)c : 0;
+        if(!c) break;
+    }
+    s->ChanNames[idx][m] = 0;
+}
+
 static int Fail(CK_GL_STATE *s, uint32_t code){
     s->Fault=code;s->Phase=CK_GL_FAILED;s->OpActive=0;return CK_GL_POLL_FAULT;
 }
@@ -34,6 +53,7 @@ void CkGlInit(CK_GL_STATE *s){
     if(!s)return;
     Zero(s, (uint32_t)sizeof(*s));
     s->NextLocalId = 1;
+    s->Aud.NextLocalId = 200u;
     CkIpcInit(&s->Ipc);
 }
 
@@ -123,6 +143,26 @@ static int QueueIpcIntent(CK_GL_STATE *s, const CK_GL_IO *io){
     return 0;
 }
 
+static int QueueAudIntent(CK_GL_STATE *s, const CK_GL_IO *io){
+    CK_AUD_STATE *aud = &s->Aud;
+    for(uint32_t i=0;i<CK_AUD_INTENTS;i++){
+        if(aud->Local[i].State == 0){
+            uint8_t f[16];
+            uint32_t id = aud->NextLocalId++;
+            if(!id){ id = aud->NextLocalId++; }
+            P16(f+0, 5u); P16(f+2, (uint16_t)CK_AUD_CID); P32(f+4, 1u);
+            P32(f+8, CK_AUD_BUF); P32(f+12, id);
+            if(!SendFrame(s, io, f, 16u)) return 0;
+            Zero(&aud->Local[i], (uint32_t)sizeof(aud->Local[i]));
+            aud->Local[i].Id = id;
+            aud->Local[i].State = 1;
+            aud->CurrentOffers++;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint32_t n, uint64_t now_us){
     if(n < 8u) return;
     uint16_t cmd = U16(f+0), p1 = U16(f+2);
@@ -140,6 +180,9 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
         if(p1 == 1u) s->VersionAckSeen = 1u;
         break;
     case 2u: /* OPEN from remote */
+        if(n >= 8u + p2){
+            RecordChanName(s, f+8, p2);
+        }
         if(n >= 8u + p2 && IsChargerName(f+8, p2)){
             s->RemoteCid = p1;
             s->RemoteOpen = 1u;
@@ -164,6 +207,18 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
                 for(uint32_t i=0;i<6u;i++) of[8+i]=(uint8_t)inm[i];
                 if(SendFrame(s, io, of, 16u)) s->Ipc.OpenSent = 1u;
             }
+        } else if(n >= 8u + p2 && IsAdspAppsName(f+8, p2)){
+            s->Aud.RemoteCid = p1;
+            s->Aud.RemoteOpen = 1u;
+            SendCmd(s, io, 4u, p1, 0u); /* OPEN_ACK */
+            if(!s->Aud.OpenSent){
+                static const char anm[] = "adsp_apps";
+                uint8_t of[24];
+                Zero(of, 24u);
+                P16(of+0, 2u); P16(of+2, (uint16_t)CK_AUD_CID); P32(of+4, 10u);
+                for(uint32_t i=0;i<9u;i++) of[8+i]=(uint8_t)anm[i];
+                if(SendFrame(s, io, of, 24u)) s->Aud.OpenSent = 1u;
+            }
         }
         break;
     case 4u: /* OPEN_ACK */
@@ -174,6 +229,11 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
                 if(!QueueIpcIntent(s, io)) break;
             }
             CkIpcQueueHello(&s->Ipc);
+        } else if(p1 == CK_AUD_CID){
+            s->Aud.OpenAcked = 1u;
+            while(s->Aud.CurrentOffers < 2u){
+                if(!QueueAudIntent(s, io)) break;
+            }
         }
         break;
     case 3u: /* CLOSE from remote */
@@ -225,6 +285,25 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
                 }
             }
             s->Ipc.IntentReqPending = 0;
+        } else if(s->Aud.RemoteOpen && p1 == s->Aud.RemoteCid && p2 >= 1u && n >= 8u + p2*8u){
+            for(uint32_t k=0;k<p2;k++){
+                uint32_t sz = U32(f+8+k*8), id = U32(f+12+k*8);
+                uint32_t slot = CK_AUD_INTENTS;
+                for(uint32_t i=0;i<CK_AUD_INTENTS;i++){
+                    if(s->Aud.Remote[i].State && s->Aud.Remote[i].Id == id){ slot = i; break; }
+                }
+                if(slot == CK_AUD_INTENTS){
+                    for(uint32_t i=0;i<CK_AUD_INTENTS;i++){
+                        if(s->Aud.Remote[i].State == 0){ slot = i; break; }
+                    }
+                }
+                if(slot < CK_AUD_INTENTS){
+                    s->Aud.Remote[slot].Id = id;
+                    s->Aud.Remote[slot].Bytes = sz;
+                    s->Aud.Remote[slot].State = 1;
+                }
+            }
+            s->Aud.IntentReqPending = 0;
         }
         break;
     case 6u:  /* RX_DONE */
@@ -305,6 +384,35 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
                             s->Ipc.Local[i].State = 0;
                             if(s->Ipc.CurrentOffers) s->Ipc.CurrentOffers--;
                             QueueIpcIntent(s, io);
+                        }
+                        break;
+                    }
+                }
+            }
+        } else if(s->Aud.RemoteOpen && p1 == s->Aud.RemoteCid && n >= 16u){
+            uint32_t chunk = U32(f+8), rem = U32(f+12);
+            if(16u + chunk <= n){
+                for(uint32_t i=0;i<CK_AUD_INTENTS;i++){
+                    if(s->Aud.Local[i].State == 1 && s->Aud.Local[i].Id == p2){
+                        if(s->Aud.Local[i].Used + chunk <= CK_AUD_BUF){
+                            for(uint32_t k=0;k<chunk;k++) s->Aud.Local[i].Data[s->Aud.Local[i].Used+k] = f[16+k];
+                            s->Aud.Local[i].Used += chunk;
+                            s->Aud.Local[i].Remaining = rem;
+                        }
+                        if(rem == 0u){
+                            uint32_t rlen = s->Aud.Local[i].Used;
+                            s->Aud.SpfRspReceived++;
+                            s->Aud.SpfRspLen = rlen;
+                            uint32_t cp = (rlen < 64u) ? rlen : 64u;
+                            for(uint32_t k=0;k<cp;k++) s->Aud.SpfRaw[k] = s->Aud.Local[i].Data[k];
+                            if(rlen >= 24u){
+                                s->Aud.SpfRspOpcode = U32(s->Aud.Local[i].Data + 20u);
+                                if(rlen >= 28u) s->Aud.SpfState = U32(s->Aud.Local[i].Data + 24u);
+                            }
+                            SendCmd(s, io, 6u, (uint16_t)CK_AUD_CID, p2);
+                            s->Aud.Local[i].State = 0;
+                            if(s->Aud.CurrentOffers) s->Aud.CurrentOffers--;
+                            QueueAudIntent(s, io);
                         }
                         break;
                     }
@@ -495,6 +603,34 @@ int CkGlPoll(CK_GL_STATE *s, const CK_GL_IO *io, uint64_t now_us){
                     CkIpcPopTx(&s->Ipc);
                     progress = 1;
                 }
+            }
+        }
+    }
+
+    /* 4. Pump adsp_apps (AudioReach GPR) SPF readiness probe */
+    if(s->Aud.OpenAcked && s->Aud.RemoteOpen && !s->Aud.SpfQuerySent && !s->CloseRequested){
+        uint32_t ridx = CK_AUD_INTENTS;
+        for(uint32_t i=0;i<CK_AUD_INTENTS;i++){
+            if(s->Aud.Remote[i].State == 1 && s->Aud.Remote[i].Bytes >= 24u){ ridx = i; break; }
+        }
+        if(ridx == CK_AUD_INTENTS){
+            if(!s->Aud.IntentReqPending){
+                if(SendCmd(s, io, 7u, (uint16_t)CK_AUD_CID, 24u)){ s->Aud.IntentReqPending = 1u; progress = 1; }
+            }
+        } else {
+            uint8_t f[40];
+            Zero(f, 40u);
+            P16(f+0, 9u); P16(f+2, (uint16_t)CK_AUD_CID); P32(f+4, s->Aud.Remote[ridx].Id);
+            P32(f+8, 24u); P32(f+12, 0u);
+            /* GPRv0 APM_CMD_GET_SPF_STATE (0x01001021), dst=ADSP(2):APM(1), src=APPS(3):client(3), token=1 */
+            P32(f+16+0, (24u << 8) | 0x60u);
+            f[16+4] = 2u; f[16+5] = 3u;
+            P32(f+16+8, 3u); P32(f+16+12, 1u);
+            P32(f+16+16, 1u); P32(f+16+20, 0x01001021u);
+            if(SendFrame(s, io, f, 40u)){
+                s->Aud.Remote[ridx].State = 2;
+                s->Aud.SpfQuerySent = 1u;
+                progress = 1;
             }
         }
     }

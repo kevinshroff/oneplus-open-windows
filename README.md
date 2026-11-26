@@ -9,8 +9,8 @@ The project reuses Windows ARM64 CPU/storage/USB stacks and OEM firmware, develo
 > [!IMPORTANT]
 > **Research source snapshot.** Development is active. Captured firmware, Windows binaries, signing certificates, credentials and private operator infrastructure are excluded; this repository does not provide a ready-to-flash installation bundle.
 
-**Demonstrated:** Windows 11 default boot (256 GB `win` partition, Android dual-boot-ready layout) • **120 Hz zero-copy GPU-accelerated desktop (DWM + Explorer + apps on Adreno 740, plus Chrome/Edge on Turnip Vulkan 1.3)** • native touchscreen • internal-storage boot • **Wi-Fi (WCN7850 802.11ax, WPA2/DHCP/DNS/HTTPS)** • **Native Windows 11 battery indicator (`OpenBattery.sys`) & sustained 3A USB-C PD charging (`OpenChargerKeeper` v5)** • **Adreno 740 WDDM 1.3 + Mesa Turnip (Vulkan 1.3) + Mesa Zink (OpenGL 4.6) + DXVK 3.1.1 (DirectX 11)** • USB debugging/control • persistent black cover framebuffer.  
-**Still unfinished:** Bluetooth/audio/cameras/sensors • complete buttons, folding and suspend/resume.
+**Demonstrated:** Windows 11 default boot (256 GB `win` partition, Android dual-boot-ready layout) • **120 Hz zero-copy GPU-accelerated desktop (DWM + Explorer + apps on Adreno 740, plus Chrome/Edge on Turnip Vulkan 1.3)** • native touchscreen (with extended-sleep recovery) • internal-storage boot • **Wi-Fi (WCN7850 802.11ax, WPA2/DHCP/DNS/HTTPS)** • **Native Windows 11 battery indicator (`OpenBattery.sys`) & sustained 3A USB-C PD charging (`OpenChargerKeeper` v8)** • **Windows 11 VHF HID 3D Accelerometer & Auto-Rotate stack (`OpenAccelHid.sys`)** • **Live ADSP AudioReach SPF readiness (`adsp_apps` GPR `GET_SPF_STATE = 1`)** • **Adreno 740 WDDM 1.3 + Mesa Turnip (Vulkan 1.3) + Mesa Zink (OpenGL 4.6) + DXVK 3.1.1 (DirectX 11)** • USB debugging/control • persistent black cover framebuffer.  
+**Still unfinished:** Audible speaker output (TFA9874 amps + TDM1 graph + WaveRT/ACX) • live ADSP `sensors_pd` accelerometer streaming (`fastrpcglink-apps-dsp`) • Bluetooth/cameras • complete buttons, folding and suspend/resume.
 
 ## Status
 
@@ -30,11 +30,11 @@ The project reuses Windows ARM64 CPU/storage/USB stacks and OEM firmware, develo
 | USB peripherals | **NOT WORKING ❌** | External keyboard / host-mode support remains unfinished. |
 | Crash recovery | **PARTIAL 🟡** | Recovery tools work; automatic reconnection is not reliable after every crash. |
 | Battery reporting | **WORKS ✅** | Native Windows Battery Class Minidriver ([`OpenBattery.sys`](drivers/power/OpenBattery/)) bridging live dual-cell ZY0602 telemetry (`Win32_Battery`, taskbar percentage, charging state, voltage, temperature). |
-| Charging | **WORKS ✅** | Sustained everyday Windows 11 charging up to 99% with 3.0 A USB-C PD input current limit (`USB_PROPERTY_SET` prop 5) and thermal/voltage safety via [`OpenChargerKeeper`](drivers/charger/OpenChargerKeeper/) v5. |
+| Charging | **WORKS ✅** | Sustained everyday Windows 11 charging up to 99% with 3.0 A USB-C PD input current limit (`USB_PROPERTY_SET` prop 5) and thermal/voltage safety via [`OpenChargerKeeper`](drivers/charger/OpenChargerKeeper/) v8. |
 | Power management | **PARTIAL 🟡** | Brightness control, display auto-off and an EPSS CPU governor work ([measurements](docs/POWER.md)); deep idle/suspend remain unfinished. |
-| Audio | **NOT WORKING ❌** | Speakers and microphone remain unfinished. |
+| Audio | **IN PROGRESS 🛠️** | Live ADSP AudioReach SPF readiness (`APM_CMD_RSP_GET_SPF_STATE = 1`) verified over SMEM GLINK `adsp_apps` (`OpenChargerKeeper` v8); 3× NXP TFA9874 amp bring-up (`qupv3_se6_i2c`), TDM1 graph, and Windows WaveRT/ACX endpoint remain unfinished. |
 | Bluetooth | **NOT WORKING ❌** | Windows radio integration remains unfinished. |
-| Motion / light / proximity sensors | **NOT WORKING ❌** | Windows sensor integration remains unfinished. |
+| Motion / light / proximity sensors | **PARTIAL 🟡** | Windows 11 VHF HID 3D Accelerometer ([`OpenAccelHid.sys`](drivers/sensors/OpenAccelHid/)) + inbox `HID 3D Accelerometer Sensor` & `Simple Device Orientation Sensor` (`AutoRotation\SensorPresent = 1`) live; ADSP `IPCRTR` QRTR/QMI `SNS_CLIENT_SVC` + `OpenTqftpServ.ps1` wired; live `lsm6dsv_0` streaming awaits `sensors_pd` bring-up over `fastrpcglink-apps-dsp`. |
 | Cameras | **NOT WORKING ❌** | Sensor/ISP and Windows camera integration remain unfinished. |
 | Cellular | **NOT WORKING ❌** | Modem/SIM and mobile-network integration remain unfinished. |
 | GNSS | **NOT WORKING ❌** | Windows location integration remains unfinished. |
@@ -169,10 +169,10 @@ These [subfeature checklists](docs/STATUS.md) track implementation and future re
 - [ ] Idle clock and rail policies (cluster/system low-power idle).
 - [ ] Thermal/performance policies.
 
-## Audio — 0/3 complete
+## Audio — 0/3 complete (ADSP SPF transport verified)
 
-- [ ] Windows audio-device integration.
-- [ ] Speaker playback.
+- [ ] Windows audio-device integration (WaveRT / ACX miniport).
+- [ ] Speaker playback (ADSP `adsp_apps` GPR `APM_CMD_RSP_GET_SPF_STATE = 1` verified live; 3× NXP TFA9874 amps on `qupv3_se6_i2c` + TDM1 graph pending).
 - [ ] Microphone capture.
 
 ## Bluetooth — 0/3 complete
@@ -181,11 +181,11 @@ These [subfeature checklists](docs/STATUS.md) track implementation and future re
 - [ ] Pairing.
 - [ ] Actual peripheral traffic.
 
-## Motion / light / proximity sensors — 0/3 complete
+## Motion / light / proximity sensors — 1/3 complete
 
-- [ ] Windows sensor integration.
-- [ ] Validated readings.
-- [ ] Orientation/automatic-policy integration.
+- [x] Windows sensor integration (`OpenAccelHid.sys` VHF HID 3D Accelerometer -> inbox `HID 3D Accelerometer Sensor` + `Simple Device Orientation Sensor`, `AutoRotation\SensorPresent = 1`).
+- [ ] Validated live hardware readings (ADSP `IPCRTR` QRTR/QMI `SNS_CLIENT_SVC` + `OpenTqftpServ.ps1` + 532-file `persist` registry wired; `sensors_pd` startup over `fastrpcglink-apps-dsp` pending).
+- [ ] End-to-end auto-rotate validation on live IMU data.
 
 ## Cameras — 0/3 complete
 

@@ -8,8 +8,10 @@
 #define CK_IPC_CID         2u
 #define CK_IPC_INTENTS     8u
 #define CK_IPC_BUF_BYTES   2048u
-#define CK_IPC_TXQ_SLOTS   8u
-#define CK_IPC_TXQ_MAX     256u
+#define CK_IPC_TXQ_SLOTS   16u
+#define CK_IPC_TXQ_MAX     1408u
+#define CK_IPC_RXQ_SLOTS   16u
+#define CK_IPC_RXQ_MAX     1408u
 #define CK_IPC_MAX_SVCS    24u
 
 #define QRTR_PORT_CTRL     0xFFFFFFFEu
@@ -39,6 +41,11 @@ typedef struct {
 } CK_IPC_TX_SLOT;
 
 typedef struct {
+    uint32_t Len;
+    uint8_t  Data[CK_IPC_RXQ_MAX];
+} CK_IPC_RX_SLOT;
+
+typedef struct {
     uint32_t RemoteCid;
     uint32_t OpenSent, OpenAcked, RemoteOpen;
     uint32_t CurrentOffers, NextLocalId, IntentReqPending;
@@ -55,6 +62,8 @@ typedef struct {
     CK_IPC_LOCAL_INTENT  Local[CK_IPC_INTENTS];
     uint32_t TxHead, TxTail;
     CK_IPC_TX_SLOT TxQ[CK_IPC_TXQ_SLOTS];
+    uint32_t RxHead, RxTail, RxDrops;
+    CK_IPC_RX_SLOT RxQ[CK_IPC_RXQ_SLOTS];
 } CK_IPC_STATE;
 
 /* Snapshot returned by IOCTL_CK_ACCEL (0x0022600C) */
@@ -91,5 +100,7 @@ void CkIpcQueueHello(CK_IPC_STATE *ipc);
 void CkIpcOnQrtrPacket(CK_IPC_STATE *ipc, const uint8_t *pkt, uint32_t len);
 int  CkIpcPeekTx(const CK_IPC_STATE *ipc, const uint8_t **data, uint32_t *len);
 void CkIpcPopTx(CK_IPC_STATE *ipc);
+int  CkIpcEnqueueRawTx(CK_IPC_STATE *ipc, const uint8_t *data, uint32_t len);
+int  CkIpcPopRx(CK_IPC_STATE *ipc, uint8_t *out, uint32_t cap, uint32_t *out_len);
 
 #endif

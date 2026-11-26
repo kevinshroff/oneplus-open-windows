@@ -13,6 +13,10 @@
 #define CK_FRAME_BYTES 2048u
 #define CK_INTENTS    32u
 #define CK_OTHER_PORTS 32u
+#define CK_AUD_CID     3u
+#define CK_AUD_INTENTS 4u
+#define CK_AUD_BUF     256u
+#define CK_MAX_CHANS   16u
 
 #define CK_OPEN_US    UINT64_C(10000000)
 #define CK_RPC_US     UINT64_C(2000000)
@@ -62,6 +66,20 @@ typedef struct {
 } CK_LOCAL_INTENT;
 
 typedef struct {
+    uint32_t RemoteCid;
+    uint32_t OpenSent, OpenAcked, RemoteOpen;
+    uint32_t CurrentOffers, NextLocalId, IntentReqPending;
+    uint32_t SpfQuerySent, SpfRspReceived;
+    uint32_t SpfRspOpcode, SpfState, SpfRspLen;
+    uint8_t  SpfRaw[64];
+    CK_REMOTE_INTENT Remote[CK_AUD_INTENTS];
+    struct {
+        uint32_t Id, State, Used, Remaining;
+        uint8_t  Data[CK_AUD_BUF];
+    } Local[CK_AUD_INTENTS];
+} CK_AUD_STATE;
+
+typedef struct {
     uint32_t Phase, Fault;
     uint32_t OwnTx, OwnRx, RemoteCid;
     uint32_t VersionSent, VersionAckSent, VersionAckSeen;
@@ -77,6 +95,9 @@ typedef struct {
     CK_REMOTE_INTENT Remote[CK_INTENTS];
     CK_LOCAL_INTENT  Local[CK_INTENTS];
     CK_IPC_STATE     Ipc;
+    CK_AUD_STATE     Aud;
+    uint32_t         ChanCount;
+    char             ChanNames[CK_MAX_CHANS][24];
 } CK_GL_STATE;
 
 void CkGlInit(CK_GL_STATE *s);
