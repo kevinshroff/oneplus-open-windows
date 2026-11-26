@@ -8,17 +8,17 @@
 
 /* Safety thresholds (real ZY0602 physical gauge readings) */
 #define CK_TEMP_MIN_DK      2781u  /*  5.0 C hard cutoff */
-#define CK_TEMP_MAX_DK      3161u  /* 43.0 C hard cutoff */
+#define CK_TEMP_MAX_DK      3171u  /* 44.0 C hard cutoff */
 #define CK_TEMP_REC_MIN_DK  2831u  /* 10.0 C recovery hysteresis */
-#define CK_TEMP_REC_MAX_DK  3121u  /* 39.0 C recovery hysteresis */
-#define CK_VOLT_HARD_MAX_MV 4450u  /* hard overvoltage cutoff */
+#define CK_TEMP_REC_MAX_DK  3126u  /* 39.5 C recovery hysteresis */
+#define CK_VOLT_HARD_MAX_MV 4480u  /* hard overvoltage cutoff */
 #define CK_VOLT_IMBAL_MV    300u   /* max cell-to-cell voltage delta */
 
-/* Dev-tethered charge hysteresis (protects battery while plugged in 24/7) */
-#define CK_SOC_STOP_PCT     85u    /* pause charging at >= 85% */
-#define CK_SOC_START_PCT    75u    /* resume charging at <= 75% */
-#define CK_VOLT_STOP_MV     4300u  /* pause charging at >= 4.30 V */
-#define CK_VOLT_START_MV    4150u  /* resume charging at <= 4.15 V */
+/* Everyday full-charge hysteresis (charges to ~100% safely, tops up <= 95%) */
+#define CK_SOC_STOP_PCT     99u    /* pause charging at >= 99% */
+#define CK_SOC_START_PCT    95u    /* resume charging at <= 95% */
+#define CK_VOLT_STOP_MV     4440u  /* pause charging at >= 4.44 V */
+#define CK_VOLT_START_MV    4340u  /* resume charging at <= 4.34 V */
 
 /* Timing (microseconds) */
 #define CK_POLL_INTERVAL_US UINT64_C(10000000) /* 10s telemetry poll */

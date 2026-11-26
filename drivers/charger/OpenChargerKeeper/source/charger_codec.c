@@ -7,6 +7,7 @@ static const CL_QUERY Queries[CL_QUERY_COUNT]={
  /* USB_PROPERTY_GET (Linux qcom_battmgr): 1 VOLT_NOW, 3 CURR_NOW, 4 CURR_MAX, 5 INPUT_CURR_LIMIT */
  {0x32,1,24,24},{0x32,3,24,24},{0x32,4,24,24},{0x32,5,24,24},
  {0x31,8,24,24},
+ {0x33,5,24,24},
  {0x31,24,24,24},{0x31,24,24,24},{0x31,24,24,24}
 };
 static uint32_t U32(const uint8_t*b){return(uint32_t)b[0]|(uint32_t)b[1]<<8|(uint32_t)b[2]<<16|(uint32_t)b[3]<<24;}
@@ -19,6 +20,7 @@ uint32_t CLBuildQuery(uint32_t index,uint8_t out[24])
  P32(out,0x800a);P32(out+4,1);P32(out+8,q->Opcode);
  if(q->RequestBytes==24)P32(out+16,q->Property);
  if(index==CL_FV_QUERY)P32(out+20,4470); /* mV, not cached GET microvolts */
+ if(index==CL_ICL_QUERY)P32(out+20,3000000); /* 3.0 A USB-C PD input current limit (uA) */
  if(index==CL_ENABLE_QUERY)P32(out+20,1); /* disable remains exactly zero */
  return q->RequestBytes;
 }

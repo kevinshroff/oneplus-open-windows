@@ -9,8 +9,8 @@ The project reuses Windows ARM64 CPU/storage/USB stacks and OEM firmware, develo
 > [!IMPORTANT]
 > **Research source snapshot.** Development is active. Captured firmware, Windows binaries, signing certificates, credentials and private operator infrastructure are excluded; this repository does not provide a ready-to-flash installation bundle.
 
-**Demonstrated:** Windows 11 default boot • **GPU-accelerated desktop (DWM + Explorer + apps on Adreno 740 via native D3D11 UMD)** • native touchscreen • internal-storage boot • **Wi-Fi (WCN7850 802.11ax, WPA2/DHCP/DNS/HTTPS)** • **Adreno 740 WDDM 1.3 + Mesa Turnip (Vulkan 1.3) + Mesa Zink (OpenGL 4.6) + DXVK 3.1.1 (DirectX 11)** • USB debugging/control • black cover framebuffer.  
-**Still unfinished:** Bluetooth/audio/cameras • everyday battery/charging • complete buttons, folding and suspend/resume.
+**Demonstrated:** Windows 11 default boot (256 GB `win` partition, Android dual-boot-ready layout) • **120 Hz zero-copy GPU-accelerated desktop (DWM + Explorer + apps on Adreno 740, plus Chrome/Edge on Turnip Vulkan 1.3)** • native touchscreen • internal-storage boot • **Wi-Fi (WCN7850 802.11ax, WPA2/DHCP/DNS/HTTPS)** • **Native Windows 11 battery indicator (`OpenBattery.sys`) & sustained 3A USB-C PD charging (`OpenChargerKeeper` v5)** • **Adreno 740 WDDM 1.3 + Mesa Turnip (Vulkan 1.3) + Mesa Zink (OpenGL 4.6) + DXVK 3.1.1 (DirectX 11)** • USB debugging/control • persistent black cover framebuffer.  
+**Still unfinished:** Bluetooth/audio/cameras/sensors • complete buttons, folding and suspend/resume.
 
 ## Status
 
@@ -29,8 +29,8 @@ The project reuses Windows ARM64 CPU/storage/USB stacks and OEM firmware, develo
 | Physical buttons | **IN PROGRESS 🛠️** | Hardware reader implemented; power-button behavior awaits a physical test. |
 | USB peripherals | **NOT WORKING ❌** | External keyboard / host-mode support remains unfinished. |
 | Crash recovery | **PARTIAL 🟡** | Recovery tools work; automatic reconnection is not reliable after every crash. |
-| Battery reporting | **IN PROGRESS 🛠️** | Raw sensor readings acquired; Windows battery reporting remains unfinished. |
-| Charging | **IN PROGRESS 🛠️** | Charging current measured in bounded WinPE tests; normal Windows charging remains unfinished. |
+| Battery reporting | **WORKS ✅** | Native Windows Battery Class Minidriver ([`OpenBattery.sys`](drivers/power/OpenBattery/)) bridging live dual-cell ZY0602 telemetry (`Win32_Battery`, taskbar percentage, charging state, voltage, temperature). |
+| Charging | **WORKS ✅** | Sustained everyday Windows 11 charging up to 99% with 3.0 A USB-C PD input current limit (`USB_PROPERTY_SET` prop 5) and thermal/voltage safety via [`OpenChargerKeeper`](drivers/charger/OpenChargerKeeper/) v5. |
 | Power management | **PARTIAL 🟡** | Brightness control, display auto-off and an EPSS CPU governor work ([measurements](docs/POWER.md)); deep idle/suspend remain unfinished. |
 | Audio | **NOT WORKING ❌** | Speakers and microphone remain unfinished. |
 | Bluetooth | **NOT WORKING ❌** | Windows radio integration remains unfinished. |
@@ -146,19 +146,19 @@ These [subfeature checklists](docs/STATUS.md) track implementation and future re
 - [ ] Reliable reconnection after every crash.
 - [ ] Actionable capture of the current GPU fatal boundary.
 
-## Battery reporting — 1/4 complete
+## Battery reporting — 4/4 complete
 
 - [x] Raw physical sensor acquisition demonstrated.
-- [ ] Installed Windows battery-class frontend.
-- [ ] Validated pack/percentage/rate semantics.
-- [ ] Sustained normal-Windows lifecycle.
+- [x] Installed Windows battery-class frontend (`OpenBattery.sys` on `ROOT\BATTERY\0000`).
+- [x] Validated pack/percentage/rate semantics (dual ZY0602 cells summed to mWh/mW).
+- [x] Sustained normal-Windows lifecycle across reboots.
 
-## Charging — 1/4 complete
+## Charging — 4/4 complete
 
 - [x] Bounded WinPE tests measured charging current.
-- [ ] Sustained normal-Windows charging.
-- [ ] Reliable USB-C/source negotiation.
-- [ ] Complete safety/thermal/full-charge policy.
+- [x] Sustained normal-Windows charging (`OpenChargerKeeper` v5, up to 99% / 4.44 V).
+- [x] Reliable USB-C/source negotiation (`USB_PROPERTY_SET` 3.0 A input current limit verified on 65W USB-C PD).
+- [x] Complete safety/thermal/full-charge policy (44.0 °C / 4.48 V / 300 mV imbalance cutoffs).
 
 ## Power management — 2/6 complete
 

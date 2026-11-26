@@ -8,10 +8,11 @@
 #define CL_CORE_GET_MASK 0x3FFu  /* GETs 0..9: a rejection fails the sample */
 #define CL_USB_GET_FIRST 10u     /* GETs 10..13: optional USB input telemetry (opcode 0x32) */
 #define CL_FV_QUERY 14u
-#define CL_ENABLE_QUERY 15u
-#define CL_DISABLE_QUERY 16u
-#define CL_RESTART_OFF_QUERY 17u
-#define CL_QUERY_COUNT 18u
+#define CL_ICL_QUERY 15u         /* optional USB_PROPERTY_SET prop 5 (3A input current limit) */
+#define CL_ENABLE_QUERY 16u
+#define CL_DISABLE_QUERY 17u
+#define CL_RESTART_OFF_QUERY 18u
+#define CL_QUERY_COUNT 19u
 #define CL_REPLY_LIMIT 1024u
 typedef struct {uint32_t Opcode,Property,RequestBytes,ReplyBytes;}CL_QUERY;
 typedef struct {

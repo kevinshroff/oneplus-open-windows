@@ -347,11 +347,13 @@ int CkGlPoll(CK_GL_STATE *s, const CK_GL_IO *io, uint64_t now_us){
                 s->ReplyReceived = 0u;
                 if(s->OpKind == CK_OP_SAMPLE && s->Query + 1u < CL_GET_COUNT){
                     s->Query++;
+                } else if(s->OpKind == CK_OP_SET_FV && s->Query == CL_FV_QUERY){
+                    s->Query = CL_ICL_QUERY;
                 } else {
                     s->LastBattery = s->Working;
                     s->LastCompletedOp = s->OpKind;
-                    /* optional USB telemetry GETs (10..13) never fail a sample */
-                    s->LastOpOk = ((s->Working.ServiceRejectedMask & ~(0xFu << CL_USB_GET_FIRST)) == 0u) ? 1u : 0u;
+                    /* optional USB telemetry GETs (10..13) and USB ICL SET never fail a sample/FV */
+                    s->LastOpOk = ((s->Working.ServiceRejectedMask & ~((0xFu << CL_USB_GET_FIRST) | (1u << CL_ICL_QUERY))) == 0u) ? 1u : 0u;
                     s->OpActive = 0u;
                     s->OpsCompleted++;
                 }
