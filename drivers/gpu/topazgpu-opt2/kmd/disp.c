@@ -411,6 +411,50 @@ static VOID VsyncNotify(BOOLEAN flip)
     }
 }
 
+/* v0.53 flip queue (MaxQueuedFlipOnVSync = 2): with one flip in flight DWM alternated between frames that made the
+   next panel TE and frames that waited a second period (~77 fps at 120 Hz). A flip that arrives while another is
+   still waiting for the MDP latch is held here and programmed the moment the earlier one latches; each flip is
+   reported done with its own address, so none is skipped. Direct scanout only; C:\topaz\flipq1 keeps depth 1. */
+static TGPU_ALLOCATION *volatile g_QAl;
+static PHYSICAL_ADDRESS g_QPa;
+static volatile LONG g_QValid;
+static volatile LONG64 g_QFlips, g_QReplaced, g_QPromoted;
+static ULONG g_FlipQueueDepth = 2;
+static VOID TimerKick(VOID);
+
+/* program one flip: deferred to its GPU fence, direct (MDP) or via the copy engine. Any IRQL up to DIRQL. */
+static BOOLEAN FlipProgram(TGPU_ALLOCATION *Al, PHYSICAL_ADDRESS Pa)
+{
+    BOOLEAN direct;
+    g_ScanCur = Al;
+    g_ScanPa = Pa;
+    g_PresT = (LONG64)KeQueryInterruptTime();
+    InterlockedIncrement(&g_FlipSeq);
+    if (g_DirectOk && Al != NULL && Al->Bo != NULL && ScanIova(Al->Bo) != 0 &&
+        (LONG)(HwCompletedFence() - Al->Bo->LastFence) < 0) {
+        g_DeferAl = Al;                                  /* GPU still rendering it: flip at fence completion */
+        g_DeferFence = Al->Bo->LastFence;
+        InterlockedExchange(&g_Deferred, 1);
+        InterlockedExchange(&g_FlipPending, 1);
+        g_DeferCount++;
+        TimerKick();
+        return TRUE;
+    }
+    InterlockedExchange(&g_Deferred, 0);
+    direct = DirectSelect(Al);
+    if (!direct) {
+        InterlockedExchange(&g_ScanDirty, 1);
+    }
+    InterlockedExchange(&g_FlipPending, 1);
+    TimerKick();
+    if (!direct) {
+        KeInsertQueueDpc(&g_CopyDpc, NULL, NULL);       /* start the copy now, not at the next tick */
+    }
+    return direct;
+}
+
+ULONG DispFlipQueueDepth(VOID) { return g_FlipQueueDepth; }
+
 static VOID VsyncWork(BOOLEAN periodicTick)
 {
     if (g_UiEv && g_UiFlips && InterlockedExchange(&g_UiFlips, 0)) {
@@ -507,6 +551,11 @@ static VOID VsyncWork(BOOLEAN periodicTick)
         g_Notifies++;
         VsyncNotify(flip);
     }
+    if (!g_FlipPending && g_QValid && InterlockedExchange(&g_QValid, 0)) {
+        KeMemoryBarrier();
+        InterlockedIncrement64(&g_QPromoted);
+        FlipProgram(g_QAl, g_QPa);                       /* the queued flip goes to the MDP right after the latch */
+    }
     if (g_StatStart == 0) {
         g_StatStart = now;
     } else if (now - g_StatStart >= 10000000LL) {
@@ -559,7 +608,7 @@ static volatile LONG64 g_TimerStarts, g_TimerStops;
 
 static BOOLEAN DispBusy(VOID)
 {
-    return g_VsyncOn || g_FlipPending || g_Deferred || g_ScanDirty;
+    return g_VsyncOn || g_FlipPending || g_Deferred || g_ScanDirty || g_QValid;
 }
 
 static VOID TimerEnsure(VOID)
@@ -626,7 +675,7 @@ static VOID TimerKick(VOID)
     if (g_HrTimer == NULL || g_Stopping) {
         return;
     }
-    if (g_FlipPending && !g_FastPoll) {
+    if ((g_FlipPending || g_QValid) && !g_FastPoll) {
         InterlockedExchange(&g_WantFast, 1);
         KeInsertQueueDpc(&g_KickDpc, NULL, NULL);
     } else if (!g_TimerRunning) {
@@ -664,7 +713,7 @@ static VOID HrTimerCb(PEX_TIMER Timer, PVOID Ctx)
     UNREFERENCED_PARAMETER(Ctx);
     if (g_FastPoll) {
         VsyncWork(FALSE);                        /* 1 ms: complete the flip at the MDP latch */
-        if (!g_FlipPending && !g_Deferred) {
+        if (!g_FlipPending && !g_Deferred && !g_QValid) {
             TimerFast(FALSE);
         }
         return;
@@ -682,9 +731,9 @@ VOID DispLogStats(VOID)
              g_LastSyncSt, g_LastSyncRet, g_ScanPa.QuadPart, g_ShownPa.QuadPart,
              g_TimerRunning ? "on" : "off", g_TimerStarts, g_TimerStops);
     LogPrint("PACE %u Hz fast %ld switches %lld waits %u | presents %ld avg %lld us | done %ld avg %lld us | present->done avg %lld "
-             "max %lld us | vsync ticks %ld\n", REFRESH, g_FastPoll, g_FastSwitches, g_FlipWaits,
+             "max %lld us | vsync ticks %ld | queue %lld promoted %lld replaced %lld\n", REFRESH, g_FastPoll, g_FastSwitches, g_FlipWaits,
              g_PresN, g_PresN ? g_PresIntSum / g_PresN / 10 : 0, g_DoneN, g_DoneN ? g_DoneIntSum / g_DoneN / 10 : 0,
-             g_LatN ? g_LatSum / g_LatN / 10 : 0, g_LatMax / 10, g_TickN);
+             g_LatN ? g_LatSum / g_LatN / 10 : 0, g_LatMax / 10, g_TickN, g_QFlips, g_QPromoted, g_QReplaced);
     g_PresN = 0; g_PresIntSum = 0; g_LatN = 0; g_LatSum = 0; g_LatMax = 0; g_DoneN = 0; g_DoneIntSum = 0; g_TickN = 0;
     {
         ULONG fsr = g_Cb4On ? CbRd(CB_FSR) : 0;
@@ -921,6 +970,9 @@ VOID DispPresentRects(TGPU_ALLOCATION *Dst, const RECT *Rects, ULONG Count)
 VOID DispAllocDestroyed(TGPU_ALLOCATION *Al)
 {
     KeWaitForSingleObject(&g_ScanLock, Executive, KernelMode, FALSE, NULL);
+    if (g_QAl == Al && InterlockedExchange(&g_QValid, 0)) {
+        g_QAl = NULL;                                    /* never promote a freed allocation */
+    }
     if (g_DeferAl == Al) {                               /* never flip to a freed BO later */
         InterlockedExchange(&g_Deferred, 0);
         g_DeferAl = NULL;
@@ -944,47 +996,37 @@ VOID DispAllocDestroyed(TGPU_ALLOCATION *Al)
 NTSTATUS DispSetSourceAddress(const DXGKARG_SETVIDPNSOURCEADDRESS *A)
 {
     static ULONG count;
-
+    TGPU_ALLOCATION *al = (TGPU_ALLOCATION *)A->hAllocation;
     BOOLEAN direct;
 
-    if (g_FlipPending) {
-        InterlockedIncrement(&g_FlipOverrun);
-    }
     if (A->Flags.FlipImmediate) {
         InterlockedIncrement(&g_FlipImm);
     }
-    g_ScanCur = (TGPU_ALLOCATION *)A->hAllocation;
-    g_ScanPa = A->PrimaryAddress;
     InterlockedIncrement(&g_FlipCount);
     InterlockedIncrement64(&g_StFlipReq);
     {
         LONG64 t = (LONG64)KeQueryInterruptTime();
         if (g_PresLast != 0 && t - g_PresLast < 2000000) { g_PresIntSum += t - g_PresLast; g_PresN++; }
         g_PresLast = t;
-        g_PresT = t;
     }
     InterlockedExchange(&g_UiFlips, 1);                   /* signalled from the vsync DPC (may be at DIRQL here) */
-    InterlockedIncrement(&g_FlipSeq);
-    if (g_DirectOk && g_ScanCur != NULL && g_ScanCur->Bo != NULL && ScanIova(g_ScanCur->Bo) != 0 &&
-        (LONG)(HwCompletedFence() - g_ScanCur->Bo->LastFence) < 0) {
-        g_DeferAl = g_ScanCur;                           /* GPU still rendering it: flip at fence completion */
-        g_DeferFence = g_ScanCur->Bo->LastFence;
-        InterlockedExchange(&g_Deferred, 1);
-        InterlockedExchange(&g_FlipPending, 1);
-        g_DeferCount++;
+    if (g_FlipQueueDepth > 1 && g_FlipPending && g_DirectActive && !A->Flags.FlipImmediate) {
+        if (InterlockedExchange(&g_QValid, 0)) {
+            InterlockedIncrement64(&g_QReplaced);        /* more than one queued: the newest wins */
+        }
+        g_QAl = al;
+        g_QPa = A->PrimaryAddress;
+        KeMemoryBarrier();
+        InterlockedExchange(&g_QValid, 1);
+        InterlockedIncrement64(&g_QFlips);
         TimerKick();
         return STATUS_SUCCESS;
     }
-    InterlockedExchange(&g_Deferred, 0);
-    direct = DirectSelect(g_ScanCur);
-    if (!direct) {
-        InterlockedExchange(&g_ScanDirty, 1);
+    if (g_FlipPending) {
+        InterlockedIncrement(&g_FlipOverrun);
     }
-    InterlockedExchange(&g_FlipPending, 1);
-    TimerKick();
-    if (!direct) {
-        KeInsertQueueDpc(&g_CopyDpc, NULL, NULL);       /* start the copy now, not at the next tick */
-    }
+    InterlockedExchange(&g_QValid, 0);
+    direct = FlipProgram(al, A->PrimaryAddress);
     if (++count <= 60) {
         LogPrint("SetVidPnSourceAddress: src %u alloc %p seg %u pa %llx flags %x%s\n", A->VidPnSourceId, A->hAllocation,
                  A->PrimarySegment, A->PrimaryAddress.QuadPart, A->Flags.Value, direct ? " (direct scanout)" : "");
@@ -1047,6 +1089,8 @@ NTSTATUS DispStart(PDXGKRNL_INTERFACE Dxgk)
 
     g_Dxgk = Dxgk;
     InterlockedExchange(&g_Stopping, 0);
+    g_FlipQueueDepth = FileExists(L"\\??\\C:\\topaz\\flipq2") ? 2 : 1;   /* DWM never queued: opt-in only */
+    InterlockedExchange(&g_QValid, 0);
     KeInitializeMutex(&g_ScanLock, 0);
     RtlZeroMemory(&g_Post, sizeof(g_Post));
     st = Dxgk->DxgkCbAcquirePostDisplayOwnership(Dxgk->DeviceHandle, &g_Post);

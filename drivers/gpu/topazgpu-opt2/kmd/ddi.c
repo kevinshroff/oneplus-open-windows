@@ -12,6 +12,7 @@
 
 VOID DispAllocCreated(TGPU_ALLOCATION *Al);
 ULONG DispRefreshHz(VOID);
+ULONG DispFlipQueueDepth(VOID);
 
 typedef struct _TGPU_ADAPTER {
     PDEVICE_OBJECT       Pdo;
@@ -332,7 +333,9 @@ static NTSTATUS QueryAdapterInfoInner(const DXGKARG_QUERYADAPTERINFO *Q)
         c->SupportNonVGA = TRUE;
         /* C2: SetVidPnSourceAddress = MMIO flip latched at the next (timer) vsync, like viogpu3d */
         c->FlipCaps.FlipOnVSyncMmIo = 1;
-        c->MaxQueuedFlipOnVSync = 1;
+        c->MaxQueuedFlipOnVSync = DispFlipQueueDepth();      /* v0.53: 2 = one flip queued behind the latch */
+        /* v0.53: let the scheduler issue the next flip before the previous one's vsync (otherwise it never queues) */
+        c->FlipCaps.FlipOnVSyncWithNoWait = DispFlipQueueDepth() > 1 ? 1 : 0;
         /* v0.29: as viogpu3d - without it no primary could be placed in the aperture segment and every
            mode set ended in CommitVidPn with 0 paths (SetDisplayConfig 1610/31, driver never asked) */
         c->MemoryManagementCaps.SectionBackedPrimary = 1;

@@ -96,7 +96,8 @@ lowest DDR) and nothing changed it afterwards. The bridge (`a740_wddm_bridge.c`)
     Configuration` and `...\Connectivity` (Windows rebuilds them).
 * GPU governor fix: the DCVS sampler was woken from the one-time init submit instead of `HwSubmit`, so it never ran
   and the GPU sat at 124.8 MHz. It is now kicked per submit, and while DWM is flipping frames (+200 ms) the GPU is
-  held at >= 401 MHz (index 5) because the sampler under-reads DWM's short bursts.
+  held at >= 615 MHz (index 8) because the sampler under-reads DWM's short bursts (only while frames are being
+  flipped, +200 ms; continuous video playback therefore runs the GPU at 615 MHz).
 * Benchmark (zero-copy, 60 Hz, window drag at 60 moves/s): no CPU copies, GPU 0.26 ms/frame, CPU 5 % total, but
   DWM still averaged 25.8 ms per frame - flips latch on the 120 Hz TE but are completed on the next 60 Hz software
   vsync tick, so DWM often misses a period.
@@ -116,9 +117,13 @@ lowest DDR) and nothing changed it afterwards. The bridge (`a740_wddm_bridge.c`)
 | 120 Hz, GPU governor not running | 17.4 ms (~57 fps) | 673 | 10.3 ms |
 | + DCVS kicked per submit | 14.1 ms (~71 fps) | 800 | 8.1 ms |
 | + 401 MHz GPU floor while flipping | 12.5-13.5 ms (~77 fps) | 903 | 5.9 ms |
+| + 615 MHz GPU floor while flipping | 11.4-11.7 ms (~87 fps) | 980 | 5.5 ms |
 
-The remaining gap to 8.3 ms: with one flip in flight DWM alternates between frames that make the next panel TE and
-frames that miss it. Next: allow a queued second flip.
+Flip queueing (v0.53) is implemented but opt-in (`C:\topaz\flipq2`): with `MaxQueuedFlipOnVSync = 2` and
+`FlipOnVSyncWithNoWait`, DWM still never submitted a frame before its previous one completed (queue counter stayed
+0), so it changed nothing. Each frame is now ~5.5 ms from present to on-screen (waiting for the next panel TE) plus
+~6 ms of DWM's own work, which includes ~1.4 CPU waits on the GPU per frame inside the UMD (Mesa waiting for buffers
+the GPU still uses). Removing those waits in the UMD is the next lever for a steady 120 fps.
 
   The drag script itself caps this test at 60 updates/s; for comparison the original CPU-copy path needed 20.6 ms
   just to copy each frame.
