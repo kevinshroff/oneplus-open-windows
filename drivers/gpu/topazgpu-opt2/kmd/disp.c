@@ -485,7 +485,9 @@ static VOID VsyncWork(BOOLEAN periodicTick)
     }
 
     if (g_Deferred) {
-        if ((LONG)(HwCompletedFence() - g_DeferFence) >= 0 && g_DeferAl == g_ScanCur) {
+        if (((LONG)(HwCompletedFence() - g_DeferFence) >= 0 || now - g_PresT > 1000000LL) && g_DeferAl == g_ScanCur) {
+            if ((LONG)(HwCompletedFence() - g_DeferFence) < 0)
+                LogPrint("DEFER_TIMEOUT fence=%u done=%u\n", g_DeferFence, HwCompletedFence());
             InterlockedExchange(&g_Deferred, 0);
             if (!DirectSelect(g_DeferAl)) {
                 InterlockedExchange(&g_ScanDirty, 1);
@@ -502,7 +504,7 @@ static VOID VsyncWork(BOOLEAN periodicTick)
             }
         } else if (!g_DirectActive && g_CopiedSeq != g_FlipSeq) {
             /* copy mode: the frame is not on the panel yet */
-        } else if (now - g_LastFlipDone < VSYNC_PERIOD - VSYNC_PERIOD / 8) {
+        } else if (now - g_LastFlipDone < VSYNC_PERIOD / 2) {
             if (!g_HeldThis) {                   /* latched, but the previous flip completed less than a period ago */
                 g_HeldThis = TRUE;
                 g_FlipHeld++;
@@ -644,7 +646,7 @@ static VOID TimerFast(BOOLEAN On)
         InterlockedExchange(&g_TimerRunning, 1);
         g_IdleTicks = 0;
         g_CbLast = 0;
-        ExSetTimer(g_HrTimer, -10000LL, 10000LL, NULL);
+        ExSetTimer(g_HrTimer, -5000LL, 5000LL, NULL);
         InterlockedIncrement64(&g_FastSwitches);
     } else if (!On && g_FastPoll) {
         LONG64 due = g_NextVsync - (LONG64)KeQueryInterruptTime();

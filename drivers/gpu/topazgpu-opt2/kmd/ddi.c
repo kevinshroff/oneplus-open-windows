@@ -196,8 +196,7 @@ static VOID HbThread(PVOID Ctx)
         n++;
         {
             extern volatile LONG64 g_StWaits, g_StWaitUs, g_StWaitMaxUs, g_StSubmits;
-            extern volatile LONG g_DcvsIdx, g_DcvsBusyPm, g_DcvsVotes, g_DcvsFails, g_DcvsOn;
-            LogPrint("HB %u vidsch submitted %u completed %u | gpu fence %u submits %lld waits %lld waitUs %lld waitMaxUs %lld"
+            extern volatile LONG g_DcvsIdx, g_DcvsBusyPm, g_DcvsVotes, g_DcvsFails, g_DcvsOn;            LogPrint("HB %u vidsch submitted %u completed %u | gpu fence %u submits %lld waits %lld waitUs %lld waitMaxUs %lld"
                      " | dcvs %s idx %d busy %d%% votes %d fails %d\n",
                      n, a->LastSubmittedFence, a->LastCompletedFence, HwCompletedFence(), g_StSubmits, g_StWaits,
                      g_StWaitUs, g_StWaitMaxUs, g_DcvsOn ? "on" : "off", g_DcvsIdx, g_DcvsBusyPm / 10, g_DcvsVotes, g_DcvsFails);

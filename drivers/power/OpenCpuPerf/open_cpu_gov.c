@@ -58,7 +58,7 @@ static PKEVENT g_UiEv;
 static HANDLE g_UiEvH;
 static PEX_TIMER g_Tick;
 static KEVENT g_TickEv;
-static const ULONG g_BoostKhz[NDOM] = { 1000000, 1400000, 1400000 };
+static const ULONG g_BoostKhz[NDOM] = { 1300000, 2200000, 2400000 };
 static ULONG64 g_BoostTicks;
 
 static VOID TickCb(PEX_TIMER Timer, PVOID Ctx)

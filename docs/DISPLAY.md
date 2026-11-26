@@ -118,6 +118,14 @@ lowest DDR) and nothing changed it afterwards. The bridge (`a740_wddm_bridge.c`)
 | + DCVS kicked per submit | 14.1 ms (~71 fps) | 800 | 8.1 ms |
 | + 401 MHz GPU floor while flipping | 12.5-13.5 ms (~77 fps) | 903 | 5.9 ms |
 | + 615 MHz GPU floor while flipping | 11.4-11.7 ms (~87 fps) | 980 | 5.5 ms |
+| + 680 MHz GPU/DDR floor (idx 9), 500 us latch poll, `RingFree` backpressure, 150 us fence micro-poll, CPU UI-boost 1.3/2.2/2.4 GHz, no UMD disk logging | **8.83-9.17 ms (~113 fps)** | **1228** | **4.04-4.13 ms** |
+
+Key changes that moved 120 Hz window drag from ~87 fps to **~113 fps** (`8.83 ms/frame` steady state, `max present->done 8.54 ms`, zero hangs/faults):
+
+* **`a740_wddm_bridge.c`**: raised `DCVS_MAX_IDX` / `DCVS_UI_IDX` from 8 (615 MHz) to **9 (680 MHz + DDR BW 9)** while flipping (parks back at 125 MHz idle); added `RingFree()` backpressure in `HwSubmit` reading the CP RPTR shadow (`Buffer[1].Cpu[0]`) so submit bursts cannot lap the 32 KiB ringbuffer; added a 150 us micro-poll (`KeStallExecutionProcessor`) in `HwWaitFenceInner` before `KeDelayExecutionThread` to avoid 1+ ms OS timer quantization on short app GPU waits.
+* **`disp.c`**: tightened active-flip polling from 1 ms to **500 us** (still 0 ticks/s at idle), relaxed the post-latch hold-back guard from `VSYNC_PERIOD - VSYNC_PERIOD/8` to `VSYNC_PERIOD / 2`, and added a 100 ms `g_Deferred` safety timeout so a stalled fence cannot trigger a `0x116` TDR bugcheck.
+* **`open_cpu_gov.c`**: raised active-flip UI-boost floor (+200 ms) from `{1.0, 1.4, 1.4}` GHz to **`{1.3, 2.2, 2.4}` GHz** (idle remains `307 / 499 / 595` MHz).
+* **Production hygiene**: removed `C:\ProgramData\topaz\umd.log.enable` / `umd.env` (eliminating per-frame synchronous disk logging) and removed the diagnostic `WAITS` counters from `ddi.c`/`msm.c`.
 
 Flip queueing (v0.53) is implemented but opt-in (`C:\topaz\flipq2`): with `MaxQueuedFlipOnVSync = 2` and
 `FlipOnVSyncWithNoWait`, DWM still never submitted a frame before its previous one completed (queue counter stayed
