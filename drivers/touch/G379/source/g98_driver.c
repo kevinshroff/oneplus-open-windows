@@ -196,12 +196,6 @@ static void SaveFirstFault(G98HID_CONTEXT*c)
  /* This snapshot is immutable after its release/acquire publication. */
  InterlockedExchange(&c->FaultReady,1);
 }
-static int Retryable(G98HID_CONTEXT*c)
-{
- G98_POLL_RESULT*p=&c->Result->Trial.Touch.Poll;G98_POLL_RECORD*r;
- if(!c->Persistent||c->Live.Error||!Restored(c)||c->Live.Accepted.Mask||p->Code!=G98_POLL_DECODE||!p->Cycles||c->Result->Trial.Touch.Code!=18)return 0;
- r=&p->Records[(p->Cycles-1)%G98_POLL_RECORDS];return G98RetryablePrefix(r->Bytes,r->ReadBytes)!=0;
-}
 static int RecoveryWait(G98HID_CONTEXT*c)
 {
  LARGE_INTEGER wait;unsigned i;wait.QuadPart=-1000000;
@@ -226,7 +220,7 @@ static VOID Worker(PVOID context)
  c->LastHardwareCode=t->Trial.Power.Code;
  restored=Restored(c);
  SaveFirstFault(c);
- if(released&&Retryable(c)&&!Counter(&c->StopReason)&&TimeValue(&c->Recoveries)<3){
+ if(c->Persistent&&!Counter(&c->StopReason)&&Available(c)){
   if(!RecoveryWait(c)){outcome=G98_OUTCOME_CANCELLED;break;}
   InterlockedIncrement64(&c->Recoveries);RtlZeroMemory(&c->Live,sizeof(c->Live));continue;
  }
@@ -313,7 +307,7 @@ NTSTATUS G98HIDSuspend(WDFDEVICE device)
 }
 NTSTATUS G98HIDRestart(WDFDEVICE device)
 {
- G98HID_CONTEXT*c=G98HIDContext(device);NTSTATUS status=STATUS_SUCCESS;ULONG reason;OwnerLock(c);if(Counter(&c->D0)&&Available(c)){InterlockedExchange(&c->Inhibit,0);reason=Counter(&c->StopReason);if(c->Persistent&&Counter(&c->State)==G98_OWNER_DONE&&(reason==G98_STOP_SUSPEND||reason==G98_STOP_D0_EXIT)&&(Counter(&c->Outcome)==G98_OUTCOME_CANCELLED||Counter(&c->Outcome)==G98_OUTCOME_CANCELLED_BEFORE_HARDWARE))status=Start(c,NULL,G98_EPOCH_CYCLES);if(NT_SUCCESS(status))status=G293KeysStart(&c->PowerKeys);}OwnerUnlock(c);return status;
+ G98HID_CONTEXT*c=G98HIDContext(device);NTSTATUS status=STATUS_SUCCESS;OwnerLock(c);if(Counter(&c->D0)&&Available(c)){InterlockedExchange(&c->Inhibit,0);if(c->Persistent&&Counter(&c->State)==G98_OWNER_DONE)status=Start(c,NULL,G98_EPOCH_CYCLES);if(NT_SUCCESS(status))status=G293KeysStart(&c->PowerKeys);}OwnerUnlock(c);return status;
 }
 VOID G98HIDSurprise(WDFDEVICE device)
 {

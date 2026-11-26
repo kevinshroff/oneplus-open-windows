@@ -6,6 +6,7 @@
 #define OPEN_CK_GLINK_CORE_H
 #include <stdint.h>
 #include "charger_codec.h"
+#include "ipcrtr_sensors.h"
 
 #define CK_FIFO_BYTES 16384u
 #define CK_FIFO_MASK  16383u
@@ -75,6 +76,7 @@ typedef struct {
     CL_BATTERY Working, LastBattery;
     CK_REMOTE_INTENT Remote[CK_INTENTS];
     CK_LOCAL_INTENT  Local[CK_INTENTS];
+    CK_IPC_STATE     Ipc;
 } CK_GL_STATE;
 
 void CkGlInit(CK_GL_STATE *s);

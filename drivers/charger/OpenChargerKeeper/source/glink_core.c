@@ -19,6 +19,13 @@ static int IsChargerName(const uint8_t *b, uint32_t n){
     return 1;
 }
 
+static int IsIpcRtrName(const uint8_t *b, uint32_t n){
+    static const char target[]="IPCRTR";
+    if(n!=6u && !(n==7u && b[6]==0))return 0;
+    for(uint32_t i=0;i<6u;i++)if(b[i]!=(uint8_t)target[i])return 0;
+    return 1;
+}
+
 static int Fail(CK_GL_STATE *s, uint32_t code){
     s->Fault=code;s->Phase=CK_GL_FAILED;s->OpActive=0;return CK_GL_POLL_FAULT;
 }
@@ -27,6 +34,7 @@ void CkGlInit(CK_GL_STATE *s){
     if(!s)return;
     Zero(s, (uint32_t)sizeof(*s));
     s->NextLocalId = 1;
+    CkIpcInit(&s->Ipc);
 }
 
 int CkGlRequest(CK_GL_STATE *s, uint32_t op_kind, uint64_t now_us){
@@ -95,6 +103,26 @@ static int QueueIntent(CK_GL_STATE *s, const CK_GL_IO *io){
     return 0;
 }
 
+static int QueueIpcIntent(CK_GL_STATE *s, const CK_GL_IO *io){
+    CK_IPC_STATE *ipc = &s->Ipc;
+    for(uint32_t i=0;i<CK_IPC_INTENTS;i++){
+        if(ipc->Local[i].State == 0){
+            uint8_t f[16];
+            uint32_t id = ipc->NextLocalId++;
+            if(!id){ id = ipc->NextLocalId++; }
+            P16(f+0, 5u); P16(f+2, (uint16_t)CK_IPC_CID); P32(f+4, 1u);
+            P32(f+8, CK_IPC_BUF_BYTES); P32(f+12, id);
+            if(!SendFrame(s, io, f, 16u)) return 0;
+            Zero(&ipc->Local[i], (uint32_t)sizeof(ipc->Local[i]));
+            ipc->Local[i].Id = id;
+            ipc->Local[i].State = 1;
+            ipc->CurrentOffers++;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint32_t n, uint64_t now_us){
     if(n < 8u) return;
     uint16_t cmd = U16(f+0), p1 = U16(f+2);
@@ -124,10 +152,29 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
                 for(uint32_t i=0;i<18u;i++) of[8+i]=(uint8_t)nm[i];
                 if(SendFrame(s, io, of, 32u)) s->OpenSent = 1u;
             }
+        } else if(n >= 8u + p2 && IsIpcRtrName(f+8, p2)){
+            s->Ipc.RemoteCid = p1;
+            s->Ipc.RemoteOpen = 1u;
+            SendCmd(s, io, 4u, p1, 0u); /* OPEN_ACK */
+            if(!s->Ipc.OpenSent){
+                static const char inm[] = "IPCRTR";
+                uint8_t of[16];
+                Zero(of, 16u);
+                P16(of+0, 2u); P16(of+2, (uint16_t)CK_IPC_CID); P32(of+4, 7u);
+                for(uint32_t i=0;i<6u;i++) of[8+i]=(uint8_t)inm[i];
+                if(SendFrame(s, io, of, 16u)) s->Ipc.OpenSent = 1u;
+            }
         }
         break;
     case 4u: /* OPEN_ACK */
         if(p1 == 1u) s->OpenAcked = 1u;
+        else if(p1 == CK_IPC_CID){
+            s->Ipc.OpenAcked = 1u;
+            while(s->Ipc.CurrentOffers < 4u){
+                if(!QueueIpcIntent(s, io)) break;
+            }
+            CkIpcQueueHello(&s->Ipc);
+        }
         break;
     case 3u: /* CLOSE from remote */
         if(p1 == s->RemoteCid){
@@ -159,6 +206,25 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
                 }
             }
             s->IntentRequestPending = 0;
+        } else if(s->Ipc.RemoteOpen && p1 == s->Ipc.RemoteCid && p2 >= 1u && n >= 8u + p2*8u){
+            for(uint32_t k=0;k<p2;k++){
+                uint32_t sz = U32(f+8+k*8), id = U32(f+12+k*8);
+                uint32_t slot = CK_IPC_INTENTS;
+                for(uint32_t i=0;i<CK_IPC_INTENTS;i++){
+                    if(s->Ipc.Remote[i].State && s->Ipc.Remote[i].Id == id){ slot = i; break; }
+                }
+                if(slot == CK_IPC_INTENTS){
+                    for(uint32_t i=0;i<CK_IPC_INTENTS;i++){
+                        if(s->Ipc.Remote[i].State == 0){ slot = i; break; }
+                    }
+                }
+                if(slot < CK_IPC_INTENTS){
+                    s->Ipc.Remote[slot].Id = id;
+                    s->Ipc.Remote[slot].Bytes = sz;
+                    s->Ipc.Remote[slot].State = 1;
+                }
+            }
+            s->Ipc.IntentReqPending = 0;
         }
         break;
     case 6u:  /* RX_DONE */
@@ -171,6 +237,13 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
                     break;
                 }
             }
+        } else if(s->Ipc.RemoteOpen && p1 == s->Ipc.RemoteCid){
+            for(uint32_t i=0;i<CK_IPC_INTENTS;i++){
+                if(s->Ipc.Remote[i].State == 2 && s->Ipc.Remote[i].Id == p2){
+                    s->Ipc.Remote[i].State = (cmd == 14u) ? 1 : 0;
+                    break;
+                }
+            }
         }
         break;
     case 7u: /* RX_INTENT_REQ */
@@ -178,10 +251,15 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
             uint32_t ok = (p2 && p2 <= CL_REPLY_LIMIT) ? 1u : 0u;
             if(ok) QueueIntent(s, io);
             SendCmd(s, io, 8u, 1u, ok); /* RX_INTENT_REQ_ACK */
+        } else if(s->Ipc.RemoteOpen && p1 == s->Ipc.RemoteCid){
+            uint32_t ok = (p2 && p2 <= CK_IPC_BUF_BYTES) ? 1u : 0u;
+            if(ok) QueueIpcIntent(s, io);
+            SendCmd(s, io, 8u, (uint16_t)CK_IPC_CID, ok);
         }
         break;
     case 8u: /* RX_INTENT_REQ_ACK */
         if(p1 == s->RemoteCid && p2 == 0u) s->IntentRequestPending = 0;
+        else if(s->Ipc.RemoteOpen && p1 == s->Ipc.RemoteCid && p2 == 0u) s->Ipc.IntentReqPending = 0;
         break;
     case 9u:  /* TX_DATA */
     case 12u: /* TX_DATA_CONT */
@@ -206,6 +284,27 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
                             s->Local[i].State = 0;
                             if(s->CurrentOffers) s->CurrentOffers--;
                             QueueIntent(s, io);
+                        }
+                        break;
+                    }
+                }
+            }
+        } else if(s->Ipc.RemoteOpen && p1 == s->Ipc.RemoteCid && n >= 16u){
+            uint32_t chunk = U32(f+8), rem = U32(f+12);
+            if(16u + chunk <= n){
+                for(uint32_t i=0;i<CK_IPC_INTENTS;i++){
+                    if(s->Ipc.Local[i].State == 1 && s->Ipc.Local[i].Id == p2){
+                        if(s->Ipc.Local[i].Used + chunk <= CK_IPC_BUF_BYTES){
+                            for(uint32_t k=0;k<chunk;k++) s->Ipc.Local[i].Data[s->Ipc.Local[i].Used+k] = f[16+k];
+                            s->Ipc.Local[i].Used += chunk;
+                            s->Ipc.Local[i].Remaining = rem;
+                        }
+                        if(rem == 0u){
+                            CkIpcOnQrtrPacket(&s->Ipc, s->Ipc.Local[i].Data, s->Ipc.Local[i].Used);
+                            SendCmd(s, io, 6u, (uint16_t)CK_IPC_CID, p2);
+                            s->Ipc.Local[i].State = 0;
+                            if(s->Ipc.CurrentOffers) s->Ipc.CurrentOffers--;
+                            QueueIpcIntent(s, io);
                         }
                         break;
                     }
@@ -368,5 +467,37 @@ int CkGlPoll(CK_GL_STATE *s, const CK_GL_IO *io, uint64_t now_us){
             }
         }
     }
+    /* 3. Pump IPCRTR (QRTR/SSC Sensors) TX queue if channel is open */
+    if(s->Ipc.OpenAcked && s->Ipc.RemoteOpen && !s->CloseRequested){
+        while(s->Ipc.CurrentOffers < 4u){
+            if(!QueueIpcIntent(s, io)) break;
+            progress = 1;
+        }
+        const uint8_t *txd = 0;
+        uint32_t txl = 0;
+        if(CkIpcPeekTx(&s->Ipc, &txd, &txl)){
+            uint32_t ridx = CK_IPC_INTENTS;
+            for(uint32_t i=0;i<CK_IPC_INTENTS;i++){
+                if(s->Ipc.Remote[i].State == 1 && s->Ipc.Remote[i].Bytes >= txl){ ridx = i; break; }
+            }
+            if(ridx == CK_IPC_INTENTS){
+                if(!s->Ipc.IntentReqPending){
+                    if(SendCmd(s, io, 7u, (uint16_t)CK_IPC_CID, txl)){ s->Ipc.IntentReqPending = 1u; progress = 1; }
+                }
+            } else if(16u + txl <= CK_FRAME_BYTES){
+                uint8_t f[16u + CK_IPC_TXQ_MAX];
+                Zero(f, 16u + txl);
+                P16(f+0, 9u); P16(f+2, (uint16_t)CK_IPC_CID); P32(f+4, s->Ipc.Remote[ridx].Id);
+                P32(f+8, txl); P32(f+12, 0u);
+                for(uint32_t k=0;k<txl;k++) f[16u+k] = txd[k];
+                if(SendFrame(s, io, f, 16u + txl)){
+                    s->Ipc.Remote[ridx].State = 2;
+                    CkIpcPopTx(&s->Ipc);
+                    progress = 1;
+                }
+            }
+        }
+    }
+
     return progress ? CK_GL_POLL_PROGRESS : CK_GL_POLL_IDLE;
 }

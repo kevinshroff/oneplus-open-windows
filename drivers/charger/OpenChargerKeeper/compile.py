@@ -6,7 +6,7 @@ import argparse, hashlib, json, pathlib, subprocess, sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 SRC = HERE / "source"
-UNITS = ["driver.c", "glink_core.c", "keeper_policy.c", "charger_codec.c", "g102_core.c", "g104_core.c"]
+UNITS = ["driver.c", "glink_core.c", "ipcrtr_sensors.c", "keeper_policy.c", "charger_codec.c", "g102_core.c", "g104_core.c"]
 
 def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
 

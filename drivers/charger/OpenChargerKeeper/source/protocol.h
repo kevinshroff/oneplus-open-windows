@@ -5,6 +5,7 @@
 #define OPEN_CK_PROTOCOL_H
 #include <stdint.h>
 #include "keeper_policy.h"
+#include "ipcrtr_sensors.h"
 
 #define CK_MAGIC    0x4B43504Fu /* "OPCK" */
 #define CK_ABI_VER  1u
@@ -12,6 +13,7 @@
 #define IOCTL_CK_STATUS 0x00226000u /* METHOD_BUFFERED, FILE_READ_ACCESS */
 #define IOCTL_CK_PAUSE  0x0022A004u /* METHOD_BUFFERED, FILE_WRITE_ACCESS */
 #define IOCTL_CK_RESUME 0x0022A008u /* METHOD_BUFFERED, FILE_WRITE_ACCESS */
+#define IOCTL_CK_ACCEL  0x0022600Cu /* METHOD_BUFFERED, FILE_READ_ACCESS */
 
 typedef struct {
     uint32_t Size;

@@ -357,7 +357,7 @@ static void Pump(void){
 
     if(Owner->Running && !Owner->Stopped){
         LONG ms = (Owner->Glink.OpActive || Owner->Glink.Phase != CK_GL_READY) ? 10 :
-                  (Owner->Policy.State == CK_ST_GAP_WAIT) ? 100 : 500;
+                  (Owner->Policy.State == CK_ST_GAP_WAIT || Owner->Glink.Ipc.OpenAcked) ? 100 : 500;
         WdfTimerStart(Timer, WDF_REL_TIMEOUT_IN_MS(ms));
     }
 }
@@ -392,6 +392,44 @@ VOID CkControl(WDFQUEUE queue, WDFREQUEST request, size_t outBytes, size_t inByt
             Owner->NextSampleUs = 0;
             Pump();
         }
+    } else if(code == IOCTL_CK_ACCEL){
+        if(outBytes >= sizeof(CK_ACCEL_SNAPSHOT)){
+            CK_ACCEL_SNAPSHOT *aout = NULL;
+            status = WdfRequestRetrieveOutputBuffer(request, sizeof(*aout), (PVOID*)&aout, NULL);
+            if(NT_SUCCESS(status) && aout && Owner){
+                const CK_IPC_STATE *ipc = &Owner->Glink.Ipc;
+                RtlZeroMemory(aout, sizeof(*aout));
+                aout->Size          = sizeof(*aout);
+                aout->Version       = CK_ABI_VER;
+                aout->Magic         = CK_MAGIC;
+                aout->OpenAcked     = ipc->OpenAcked;
+                aout->RemoteOpen    = ipc->RemoteOpen;
+                aout->HelloSent     = ipc->HelloSent;
+                aout->SnsFound      = ipc->SnsFound;
+                aout->SnsNode       = ipc->SnsNode;
+                aout->SnsPort       = ipc->SnsPort;
+                aout->SuidSent      = ipc->SuidSent;
+                aout->SuidFound     = ipc->SuidFound;
+                aout->AccelReqSent  = ipc->AccelReqSent;
+                aout->AccelValid    = ipc->AccelValid;
+                aout->AccelSeq      = ipc->AccelSeq;
+                aout->AxMilliG      = ipc->AxMilliG;
+                aout->AyMilliG      = ipc->AyMilliG;
+                aout->AzMilliG      = ipc->AzMilliG;
+                aout->TxPackets     = ipc->TxPackets;
+                aout->RxPackets     = ipc->RxPackets;
+                aout->IndPackets    = ipc->IndPackets;
+                aout->LastIndMsgId  = ipc->LastIndMsgId;
+                aout->ServicesCount = ipc->ServicesCount;
+                aout->SuidLow       = ipc->SuidLow;
+                aout->SuidHigh      = ipc->SuidHigh;
+                RtlCopyMemory(aout->Services, ipc->Services, sizeof(aout->Services));
+                info = sizeof(*aout);
+            }
+        } else {
+            status = STATUS_BUFFER_TOO_SMALL;
+        }
+        goto done;
     } else if(code != IOCTL_CK_STATUS){
         status = STATUS_INVALID_DEVICE_REQUEST;
         goto done;
