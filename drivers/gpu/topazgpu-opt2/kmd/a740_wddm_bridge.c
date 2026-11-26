@@ -399,7 +399,7 @@ NTSTATUS A740BindDevice(PDEVICE_OBJECT Pdo, PCM_RESOURCE_LIST Translated) {
    the DDR (bandwidth) index follows the GPU index. C:\topaz\gpu.nodcvs disables it. */
 static const ULONG g_GpuMhz[10] = { 0, 125, 220, 295, 348, 401, 475, 550, 615, 680 };
 #define DCVS_MAX_IDX 9
-#define DCVS_UI_IDX 9                                  /* EXPERIMENT: 615 MHz floor while DWM flips frames */
+#define DCVS_UI_IDX 9                                  /* 680 MHz + DDR BW 9 floor while DWM flips frames (+200 ms); ~113 fps at 120 Hz */
 LONG64 DispLastFlipTime(VOID);
 static PEX_TIMER g_DcvsTimer;
 static volatile LONG g_DcvsSamples, g_DcvsBusy, g_DcvsTimerOn, g_DcvsStop;
