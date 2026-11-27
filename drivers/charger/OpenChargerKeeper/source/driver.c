@@ -42,6 +42,9 @@ typedef struct {
     PVOID        Part;
     PVOID        Irq;
     PVOID        GaugeMap[12];
+    PVOID        FrpcBuf;
+    uint64_t     FrpcPhys;
+    uint32_t     FrpcBufSize;
     volatile ULONG *Descriptor;
     volatile ULONG *Doorbell;
     volatile UCHAR *Tx;
@@ -357,7 +360,9 @@ static void Pump(void){
 
     if(Owner->Running && !Owner->Stopped){
         LONG ms = (Owner->Glink.OpActive || Owner->Glink.Phase != CK_GL_READY ||
-                   Owner->Glink.Ipc.TxHead != Owner->Glink.Ipc.TxTail) ? 10 :
+                   Owner->Glink.Ipc.TxHead != Owner->Glink.Ipc.TxTail ||
+                   Owner->Glink.Aud.TxHead != Owner->Glink.Aud.TxTail ||
+                   Owner->Glink.Frpc.TxPending) ? 10 :
                   (Owner->Policy.State == CK_ST_GAP_WAIT || Owner->Glink.Ipc.OpenAcked) ? 50 : 500;
         WdfTimerStart(Timer, WDF_REL_TIMEOUT_IN_MS(ms));
     }
@@ -489,6 +494,307 @@ VOID CkControl(WDFQUEUE queue, WDFREQUEST request, size_t outBytes, size_t inByt
             status = STATUS_BUFFER_TOO_SMALL;
         }
         goto done;
+    } else if(code == IOCTL_CK_FRPC_INFO){
+        if(Owner && outBytes >= sizeof(CK_FRPC_SNAPSHOT)){
+            CK_FRPC_SNAPSHOT *fout = NULL;
+            status = WdfRequestRetrieveOutputBuffer(request, sizeof(*fout), (PVOID*)&fout, NULL);
+            if(NT_SUCCESS(status) && fout){
+                Pump();
+                const CK_FRPC_STATE *fr = &Owner->Glink.Frpc;
+                RtlZeroMemory(fout, sizeof(*fout));
+                fout->Size          = sizeof(*fout);
+                fout->Version       = CK_ABI_VER;
+                fout->Magic         = CK_MAGIC;
+                fout->OpenAcked     = fr->OpenAcked;
+                fout->RemoteOpen    = fr->RemoteOpen;
+                fout->RspCount      = fr->RspCount;
+                fout->RspLen        = fr->RspLen;
+                fout->LastRspRetval = fr->LastRspRetval;
+                fout->LastRspCtx    = fr->LastRspCtx;
+                fout->BufPhys       = Owner->FrpcPhys;
+                fout->BufSize       = Owner->FrpcBufSize;
+                fout->TxPending     = fr->TxPending;
+                RtlCopyMemory(fout->LastRspRaw, fr->LastRspRaw, sizeof(fout->LastRspRaw));
+                info = sizeof(*fout);
+            }
+        } else {
+            status = STATUS_BUFFER_TOO_SMALL;
+        }
+        goto done;
+    } else if(code == IOCTL_CK_FRPC_SEND){
+        if(Owner && Owner->FrpcBuf && inBytes >= 40u){
+            PVOID inBuf = NULL;
+            status = WdfRequestRetrieveInputBuffer(request, inBytes, &inBuf, NULL);
+            if(NT_SUCCESS(status) && inBuf){
+                const uint8_t *ib = (const uint8_t*)inBuf;
+                uint32_t payLen = (uint32_t)(inBytes - 40u);
+                if(payLen > Owner->FrpcBufSize) payLen = Owner->FrpcBufSize;
+                if(payLen > 0u){
+                    RtlCopyMemory(Owner->FrpcBuf, ib + 40u, payLen);
+                    KeMemoryBarrier();
+                }
+                if(!Owner->Glink.Frpc.TxPending){
+                    RtlCopyMemory(Owner->Glink.Frpc.TxBuf, ib, 40u);
+                    Owner->Glink.Frpc.TxLen = 40u;
+                    Owner->Glink.Frpc.TxPending = 1u;
+                    Pump();
+                } else {
+                    status = STATUS_DEVICE_BUSY;
+                }
+            }
+        } else {
+            status = STATUS_INVALID_PARAMETER;
+        }
+        goto done;
+    } else if(code == IOCTL_CK_FRPC_READ){
+        if(Owner && Owner->FrpcBuf && outBytes > 0u){
+            PVOID outBuf = NULL;
+            status = WdfRequestRetrieveOutputBuffer(request, outBytes, &outBuf, NULL);
+            if(NT_SUCCESS(status) && outBuf){
+                uint32_t cp = (outBytes < Owner->FrpcBufSize) ? (uint32_t)outBytes : Owner->FrpcBufSize;
+                KeMemoryBarrier();
+                RtlCopyMemory(outBuf, Owner->FrpcBuf, cp);
+                info = cp;
+            }
+        } else {
+            status = STATUS_BUFFER_TOO_SMALL;
+        }
+        goto done;
+    } else if(code == IOCTL_CK_GPR_SEND){
+        if(Owner && inBytes >= 24u && inBytes <= CK_AUD_BUF){
+            PVOID inBuf = NULL;
+            status = WdfRequestRetrieveInputBuffer(request, inBytes, &inBuf, NULL);
+            if(NT_SUCCESS(status) && inBuf){
+                if(CkAudEnqueueTx(&Owner->Glink.Aud, (const uint8_t*)inBuf, (uint32_t)inBytes)){
+                    Pump();
+                } else {
+                    status = STATUS_DEVICE_BUSY;
+                }
+            }
+        } else {
+            status = STATUS_INVALID_PARAMETER;
+        }
+        goto done;
+    } else if(code == IOCTL_CK_GPR_RECV){
+        if(Owner && outBytes >= 24u){
+            PVOID outBuf = NULL;
+            status = WdfRequestRetrieveOutputBuffer(request, outBytes, &outBuf, NULL);
+            if(NT_SUCCESS(status) && outBuf){
+                uint32_t got = 0;
+                Pump();
+                if(CkAudPopRx(&Owner->Glink.Aud, (uint8_t*)outBuf, (uint32_t)outBytes, &got)){
+                    info = got;
+                } else {
+                    info = 0;
+                }
+            }
+        } else {
+            status = STATUS_BUFFER_TOO_SMALL;
+        }
+        goto done;
+    } else if(code == IOCTL_CK_SHM_WRITE){
+        /* Input: [0..3] offset, [4..end] data -> writes into Owner->FrpcBuf (non-cached physical SHMEM) */
+        if(Owner && Owner->FrpcBuf && inBytes >= 4u){
+            PVOID inBuf = NULL;
+            status = WdfRequestRetrieveInputBuffer(request, inBytes, &inBuf, NULL);
+            if(NT_SUCCESS(status) && inBuf){
+                const uint8_t *ib = (const uint8_t*)inBuf;
+                uint32_t off = *(const uint32_t*)ib;
+                uint32_t dlen = (uint32_t)(inBytes - 4u);
+                if(off <= Owner->FrpcBufSize && dlen <= Owner->FrpcBufSize - off){
+                    if(dlen > 0u){
+                        RtlCopyMemory((uint8_t*)Owner->FrpcBuf + off, ib + 4u, dlen);
+                        KeMemoryBarrier();
+                    }
+                    info = dlen;
+                } else {
+                    status = STATUS_INVALID_PARAMETER;
+                }
+            }
+        } else {
+            status = STATUS_INVALID_PARAMETER;
+        }
+        goto done;
+    } else if(code == IOCTL_CK_TFA_I2C){
+        /* Safe QUPv3 SE6 I2C (0x00A98000) + 3x NXP TFA9874 (0x34, 0x35, 0x36) helper */
+        if(inBytes >= sizeof(CK_TFA_REQ) && outBytes >= sizeof(CK_TFA_RSP)){
+            CK_TFA_REQ *req = NULL;
+            CK_TFA_RSP *rsp = NULL;
+            status = WdfRequestRetrieveInputBuffer(request, sizeof(*req), (PVOID*)&req, NULL);
+            if(NT_SUCCESS(status)) status = WdfRequestRetrieveOutputBuffer(request, sizeof(*rsp), (PVOID*)&rsp, NULL);
+            if(NT_SUCCESS(status) && req && rsp){
+                CK_TFA_REQ rcopy = *req;
+                RtlZeroMemory(rsp, sizeof(*rsp));
+                PVOID pGccS6   = MapPhys(0x00118000ULL, 0x1000, PAGE_READWRITE | PAGE_NOCACHE);
+                PVOID pGccCbcr = MapPhys(0x00123000ULL, 0x1000, PAGE_READWRITE | PAGE_NOCACHE);
+                PVOID pGccVote = MapPhys(0x00152000ULL, 0x1000, PAGE_READWRITE | PAGE_NOCACHE);
+                PVOID pG48     = MapPhys(0x0F130000ULL, 0x1000, PAGE_READWRITE | PAGE_NOCACHE);
+                PVOID pG49     = MapPhys(0x0F131000ULL, 0x1000, PAGE_READWRITE | PAGE_NOCACHE);
+                PVOID pG50     = MapPhys(0x0F132000ULL, 0x1000, PAGE_READWRITE | PAGE_NOCACHE);
+                PVOID pG56     = MapPhys(0x0F138000ULL, 0x1000, PAGE_READWRITE | PAGE_NOCACHE);
+                PVOID pG173    = MapPhys(0x0F1AD000ULL, 0x1000, PAGE_READWRITE | PAGE_NOCACHE);
+                if(pGccS6 && pGccCbcr && pGccVote && pG48 && pG49 && pG50 && pG56 && pG173){
+                    volatile ULONG *cbS6   = (volatile ULONG*)((UCHAR*)pGccS6 + 0x754);
+                    volatile ULONG *cbMAhb = (volatile ULONG*)((UCHAR*)pGccCbcr + 0x27C);
+                    volatile ULONG *cbSAhb = (volatile ULONG*)((UCHAR*)pGccCbcr + 0x280);
+                    volatile ULONG *cbCore = (volatile ULONG*)((UCHAR*)pGccCbcr + 0x284);
+                    volatile ULONG *vote   = (volatile ULONG*)((UCHAR*)pGccVote + 0x008);
+                    volatile ULONG *g48    = (volatile ULONG*)pG48;
+                    volatile ULONG *g49    = (volatile ULONG*)pG49;
+                    volatile ULONG *g50    = (volatile ULONG*)pG50;
+                    volatile ULONG *g56    = (volatile ULONG*)pG56;
+                    volatile ULONG *g173   = (volatile ULONG*)pG173;
+                    if(rcopy.Op >= 1u){
+                        /* Vote WRAP1 core(19), m_ahb(20), s_ahb(21), s6(28) ON */
+                        ULONG v = READ_REGISTER_ULONG(vote);
+                        WRITE_REGISTER_ULONG(vote, v | (1u<<19) | (1u<<20) | (1u<<21) | (1u<<28));
+                        for(int t=0; t<200; t++){
+                            if(!((READ_REGISTER_ULONG(cbS6) | READ_REGISTER_ULONG(cbMAhb) |
+                                  READ_REGISTER_ULONG(cbCore)) & 0x80000000u))
+                                break;
+                            KeStallExecutionProcessor(10);
+                        }
+                    }
+                    rsp->Cbcr[0] = READ_REGISTER_ULONG(cbS6);
+                    rsp->Cbcr[1] = READ_REGISTER_ULONG(cbMAhb);
+                    rsp->Cbcr[2] = READ_REGISTER_ULONG(cbSAhb);
+                    rsp->Cbcr[3] = READ_REGISTER_ULONG(cbCore);
+                    rsp->Gpio[0] = READ_REGISTER_ULONG(g48);
+                    rsp->Gpio[1] = READ_REGISTER_ULONG(g49);
+                    rsp->Gpio[2] = READ_REGISTER_ULONG(g50);
+                    rsp->Gpio[3] = READ_REGISTER_ULONG(g56);
+                    rsp->Gpio[4] = READ_REGISTER_ULONG(g173);
+                    if(rcopy.Op >= 1u){
+                        /* cbSAhb (0x123280) is HWCG-controlled (bit 1=HW_CTL), so CLK_OFF=1 when idle is normal */
+                        ULONG clkOff = (rsp->Cbcr[0] | rsp->Cbcr[1] | rsp->Cbcr[3]) & 0x80000000u;
+                        if(clkOff){
+                            rsp->Status = 10u; /* Clocks still off; do not touch QUP MMIO */
+                        } else {
+                            if(rcopy.Op == 1u){
+                                /* Configure GPIO 48 (SDA=func 2, PU) & GPIO 49 (SCL=func 1, PU) */
+                                WRITE_REGISTER_ULONG(g48, 0x0Bu);
+                                WRITE_REGISTER_ULONG(g49, 0x07u);
+                                /* Reset pulse (HIGH 5ms -> LOW 5ms) on TFA9874 reset GPIOs 50, 56, 173 */
+                                WRITE_REGISTER_ULONG(g50 + 1, 2u);  WRITE_REGISTER_ULONG(g50, 0x200u);
+                                WRITE_REGISTER_ULONG(g56 + 1, 2u);  WRITE_REGISTER_ULONG(g56, 0x200u);
+                                WRITE_REGISTER_ULONG(g173 + 1, 2u); WRITE_REGISTER_ULONG(g173, 0x200u);
+                                KeStallExecutionProcessor(5000);
+                                WRITE_REGISTER_ULONG(g50 + 1, 0u);
+                                WRITE_REGISTER_ULONG(g56 + 1, 0u);
+                                WRITE_REGISTER_ULONG(g173 + 1, 0u);
+                                /* Also configure Secondary TDM1 / i2s1 GPIOs 121..124 (func 1, 8mA) */
+                                for(ULONG g = 121; g <= 124; g++){
+                                    PVOID pg = MapPhys(0x0F100000ULL + (ULONGLONG)g * 0x1000ULL, 0x1000, PAGE_READWRITE | PAGE_NOCACHE);
+                                    if(pg){
+                                        WRITE_REGISTER_ULONG((volatile ULONG*)pg, 0xC4u);
+                                        MmUnmapIoSpace(pg, 0x1000);
+                                    }
+                                }
+                                KeStallExecutionProcessor(5000);
+                            }
+                            PVOID pQup = MapPhys(0x00A98000ULL, 0x4000, PAGE_READWRITE | PAGE_NOCACHE);
+                            if(pQup){
+                                volatile ULONG *q = (volatile ULONG*)pQup;
+                                rsp->GeniRev = READ_REGISTER_ULONG(q + (0x20/4));
+                                rsp->GeniIos = READ_REGISTER_ULONG(q + (0x908/4));
+                                if(rcopy.Op == 1u){
+                                    /* Initialize GENI SE6 I2C packing & 400kHz SCL counters (same proven values as g104) */
+                                    WRITE_REGISTER_ULONG(q + (0x48/4),  0x71u);
+                                    WRITE_REGISTER_ULONG(q + (0x68/4),  0x303u);
+                                    WRITE_REGISTER_ULONG(q + (0x6C/4),  0x303u);
+                                    WRITE_REGISTER_ULONG(q + (0x254/4), 0u);
+                                    WRITE_REGISTER_ULONG(q + (0x260/4), 0x7F8FEu);
+                                    WRITE_REGISTER_ULONG(q + (0x264/4), 0xFFEFEu);
+                                    WRITE_REGISTER_ULONG(q + (0x284/4), 0x7F8FEu);
+                                    WRITE_REGISTER_ULONG(q + (0x288/4), 0xFFEFEu);
+                                    WRITE_REGISTER_ULONG(q + (0x278/4), 0x00A02C1Au);
+                                    WRITE_REGISTER_ULONG(q + (0x614/4), 0x33C0007Eu);
+                                    WRITE_REGISTER_ULONG(q + (0x618/4), 0xFFFFFFFFu);
+                                    rsp->GeniIos = READ_REGISTER_ULONG(q + (0x908/4));
+                                }
+                                if(rcopy.Op == 2u || rcopy.Op == 3u){
+                                    /* Ensure 400kHz SCL counters & clear stale IRQs */
+                                    ULONG st = READ_REGISTER_ULONG(q + (0x610/4));
+                                    if(st) WRITE_REGISTER_ULONG(q + (0x618/4), st);
+                                    if(rcopy.Op == 2u){
+                                        /* 1-byte reg write (stretch) + 2-byte big-endian read */
+                                        WRITE_REGISTER_ULONG(q + (0x26C/4), 1u);
+                                        WRITE_REGISTER_ULONG(q + (0x600/4), (1u << 27) | ((rcopy.Addr7 & 0x7Fu) << 9) | 4u);
+                                        WRITE_REGISTER_ULONG(q + (0x80C/4), 1u);
+                                        int ok1 = 0, fed = 0;
+                                        for(int j=0; j<500; j++){
+                                            ULONG m = READ_REGISTER_ULONG(q + (0x610/4));
+                                            if(m & 0x3C0Cu){ rsp->Status = 21u; rsp->Data = m; WRITE_REGISTER_ULONG(q + (0x618/4), m); break; }
+                                            if(!fed && (m & 0x40000000u)){ WRITE_REGISTER_ULONG(q + (0x700/4), rcopy.Reg & 0xFFu); WRITE_REGISTER_ULONG(q + (0x80C/4), 0u); fed = 1; }
+                                            if(m & 1u){ WRITE_REGISTER_ULONG(q + (0x618/4), m); ok1 = 1; break; }
+                                            if(m) WRITE_REGISTER_ULONG(q + (0x618/4), m);
+                                            KeStallExecutionProcessor(20);
+                                        }
+                                        if(ok1){
+                                            WRITE_REGISTER_ULONG(q + (0x270/4), 2u);
+                                            WRITE_REGISTER_ULONG(q + (0x600/4), (2u << 27) | ((rcopy.Addr7 & 0x7Fu) << 9));
+                                            ULONG word = 0; int gotRx = 0, ok2 = 0;
+                                            for(int j=0; j<500; j++){
+                                                ULONG m = READ_REGISTER_ULONG(q + (0x610/4));
+                                                ULONG rxs = READ_REGISTER_ULONG(q + (0x804/4));
+                                                if(m & 0x3C0Cu){ rsp->Status = 22u; rsp->Data = m; WRITE_REGISTER_ULONG(q + (0x618/4), m); break; }
+                                                if(!gotRx && (rxs & 0x1FFFFFFu)){ word = READ_REGISTER_ULONG(q + (0x780/4)); gotRx = 1; }
+                                                if(m & 1u){ WRITE_REGISTER_ULONG(q + (0x618/4), m); ok2 = 1; break; }
+                                                if(m) WRITE_REGISTER_ULONG(q + (0x618/4), m);
+                                                KeStallExecutionProcessor(20);
+                                            }
+                                            if(ok2 && gotRx){
+                                                /* TFA9874 is big-endian 16-bit: byte0=MSB, byte1=LSB */
+                                                rsp->Data = ((word & 0xFFu) << 8) | ((word >> 8) & 0xFFu);
+                                                rsp->Status = 0u;
+                                            } else if(!rsp->Status){
+                                                rsp->Status = 23u;
+                                            }
+                                        } else if(!rsp->Status){
+                                            rsp->Status = 20u;
+                                        }
+                                    } else {
+                                        /* 3-byte write: [reg, val_hi, val_lo] */
+                                        ULONG txw = (rcopy.Reg & 0xFFu) | (((rcopy.Val >> 8) & 0xFFu) << 8) | ((rcopy.Val & 0xFFu) << 16);
+                                        WRITE_REGISTER_ULONG(q + (0x26C/4), 3u);
+                                        WRITE_REGISTER_ULONG(q + (0x600/4), (1u << 27) | ((rcopy.Addr7 & 0x7Fu) << 9));
+                                        WRITE_REGISTER_ULONG(q + (0x80C/4), 1u);
+                                        int okw = 0, fed = 0;
+                                        for(int j=0; j<500; j++){
+                                            ULONG m = READ_REGISTER_ULONG(q + (0x610/4));
+                                            if(m & 0x3C0Cu){ rsp->Status = 31u; rsp->Data = m; WRITE_REGISTER_ULONG(q + (0x618/4), m); break; }
+                                            if(!fed && (m & 0x40000000u)){ WRITE_REGISTER_ULONG(q + (0x700/4), txw); WRITE_REGISTER_ULONG(q + (0x80C/4), 0u); fed = 1; }
+                                            if(m & 1u){ WRITE_REGISTER_ULONG(q + (0x618/4), m); okw = 1; break; }
+                                            if(m) WRITE_REGISTER_ULONG(q + (0x618/4), m);
+                                            KeStallExecutionProcessor(20);
+                                        }
+                                        if(okw) rsp->Status = 0u;
+                                        else if(!rsp->Status) rsp->Status = 30u;
+                                    }
+                                }
+                                MmUnmapIoSpace(pQup, 0x4000);
+                            } else {
+                                rsp->Status = 11u;
+                            }
+                        }
+                    }
+                } else {
+                    rsp->Status = 1u;
+                }
+                if(pG173)    MmUnmapIoSpace(pG173, 0x1000);
+                if(pG56)     MmUnmapIoSpace(pG56, 0x1000);
+                if(pG50)     MmUnmapIoSpace(pG50, 0x1000);
+                if(pG49)     MmUnmapIoSpace(pG49, 0x1000);
+                if(pG48)     MmUnmapIoSpace(pG48, 0x1000);
+                if(pGccVote) MmUnmapIoSpace(pGccVote, 0x1000);
+                if(pGccCbcr) MmUnmapIoSpace(pGccCbcr, 0x1000);
+                if(pGccS6)   MmUnmapIoSpace(pGccS6, 0x1000);
+                info = sizeof(*rsp);
+            }
+        } else {
+            status = STATUS_BUFFER_TOO_SMALL;
+        }
+        goto done;
     } else if(code != IOCTL_CK_STATUS){
         status = STATUS_INVALID_DEVICE_REQUEST;
         goto done;
@@ -565,6 +871,10 @@ VOID CkUnload(WDFDRIVER driver){
     }
     if(Timer){ WdfTimerStop(Timer, TRUE); Timer = NULL; }
     if(Owner){
+        if(Owner->FrpcBuf){
+            MmFreeContiguousMemorySpecifyCache(Owner->FrpcBuf, Owner->FrpcBufSize, MmNonCached);
+            Owner->FrpcBuf = NULL;
+        }
         UnmapAll();
         ExFreePoolWithTag(Owner, 'KCP0');
         Owner = NULL;
@@ -597,6 +907,25 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING path){
     RtlZeroMemory(Owner, sizeof(*Owner));
     CkGlInit(&Owner->Glink);
     CkPolicyInit(&Owner->Policy);
+    {
+        PHYSICAL_ADDRESS lo, hi, bnd;
+        lo.QuadPart  = 0x80000000LL;
+        hi.QuadPart  = 0xFFFFFFFFLL;
+        bnd.QuadPart = 0;
+        Owner->FrpcBufSize = 65536u;
+        Owner->FrpcBuf = MmAllocateContiguousMemorySpecifyCache(Owner->FrpcBufSize, lo, hi, bnd, MmNonCached);
+        if(!Owner->FrpcBuf){
+            lo.QuadPart = 0;
+            hi.QuadPart = 0xFFFFFFFFFFFFFFFFLL;
+            Owner->FrpcBuf = MmAllocateContiguousMemorySpecifyCache(Owner->FrpcBufSize, lo, hi, bnd, MmNonCached);
+        }
+        if(Owner->FrpcBuf){
+            RtlZeroMemory(Owner->FrpcBuf, Owner->FrpcBufSize);
+            Owner->FrpcPhys = (uint64_t)MmGetPhysicalAddress(Owner->FrpcBuf).QuadPart;
+        } else {
+            Owner->FrpcBufSize = 0;
+        }
+    }
 
     init = WdfControlDeviceInitAllocate(driver, &sddl);
     if(!init){ status = STATUS_INSUFFICIENT_RESOURCES; goto fail; }

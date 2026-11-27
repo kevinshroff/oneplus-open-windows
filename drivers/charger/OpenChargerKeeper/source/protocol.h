@@ -17,6 +17,45 @@
 #define IOCTL_CK_QRTR_SEND 0x0022A010u /* METHOD_BUFFERED, FILE_WRITE_ACCESS */
 #define IOCTL_CK_QRTR_RECV 0x00226014u /* METHOD_BUFFERED, FILE_READ_ACCESS */
 #define IOCTL_CK_AUDIO     0x00226018u /* METHOD_BUFFERED, FILE_READ_ACCESS */
+#define IOCTL_CK_FRPC_INFO 0x0022601Cu /* METHOD_BUFFERED, FILE_READ_ACCESS */
+#define IOCTL_CK_FRPC_SEND 0x0022A020u /* METHOD_BUFFERED, FILE_WRITE_ACCESS */
+#define IOCTL_CK_FRPC_READ 0x00226024u /* METHOD_BUFFERED, FILE_READ_ACCESS */
+#define IOCTL_CK_GPR_SEND  0x0022A028u /* METHOD_BUFFERED, FILE_WRITE_ACCESS */
+#define IOCTL_CK_GPR_RECV  0x0022602Cu /* METHOD_BUFFERED, FILE_READ_ACCESS */
+#define IOCTL_CK_TFA_I2C   0x0022E030u /* METHOD_BUFFERED, FILE_READ_ACCESS|FILE_WRITE_ACCESS */
+#define IOCTL_CK_SHM_WRITE 0x0022A034u /* METHOD_BUFFERED, FILE_WRITE_ACCESS */
+
+typedef struct {
+    uint32_t Op;    /* 0=status(RO), 1=clk+gpio+init, 2=i2c_read16, 3=i2c_write16 */
+    uint32_t Addr7; /* 0x34, 0x35, 0x36 */
+    uint32_t Reg;   /* 8-bit register address */
+    uint32_t Val;   /* 16-bit value for write */
+} CK_TFA_REQ;
+
+typedef struct {
+    uint32_t Status;   /* 0=OK */
+    uint32_t Data;     /* 16-bit read value or GENI_IOS/IRQ error */
+    uint32_t Cbcr[4];  /* s6, wrap1_m_ahb, wrap1_s_ahb, wrap1_core */
+    uint32_t Gpio[5];  /* gpio 48, 49, 50, 56, 173 CFG */
+    uint32_t GeniRev;  /* GENI_FW_REVISION_RO */
+    uint32_t GeniIos;  /* GENI_IOS */
+} CK_TFA_RSP;
+
+typedef struct {
+    uint32_t Size;
+    uint32_t Version;
+    uint32_t Magic;
+    uint32_t OpenAcked;
+    uint32_t RemoteOpen;
+    uint32_t RspCount;
+    uint32_t RspLen;
+    int32_t  LastRspRetval;
+    uint64_t LastRspCtx;
+    uint64_t BufPhys;
+    uint32_t BufSize;
+    uint32_t TxPending;
+    uint8_t  LastRspRaw[64];
+} CK_FRPC_SNAPSHOT;
 
 typedef struct {
     uint32_t Size;

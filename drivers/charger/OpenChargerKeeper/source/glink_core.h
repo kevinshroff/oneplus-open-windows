@@ -14,8 +14,12 @@
 #define CK_INTENTS    32u
 #define CK_OTHER_PORTS 32u
 #define CK_AUD_CID     3u
-#define CK_AUD_INTENTS 4u
-#define CK_AUD_BUF     256u
+#define CK_AUD_INTENTS 24u
+#define CK_AUD_BUF     1536u
+#define CK_AUD_QSLOTS  8u
+#define CK_FRPC_CID     4u
+#define CK_FRPC_INTENTS 4u
+#define CK_FRPC_BUF     256u
 #define CK_MAX_CHANS   16u
 
 #define CK_OPEN_US    UINT64_C(10000000)
@@ -66,18 +70,44 @@ typedef struct {
 } CK_LOCAL_INTENT;
 
 typedef struct {
+    uint32_t Len;
+    uint8_t  Data[CK_AUD_BUF];
+} CK_AUD_SLOT;
+
+typedef struct {
     uint32_t RemoteCid;
     uint32_t OpenSent, OpenAcked, RemoteOpen;
     uint32_t CurrentOffers, NextLocalId, IntentReqPending;
     uint32_t SpfQuerySent, SpfRspReceived;
     uint32_t SpfRspOpcode, SpfState, SpfRspLen;
     uint8_t  SpfRaw[64];
+    uint32_t TxHead, TxTail;
+    CK_AUD_SLOT TxQ[CK_AUD_QSLOTS];
+    uint32_t RxHead, RxTail, RxDrops;
+    CK_AUD_SLOT RxQ[CK_AUD_QSLOTS];
     CK_REMOTE_INTENT Remote[CK_AUD_INTENTS];
     struct {
         uint32_t Id, State, Used, Remaining;
         uint8_t  Data[CK_AUD_BUF];
     } Local[CK_AUD_INTENTS];
 } CK_AUD_STATE;
+
+typedef struct {
+    uint32_t RemoteCid;
+    uint32_t OpenSent, OpenAcked, RemoteOpen;
+    uint32_t CurrentOffers, NextLocalId, IntentReqPending;
+    uint32_t TxPending, TxLen;
+    uint8_t  TxBuf[64];
+    uint32_t RspCount, RspLen;
+    uint64_t LastRspCtx;
+    int32_t  LastRspRetval;
+    uint8_t  LastRspRaw[64];
+    CK_REMOTE_INTENT Remote[CK_FRPC_INTENTS];
+    struct {
+        uint32_t Id, State, Used, Remaining;
+        uint8_t  Data[CK_FRPC_BUF];
+    } Local[CK_FRPC_INTENTS];
+} CK_FRPC_STATE;
 
 typedef struct {
     uint32_t Phase, Fault;
@@ -96,6 +126,7 @@ typedef struct {
     CK_LOCAL_INTENT  Local[CK_INTENTS];
     CK_IPC_STATE     Ipc;
     CK_AUD_STATE     Aud;
+    CK_FRPC_STATE    Frpc;
     uint32_t         ChanCount;
     char             ChanNames[CK_MAX_CHANS][24];
 } CK_GL_STATE;
@@ -104,5 +135,7 @@ void CkGlInit(CK_GL_STATE *s);
 int  CkGlRequest(CK_GL_STATE *s, uint32_t op_kind, uint64_t now_us);
 int  CkGlRequestClose(CK_GL_STATE *s, uint64_t now_us);
 int  CkGlPoll(CK_GL_STATE *s, const CK_GL_IO *io, uint64_t now_us);
+int  CkAudEnqueueTx(CK_AUD_STATE *aud, const uint8_t *data, uint32_t len);
+int  CkAudPopRx(CK_AUD_STATE *aud, uint8_t *out, uint32_t cap, uint32_t *out_len);
 
 #endif
