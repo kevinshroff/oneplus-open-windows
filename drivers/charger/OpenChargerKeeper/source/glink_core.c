@@ -789,7 +789,7 @@ int CkGlPoll(CK_GL_STATE *s, const CK_GL_IO *io, uint64_t now_us){
             }
             if(ridx == CK_AUD_INTENTS){
                 if(!s->Aud.IntentReqPending){
-                    if(SendCmd(s, io, 7u, (uint16_t)CK_AUD_CID, txl)){ s->Aud.IntentReqPending = 1u; progress = 1; }
+                    if(SendCmd(s, io, 7u, (uint16_t)s->Aud.RemoteCid, txl)){ s->Aud.IntentReqPending = 1u; progress = 1; }
                 }
             } else if(16u + txl <= CK_FRAME_BYTES){
                 uint8_t f[16u + CK_AUD_BUF];
