@@ -45,6 +45,8 @@ typedef struct {
     PVOID        FrpcBuf;
     uint64_t     FrpcPhys;
     uint32_t     FrpcBufSize;
+    uint8_t     *SmmuPt;
+    uint64_t     SmmuPtPhys;
     volatile ULONG *Descriptor;
     volatile ULONG *Doorbell;
     volatile UCHAR *Tx;
@@ -486,6 +488,24 @@ VOID CkControl(WDFQUEUE queue, WDFREQUEST request, size_t outBytes, size_t inByt
                 aout->SpfState       = aud->SpfState;
                 aout->SpfRspLen      = aud->SpfRspLen;
                 RtlCopyMemory(aout->SpfRaw, aud->SpfRaw, sizeof(aout->SpfRaw));
+                {
+                    uint32_t maxSz = 0, cnt = 0;
+                    for(uint32_t i=0;i<CK_AUD_INTENTS;i++){
+                        if(Owner->Glink.Aud.Remote[i].State == 1){
+                            cnt++;
+                            if(Owner->Glink.Aud.Remote[i].Bytes > maxSz) maxSz = Owner->Glink.Aud.Remote[i].Bytes;
+                        }
+                    }
+                    uint32_t *dbg = (uint32_t*)(aout->SpfRaw + 32);
+                    dbg[0] = Owner->Glink.Aud.RemoteCid;
+                    dbg[1] = Owner->Glink.Aud.IntentReqPending;
+                    dbg[2] = cnt;
+                    dbg[3] = maxSz;
+                    dbg[4] = Owner->Glink.Aud.TxHead;
+                    dbg[5] = Owner->Glink.Aud.TxTail;
+                    dbg[6] = Owner->Glink.Aud.Remote[0].Bytes;
+                    dbg[7] = Owner->Glink.Aud.Remote[1].Bytes;
+                }
                 aout->ChanCount      = Owner->Glink.ChanCount;
                 RtlCopyMemory(aout->ChanNames, Owner->Glink.ChanNames, sizeof(aout->ChanNames));
                 info = sizeof(*aout);
@@ -789,6 +809,275 @@ VOID CkControl(WDFQUEUE queue, WDFREQUEST request, size_t outBytes, size_t inByt
                 if(pGccVote) MmUnmapIoSpace(pGccVote, 0x1000);
                 if(pGccCbcr) MmUnmapIoSpace(pGccCbcr, 0x1000);
                 if(pGccS6)   MmUnmapIoSpace(pGccS6, 0x1000);
+                info = sizeof(*rsp);
+            }
+        } else {
+            status = STATUS_BUFFER_TOO_SMALL;
+        }
+        goto done;
+    } else if(code == IOCTL_CK_SMMU_ADSP){
+        /* Safe G735-style apps_smmu (0x15000000) inspector & identity-bypass programmer for ADSP SIDs */
+        if(inBytes >= sizeof(CK_SMMU_REQ) && outBytes >= sizeof(CK_SMMU_RSP)){
+            CK_SMMU_REQ *req = NULL;
+            CK_SMMU_RSP *rsp = NULL;
+            status = WdfRequestRetrieveInputBuffer(request, sizeof(*req), (PVOID*)&req, NULL);
+            if(NT_SUCCESS(status)) status = WdfRequestRetrieveOutputBuffer(request, sizeof(*rsp), (PVOID*)&rsp, NULL);
+            if(NT_SUCCESS(status) && req && rsp){
+                CK_SMMU_REQ rc = *req;
+                RtlZeroMemory(rsp, sizeof(*rsp));
+                PVOID pSmmu = MapPhys(0x15000000ULL, 0x100000, PAGE_READWRITE | PAGE_NOCACHE);
+                if(!pSmmu){
+                    rsp->Status = 1u;
+                } else {
+                    volatile ULONG *base = (volatile ULONG*)pSmmu;
+                    rsp->Cr0     = READ_REGISTER_ULONG(base + (0x00/4));
+                    rsp->Id0     = READ_REGISTER_ULONG(base + (0x20/4));
+                    rsp->Id1     = READ_REGISTER_ULONG(base + (0x24/4));
+                    rsp->Gfsr    = READ_REGISTER_ULONG(base + (0x48/4));
+                    rsp->Gfsynr0 = READ_REGISTER_ULONG(base + (0x50/4));
+                    rsp->Gfsynr1 = READ_REGISTER_ULONG(base + (0x54/4));
+                    uint32_t numSmr = rsp->Id0 & 0xFFu;
+                    uint32_t numCb  = rsp->Id1 & 0xFFu;
+                    if(numSmr > 128u) numSmr = 128u;
+                    if(numCb > 128u)  numCb  = 128u;
+                    uint8_t usedCb[128];
+                    RtlZeroMemory(usedCb, sizeof(usedCb));
+                    uint32_t freeSlot = 0xFFFFFFFFu;
+                    int overlap = 0;
+                    for(uint32_t i=0; i<numSmr; i++){
+                        ULONG smr  = READ_REGISTER_ULONG(base + ((0x800 + 4*i)/4));
+                        ULONG s2cr = READ_REGISTER_ULONG(base + ((0xC00 + 4*i)/4));
+                        if(smr & 0x80000000u){
+                            if(rsp->ActiveCount < 24u){
+                                rsp->ActiveSmr[rsp->ActiveCount]  = smr;
+                                rsp->ActiveS2cr[rsp->ActiveCount] = s2cr;
+                            }
+                            rsp->ActiveCount++;
+                            if(((s2cr >> 16) & 3u) == 0u && (s2cr & 0xFFu) < 128u) usedCb[s2cr & 0xFFu] = 1u;
+                            uint32_t m = ((smr >> 16) & 0x7FFFu) | (rc.Mask & 0x7FFFu);
+                            if((((smr ^ rc.Sid) & ~m) & 0x7FFFu) == 0u){
+                                overlap = 1;
+                                rsp->Slot = i;
+                                rsp->ReadbackSmr = smr;
+                                rsp->ReadbackS2cr = s2cr;
+                            }
+                        } else if(freeSlot == 0xFFFFFFFFu){
+                            freeSlot = i;
+                        }
+                    }
+                    if(rc.Op == 1u || rc.Op == 2u){
+                        if(rsp->Id0 != 0x4C017E69u || rsp->Id1 != 0x60000046u){
+                            rsp->Status = 2u; /* Unexpected SMMU geometry */
+                        } else if(overlap){
+                            rsp->Status = 3u; /* Already mapped / overlapping */
+                        } else if(freeSlot == 0xFFFFFFFFu){
+                            rsp->Status = 4u; /* No free SMR slot */
+                        } else {
+                            /* Find inactive context bank per G735 policy (CbBase = +0x80000, stride 0x1000) */
+                            uint32_t freeCb = 0xFFFFFFFFu;
+                            uint32_t maxSafeCb = (numCb < 14u) ? numCb : 14u; for(uint32_t cb=0; cb<maxSafeCb; cb++){
+                                if(usedCb[cb]) continue;
+                                volatile ULONG *cbar  = base + ((0x1000 + 4*cb)/4);
+                                volatile ULONG *cba2r = base + ((0x1800 + 4*cb)/4);
+                                volatile ULONG *cbr   = base + ((0x80000 + 0x1000*cb)/4);
+                                ULONG sctlr = READ_REGISTER_ULONG(cbr + (0x00/4));
+                                ULONG actlr = READ_REGISTER_ULONG(cbr + (0x04/4));
+                                ULONG fsr   = READ_REGISTER_ULONG(cbr + (0x58/4));
+                                if(!(sctlr & 0x61u) && actlr == 3u && !fsr && !READ_REGISTER_ULONG(cbar) && !READ_REGISTER_ULONG(cba2r)){
+                                    freeCb = cb;
+                                    break;
+                                }
+                            }
+                            if(freeCb == 0xFFFFFFFFu){
+                                rsp->Status = 5u; /* No inactive CB */
+                            } else {
+                                volatile ULONG *cbar  = base + ((0x1000 + 4*freeCb)/4);
+                                volatile ULONG *cba2r = base + ((0x1800 + 4*freeCb)/4);
+                                volatile ULONG *cbr   = base + ((0x80000 + 0x1000*freeCb)/4);
+                                volatile ULONG *smrp  = base + ((0x800 + 4*freeSlot)/4);
+                                volatile ULONG *s2crp = base + ((0xC00 + 4*freeSlot)/4);
+                                if(rc.Op == 2u && Owner && Owner->FrpcBuf){
+                                    /* Stage-1 39-bit 4KB page table mapping IOVA 0x10000000 (64KB) -> Owner->FrpcPhys */
+                                    if(!Owner->SmmuPt){
+                                        PHYSICAL_ADDRESS lo, hi, bnd;
+                                        lo.QuadPart = 0; hi.QuadPart = 0xFFFFFFFFLL; bnd.QuadPart = 0;
+                                        Owner->SmmuPt = (uint8_t*)MmAllocateContiguousMemorySpecifyCache(12288, lo, hi, bnd, MmNonCached);
+                                        if(Owner->SmmuPt){
+                                            RtlZeroMemory(Owner->SmmuPt, 12288);
+                                            Owner->SmmuPtPhys = (uint64_t)MmGetPhysicalAddress(Owner->SmmuPt).QuadPart;
+                                            uint64_t l2p = Owner->SmmuPtPhys + 4096ULL;
+                                            uint64_t l3p = Owner->SmmuPtPhys + 8192ULL;
+                                            uint64_t *l1 = (uint64_t*)(Owner->SmmuPt + 0);
+                                            uint64_t *l2 = (uint64_t*)(Owner->SmmuPt + 4096);
+                                            uint64_t *l3 = (uint64_t*)(Owner->SmmuPt + 8192);
+                                            l1[0]   = l2p | 3ULL; /* VA 0x00000000..0x3FFFFFFF */
+                                            l2[128] = l3p | 3ULL; /* VA 0x10000000..0x101FFFFF */
+                                            for(uint32_t pg = 0; pg < 16u; pg++){
+                                                /* AF=1(0x400), SH=IS(0x300), AP=01 RW any EL(0x40), AttrIndx=0(NC), Page=3 -> 0x743 */
+                                                l3[pg] = (Owner->FrpcPhys + (uint64_t)pg * 4096ULL) | 0x743ULL; /* v24: AP=01 (RW at any EL): SMMU DMA is unprivileged; 0x703 (EL1-only) permission-faulted the ADSP's first PCM read */
+                                            }
+                                            KeMemoryBarrier();
+                                        }
+                                    }
+                                    if(!Owner->SmmuPt){
+                                        rsp->Status = 6u;
+                                    } else {
+                                        WRITE_REGISTER_ULONG(cbar,  0x0001F300u);
+                                        WRITE_REGISTER_ULONG(cba2r, 1u);
+                                        WRITE_REGISTER_ULONG(cbr + (0x10/4), 0x00000002u); /* TCR2: PASize=2 (40-bit), SEP=0 */
+                                        WRITE_REGISTER_ULONG(cbr + (0x20/4), (ULONG)(Owner->SmmuPtPhys & 0xFFFFFFFFULL));
+                                        WRITE_REGISTER_ULONG(cbr + (0x24/4), (ULONG)(Owner->SmmuPtPhys >> 32));
+                                        WRITE_REGISTER_ULONG(cbr + (0x28/4), 0u);
+                                        WRITE_REGISTER_ULONG(cbr + (0x2C/4), 0u);
+                                        WRITE_REGISTER_ULONG(cbr + (0x30/4), 0x00803019u); /* TCR: T0SZ=25(39b), TG0=4K, SH0=IS, NC, EPD1=1 */
+                                        WRITE_REGISTER_ULONG(cbr + (0x34/4), 0u);
+                                        WRITE_REGISTER_ULONG(cbr + (0x38/4), 0x00000044u); /* MAIR0: Attr0=Normal NC */
+                                        WRITE_REGISTER_ULONG(cbr + (0x3C/4), 0u);
+                                        WRITE_REGISTER_ULONG(cbr + (0x618/4), 0u);         /* TLBIALL */
+                                        KeMemoryBarrier();
+                                        WRITE_REGISTER_ULONG(cbr + (0x00/4), 0xE1u);       /* SCTLR: M=1 Stage-1 enabled! */
+                                    }
+                                } else {
+                                    /* Exact G735 identity-bypass sequence (M=0, VA64, Stage-1/Stage-2 bypass) */
+                                    WRITE_REGISTER_ULONG(cbar,  0x0001F300u);
+                                    WRITE_REGISTER_ULONG(cba2r, 1u);
+                                    WRITE_REGISTER_ULONG(cbr + (0x10/4), 0x60u);       /* TCR2 */
+                                    WRITE_REGISTER_ULONG(cbr + (0x20/4), 0u);          /* TTBR0_LO */
+                                    WRITE_REGISTER_ULONG(cbr + (0x24/4), 0u);          /* TTBR0_HI */
+                                    WRITE_REGISTER_ULONG(cbr + (0x28/4), 0u);          /* TTBR1_LO */
+                                    WRITE_REGISTER_ULONG(cbr + (0x2C/4), 0u);          /* TTBR1_HI */
+                                    WRITE_REGISTER_ULONG(cbr + (0x30/4), 0x80A000A0u); /* TCR */
+                                    WRITE_REGISTER_ULONG(cbr + (0x34/4), 0u);          /* CONTEXTIDR */
+                                    WRITE_REGISTER_ULONG(cbr + (0x38/4), 0u);          /* MAIR0 */
+                                    WRITE_REGISTER_ULONG(cbr + (0x3C/4), 0u);          /* MAIR1 */
+                                    WRITE_REGISTER_ULONG(cbr + (0x00/4), 0xE0u);       /* SCTLR: M=0 bypass */
+                                }
+                                KeMemoryBarrier();
+                                WRITE_REGISTER_ULONG(s2crp, freeCb);
+                                KeMemoryBarrier();
+                                ULONG smrVal = 0x80000000u | ((rc.Mask & 0x7FFFu) << 16) | (rc.Sid & 0x7FFFu);
+                                WRITE_REGISTER_ULONG(smrp, smrVal);
+                                KeMemoryBarrier();
+                                rsp->Slot          = freeSlot;
+                                rsp->Cb            = freeCb;
+                                rsp->ReadbackSmr   = READ_REGISTER_ULONG(smrp);
+                                rsp->ReadbackS2cr  = READ_REGISTER_ULONG(s2crp);
+                                rsp->ReadbackCbar  = READ_REGISTER_ULONG(cbar);
+                                rsp->ReadbackSctlr = READ_REGISTER_ULONG(cbr + (0x00/4));
+                                rsp->Gfsr          = READ_REGISTER_ULONG(base + (0x48/4));
+                                rsp->Status        = (rsp->ReadbackSmr == smrVal && rsp->ReadbackS2cr == freeCb) ? 0u : 6u;
+                            }
+                        }
+                    }
+                    MmUnmapIoSpace(pSmmu, 0x100000);
+                }
+                info = sizeof(*rsp);
+            }
+        } else {
+            status = STATUS_BUFFER_TOO_SMALL;
+        }
+        goto done;
+    } else if(code == IOCTL_CK_HYP_ASSIGN){
+        /* Qualcomm SCM MEM_PROT_ASSIGN (0x42000C16) to share Owner->FrpcBuf with ADSP/LPASS/SSC */
+        if(Owner && Owner->FrpcBuf && inBytes >= sizeof(CK_HYP_REQ) && outBytes >= sizeof(CK_HYP_RSP)){
+            CK_HYP_REQ *req = NULL;
+            CK_HYP_RSP *rsp = NULL;
+            status = WdfRequestRetrieveInputBuffer(request, sizeof(*req), (PVOID*)&req, NULL);
+            if(NT_SUCCESS(status)) status = WdfRequestRetrieveOutputBuffer(request, sizeof(*rsp), (PVOID*)&rsp, NULL);
+            if(NT_SUCCESS(status) && req && rsp){
+                CK_HYP_REQ rq = *req;
+                RtlZeroMemory(rsp, sizeof(*rsp));
+                rsp->BufPhys = Owner->FrpcPhys;
+                rsp->BufSize = Owner->FrpcBufSize;
+                PHYSICAL_ADDRESS lo, hi, bnd;
+                lo.QuadPart = 0; hi.QuadPart = 0xFFFFFFFFLL; bnd.QuadPart = 0;
+                uint8_t *db = (uint8_t*)MmAllocateContiguousMemorySpecifyCache(4096, lo, hi, bnd, MmNonCached);
+                if(!db){
+                    rsp->R0 = -12;
+                } else {
+                    RtlZeroMemory(db, 4096);
+                    uint64_t dp = (uint64_t)MmGetPhysicalAddress(db).QuadPart;
+                    /* +0x00: src[1] = { 3 (VMID_HLOS) } */
+                    *(uint32_t*)(db + 0x00) = 3u;
+                    uint8_t *probeBuf = NULL;
+                    uint64_t tgtPhys = Owner->FrpcPhys;
+                    uint64_t tgtSize = (uint64_t)Owner->FrpcBufSize;
+                    int isProbe = (rq.DestVmid2 & 0x80000000u) ? 1 : 0;
+                    rq.DestVmid2 &= 0x7FFFFFFFu;
+                    if(isProbe){
+                        probeBuf = (uint8_t*)MmAllocateContiguousMemorySpecifyCache(4096, lo, hi, bnd, MmNonCached);
+                        if(probeBuf){ tgtPhys = (uint64_t)MmGetPhysicalAddress(probeBuf).QuadPart; tgtSize = 4096ULL; }
+                    }
+                    rsp->BufPhys = tgtPhys; rsp->BufSize = (uint32_t)tgtSize;
+                    /* +0x40: mem_to_map = { mem_addr, mem_size } */
+                    *(uint64_t*)(db + 0x40) = tgtPhys;
+                    *(uint64_t*)(db + 0x48) = tgtSize;
+                    /* +0x80: dest[] = struct qcom_scm_current_perm_info { u32 vmid, u32 perm, u64 ctx, u32 ctx_size, u32 pad } = 24B each */
+                    uint32_t dcnt = 1u;
+                    *(uint32_t*)(db + 0x80 + 0) = 3u; /* VMID_HLOS */
+                    *(uint32_t*)(db + 0x80 + 4) = 7u; /* RWX */
+                    if(rq.DestVmid1){
+                        *(uint32_t*)(db + 0x80 + dcnt*24 + 0) = rq.DestVmid1;
+                        *(uint32_t*)(db + 0x80 + dcnt*24 + 4) = 6u; /* RW */
+                        dcnt++;
+                    }
+                    if(rq.DestVmid2){
+                        *(uint32_t*)(db + 0x80 + dcnt*24 + 0) = rq.DestVmid2;
+                        *(uint32_t*)(db + 0x80 + dcnt*24 + 4) = 6u; /* RW */
+                        dcnt++;
+                    }
+                    /* +0x100: ext_args[4] = { src_sz=4, dest_phys, dest_sz, spare=0 } */
+                    *(uint64_t*)(db + 0x100) = 4ULL;
+                    *(uint64_t*)(db + 0x108) = dp + 0x80ULL;
+                    *(uint64_t*)(db + 0x110) = (uint64_t)(dcnt * 24u);
+                    *(uint64_t*)(db + 0x118) = 0ULL;
+                    KeMemoryBarrier();
+
+                    register uint64_t x0 __asm__("x0") = 0x42000C16ULL;
+                    register uint64_t x1 __asm__("x1") = 0x00001117ULL;
+                    register uint64_t x2 __asm__("x2") = dp + 0x40ULL;
+                    register uint64_t x3 __asm__("x3") = 16ULL;
+                    register uint64_t x4 __asm__("x4") = dp + 0x00ULL;
+                    register uint64_t x5 __asm__("x5") = dp + 0x100ULL;
+                    register uint64_t x6 __asm__("x6") = 0ULL;
+                    for(uint32_t tries = 0; tries < 20; tries++){
+                        __asm__ volatile("smc #0"
+                            : "+r"(x0), "+r"(x1), "+r"(x2), "+r"(x3), "+r"(x4), "+r"(x5), "+r"(x6)
+                            :
+                            : "x7", "x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17", "memory");
+                        rsp->Retries = tries;
+                        if((int64_t)x0 != 1LL) break; /* 1 == QCOM_SCM_INTERRUPTED */
+                        x0 = 0x42000C16ULL;
+                    }
+                    rsp->R0 = (int64_t)x0;
+                    rsp->R1 = (int64_t)x1;
+                    rsp->R2 = (int64_t)x2;
+                    rsp->R3 = (int64_t)x3;
+                    if(probeBuf){
+                        if(rsp->R0 == 0 && rsp->R1 == 0){
+                            /* Restore {3, v1} -> {3} so page is safely owned by HLOS before freeing */
+                            *(uint32_t*)(db + 0x00) = 3u;
+                            *(uint32_t*)(db + 0x04) = rq.DestVmid1;
+                            *(uint32_t*)(db + 0x80 + 0) = 3u;
+                            *(uint32_t*)(db + 0x80 + 4) = 7u;
+                            *(uint64_t*)(db + 0x100) = 8ULL;
+                            *(uint64_t*)(db + 0x108) = dp + 0x80ULL;
+                            *(uint64_t*)(db + 0x110) = 24ULL;
+                            *(uint64_t*)(db + 0x118) = 0ULL;
+                            KeMemoryBarrier();
+                            register uint64_t rx0 __asm__("x0") = 0x42000C16ULL;
+                            register uint64_t rx1 __asm__("x1") = 0x00001117ULL;
+                            register uint64_t rx2 __asm__("x2") = dp + 0x40ULL;
+                            register uint64_t rx3 __asm__("x3") = 16ULL;
+                            register uint64_t rx4 __asm__("x4") = dp + 0x00ULL;
+                            register uint64_t rx5 __asm__("x5") = dp + 0x100ULL;
+                            register uint64_t rx6 __asm__("x6") = 0ULL;
+                            __asm__ volatile("smc #0" : "+r"(rx0), "+r"(rx1), "+r"(rx2), "+r"(rx3), "+r"(rx4), "+r"(rx5), "+r"(rx6) : : "x7","x8","x9","x10","x11","x12","x13","x14","x15","x16","x17","memory");
+                        }
+                        MmFreeContiguousMemorySpecifyCache(probeBuf, 4096, MmNonCached);
+                    }
+                    MmFreeContiguousMemorySpecifyCache(db, 4096, MmNonCached);
+                }
                 info = sizeof(*rsp);
             }
         } else {

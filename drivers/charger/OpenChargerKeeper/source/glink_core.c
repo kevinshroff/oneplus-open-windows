@@ -291,12 +291,12 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
             CkIpcQueueHello(&s->Ipc);
         } else if(p1 == CK_AUD_CID){
             s->Aud.OpenAcked = 1u;
-            while(s->Aud.CurrentOffers < 2u){
+            while(s->Aud.CurrentOffers < 8u){
                 if(!QueueAudIntent(s, io)) break;
             }
         } else if(p1 == CK_FRPC_CID){
             s->Frpc.OpenAcked = 1u;
-            while(s->Frpc.CurrentOffers < 2u){
+            while(s->Frpc.CurrentOffers < 4u){
                 if(!QueueFrpcIntent(s, io)) break;
             }
         }
@@ -360,6 +360,12 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
                 if(slot == CK_AUD_INTENTS){
                     for(uint32_t i=0;i<CK_AUD_INTENTS;i++){
                         if(s->Aud.Remote[i].State == 0){ slot = i; break; }
+                    }
+                }
+                if(slot == CK_AUD_INTENTS){
+                    uint32_t minSz = 0xFFFFFFFFu;
+                    for(uint32_t i=0;i<CK_AUD_INTENTS;i++){
+                        if(s->Aud.Remote[i].State == 1 && s->Aud.Remote[i].Bytes < minSz){ minSz = s->Aud.Remote[i].Bytes; slot = i; }
                     }
                 }
                 if(slot < CK_AUD_INTENTS){
@@ -441,7 +447,7 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
     case 8u: /* RX_INTENT_REQ_ACK */
         if(p1 == s->RemoteCid && p2 == 0u) s->IntentRequestPending = 0;
         else if(s->Ipc.RemoteOpen && p1 == s->Ipc.RemoteCid && p2 == 0u) s->Ipc.IntentReqPending = 0;
-        else if(s->Aud.RemoteOpen && p1 == s->Aud.RemoteCid && p2 == 0u) s->Aud.IntentReqPending = 0;
+        else if(s->Aud.RemoteOpen && p1 == s->Aud.RemoteCid && p2 == 0u){ s->Aud.IntentReqPending = 0; if(s->Aud.TxHead != s->Aud.TxTail) s->Aud.TxTail = (s->Aud.TxTail + 1u) % CK_AUD_QSLOTS; }
         break;
     case 9u:  /* TX_DATA */
     case 12u: /* TX_DATA_CONT */
@@ -527,6 +533,7 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
                             s->Aud.Local[i].State = 0;
                             if(s->Aud.CurrentOffers) s->Aud.CurrentOffers--;
                             QueueAudIntent(s, io);
+                            QueueAudIntent(s, io);
                         }
                         break;
                     }
@@ -555,6 +562,7 @@ static void HandleRx(CK_GL_STATE *s, const CK_GL_IO *io, const uint8_t *f, uint3
                             SendCmd(s, io, 6u, (uint16_t)CK_FRPC_CID, p2);
                             s->Frpc.Local[i].State = 0;
                             if(s->Frpc.CurrentOffers) s->Frpc.CurrentOffers--;
+                            QueueFrpcIntent(s, io);
                             QueueFrpcIntent(s, io);
                         }
                         break;
@@ -789,7 +797,7 @@ int CkGlPoll(CK_GL_STATE *s, const CK_GL_IO *io, uint64_t now_us){
             }
             if(ridx == CK_AUD_INTENTS){
                 if(!s->Aud.IntentReqPending){
-                    if(SendCmd(s, io, 7u, (uint16_t)s->Aud.RemoteCid, txl)){ s->Aud.IntentReqPending = 1u; progress = 1; }
+                    if(SendCmd(s, io, 7u, (uint16_t)CK_AUD_CID, txl)){ s->Aud.IntentReqPending = 1u; progress = 1; }
                 }
             } else if(16u + txl <= CK_FRAME_BYTES){
                 uint8_t f[16u + CK_AUD_BUF];

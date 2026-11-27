@@ -23,7 +23,37 @@
 #define IOCTL_CK_GPR_SEND  0x0022A028u /* METHOD_BUFFERED, FILE_WRITE_ACCESS */
 #define IOCTL_CK_GPR_RECV  0x0022602Cu /* METHOD_BUFFERED, FILE_READ_ACCESS */
 #define IOCTL_CK_TFA_I2C   0x0022E030u /* METHOD_BUFFERED, FILE_READ_ACCESS|FILE_WRITE_ACCESS */
-#define IOCTL_CK_SHM_WRITE 0x0022A034u /* METHOD_BUFFERED, FILE_WRITE_ACCESS */
+#define IOCTL_CK_SHM_WRITE  0x0022A034u /* METHOD_BUFFERED, FILE_WRITE_ACCESS */
+#define IOCTL_CK_SMMU_ADSP  0x0022E038u /* METHOD_BUFFERED, FILE_READ_ACCESS|FILE_WRITE_ACCESS */
+#define IOCTL_CK_HYP_ASSIGN 0x0022E03Cu /* METHOD_BUFFERED, FILE_READ_ACCESS|FILE_WRITE_ACCESS */
+
+typedef struct {
+    uint32_t DestVmid1; /* e.g. 0x16 (LPASS/ADSP) */
+    uint32_t DestVmid2; /* optional, e.g. 0x05 (SSC_Q6) or 0 */
+} CK_HYP_REQ;
+
+typedef struct {
+    int64_t  R0, R1, R2, R3;
+    uint64_t BufPhys;
+    uint32_t BufSize;
+    uint32_t Retries;
+} CK_HYP_RSP;
+
+typedef struct {
+    uint32_t Op;   /* 0=inspect(RO), 1=program identity bypass for (Sid, Mask) */
+    uint32_t Sid;  /* e.g. 0x1001, 0x1061, 0x1003, 0x1063 */
+    uint32_t Mask; /* e.g. 0x0080 or 0 */
+} CK_SMMU_REQ;
+
+typedef struct {
+    uint32_t Status;   /* 0=OK */
+    uint32_t Id0, Id1, Cr0, Gfsr, Gfsynr0, Gfsynr1;
+    uint32_t ActiveCount;
+    uint32_t Slot, Cb;
+    uint32_t ReadbackSmr, ReadbackS2cr, ReadbackCbar, ReadbackSctlr;
+    uint32_t ActiveSmr[24];
+    uint32_t ActiveS2cr[24];
+} CK_SMMU_RSP;
 
 typedef struct {
     uint32_t Op;    /* 0=status(RO), 1=clk+gpio+init, 2=i2c_read16, 3=i2c_write16 */
