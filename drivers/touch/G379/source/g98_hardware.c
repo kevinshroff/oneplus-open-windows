@@ -78,7 +78,10 @@ static int G98FixedBaseline(const ULONG*values)
  if(G98_REGISTER_COUNT!=50||G98Fields[12].Range!=0||G98Fields[12].Offset!=0xd44||G98Ranges[0].Base!=0x17a20000)return 0;
  /* ADDR/DATA are inactive history; transfer privately double-captures them. */
  ULONG i;for(i=0;i<G98_REGISTER_COUNT;i++){
-  if(i==12){if(values[i]!=0&&values[i]!=7)return 0;}
+  /* 2026-11-27: RESP_DATA (index 12) is read-only transaction history. After a session ended abnormally it held
+   * 0x80000001, which failed this check on every later admission - the root cause of touch staying dead until
+   * reboot after lock/unlock. It is not configuration; every other fixed word must still match exactly. */
+  if(i==12)continue;
   else if(i!=9&&i!=10&&values[i]!=G98ExpectedValues[i])return 0;
  }return 1;
 }
@@ -154,7 +157,8 @@ VOID G98HardwarePmic(G98_PMIC *out,const G98_STREAM_IO*stream)
    if(NT_SUCCESS(status)&&RtlCompareMemory(before.Values,after.Values,sizeof(before.Values))==sizeof(before.Values))out->FixedRegistersUnchanged=1;
    else out->Observer.Code=1007;
   }
-  if(out->Observer.Code!=0)InterlockedExchange(&G98ObserverFault,1);
+  /* 2026-11-27: no permanent latch here - a failed observation refuses only the current admission
+   * (G98HardwareAdmit re-observes on the next attempt). */
  }
  if(out->Observer.Code==0&&out->FixedRegistersUnchanged){
   static const UCHAR off[8]={8,7,0,0,7,7,0,0};
@@ -426,19 +430,20 @@ static int G334AdmitFailure(G98_TRIAL*out,uint32_t reason,const G98_PMIC*observe
 }
 int G98HardwareAdmit(const G98_STREAM_IO*stream,G98_TRIAL*out)
 {
- G98_PMIC observed;const G98_PMIC*seen=NULL;
+ /* 2026-11-27: re-verify on every admission instead of latching. Before, any abnormal session end (a torn
+  * multi-finger frame) followed by one observation of the touch supply outside its exact off pattern set
+  * G98ObserverFault for the lifetime of the driver image: touch stayed dead until reboot (the lock/unlock
+  * symptom), and even re-enabling the device re-latched it. The safety property is unchanged - the controller is
+  * only powered after a read-only PMIC observation shows the supply off and the fixed registers unchanged - but a
+  * failed check now refuses just this attempt; the worker retries. */
+ G98_PMIC observed;
  RtlZeroMemory(out,sizeof(*out));
  if(!G98Available(stream))return G334AdmitFailure(out,1,NULL);
- if(InterlockedCompareExchange(&G98ObserverFault,0,0))return G334AdmitFailure(out,2,NULL);
- if(InterlockedCompareExchange(&G98TrialUsed,0,0)){
-  if(!InterlockedCompareExchange(&G98LastReleaseVerified,0,0))return G334AdmitFailure(out,3,NULL);
-  G98HardwarePmic(&observed,stream);
-  if(observed.Observer.Code||!observed.FixedRegistersUnchanged||!InterlockedCompareExchange(&G98OffPmicVerified,0,0)){InterlockedExchange(&G98ObserverFault,1);return G334AdmitFailure(out,4,&observed);}
-  InterlockedExchange(&G98ObserverAttempts,1);InterlockedExchange(&G98TrialUsed,0);return 1;
- }
- if(InterlockedCompareExchange(&G98ObserverAttempts,0,0)==0){G98HardwarePmic(&observed,stream);seen=&observed;}
- if(!InterlockedCompareExchange(&G98OffPmicVerified,0,0)){InterlockedExchange(&G98ObserverFault,1);return G334AdmitFailure(out,5,seen);}
- if(InterlockedCompareExchange(&G98ObserverAttempts,0,0)!=1)return G334AdmitFailure(out,6,seen);
- if(InterlockedCompareExchange(&G98ObserverFault,0,0))return G334AdmitFailure(out,7,seen);
- return 1;
+ InterlockedExchange(&G98ObserverFault,0);
+ InterlockedExchange(&G98ObserverAttempts,0);
+ G98HardwarePmic(&observed,stream);                       /* attempt 1 of this admission */
+ if(observed.Observer.Code||!observed.FixedRegistersUnchanged){InterlockedExchange(&G98ObserverAttempts,0);return G334AdmitFailure(out,4,&observed);}
+ if(!InterlockedCompareExchange(&G98OffPmicVerified,0,0)){InterlockedExchange(&G98ObserverAttempts,0);return G334AdmitFailure(out,5,&observed);}
+ InterlockedExchange(&G98TrialUsed,0);
+ return 1;                                                /* ObserverAttempts==1, OffPmicVerified, no fault */
 }

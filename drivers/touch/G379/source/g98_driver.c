@@ -138,7 +138,14 @@ static void RuntimeStatus(G98HID_CONTEXT*c,G98_RUNTIME*out)
  G98_SESSION session;SessionStatus(c,&session);RtlZeroMemory(out,sizeof(*out));out->Size=sizeof(*out);out->Version=1;out->Magic=G98HID_MAGIC;
  out->State=session.State;out->StopReason=session.StopReason;out->Starts=session.Starts;out->HardwareCalls=session.HardwareCalls;out->ResultReady=session.ResultReady;out->Outcome=session.Outcome;out->Inhibit=session.Inhibit;out->ThreadJoined=session.ThreadJoined;
  out->Cycles=TimeValue(&c->DiagCycles);out->Epochs=TimeValue(&c->DiagEpochs);out->ReportsSubmitted=TimeValue(&c->DiagSubmitted);out->ReportsAccepted=TimeValue(&c->DiagAccepted);out->Reads=TimeValue(&c->DiagReads);out->Writes=TimeValue(&c->DiagWrites);out->Wires=TimeValue(&c->DiagWires);out->BeginUs=session.BeginUs;out->LastCycleUs=TimeValue(&c->LastCycleUs);out->OwnerStarts=TimeValue(&c->OwnerStarts);out->Recoveries=TimeValue(&c->Recoveries);out->D0=Counter(&c->D0);out->Started=Counter(&c->Started);out->FaultReady=Counter(&c->FaultReady);
- if(Counter(&c->State)==G98_OWNER_DONE){out->HardwareCode=c->Result->Trial.Power.Code;out->PollCode=c->Result->Trial.Touch.Poll.Code;out->TouchCode=c->Result->Trial.Touch.Code;}
+ /* 2026-11-27: always report the latest attempt's codes (racy snapshot while running); before, a worker stuck
+  * retrying in recovery hid why each attempt failed. */
+ out->HardwareCode=c->Result->Trial.Power.Code;out->PollCode=c->Result->Trial.Touch.Poll.Code;out->TouchCode=c->Result->Trial.Touch.Code;
+ /* hardware code 1011 (admission refused): PollCode carries the 334xx admission stage and TouchCode the guard
+  * snapshot (bit0 ObserverAttempts, bit1 ObserverFault, bit2 OffPmicVerified, bit3 TrialUsed, bit4 LastReleaseVerified,
+  * bit5 FixedRegistersUnchanged, bits8-15 observed supply status, bits16-31 observer code) */
+ if(out->HardwareCode==1011){G98_POWER_RESULT*pw=&c->Result->Trial.Power;out->PollCode=pw->Stage;
+  out->TouchCode=(pw->GuardBefore[0]?1u:0u)|(pw->GuardBefore[1]?2u:0u)|(pw->GuardBefore[2]?4u:0u)|(pw->GuardBefore[3]?8u:0u)|(pw->GuardBefore[4]?16u:0u)|(pw->GuardBefore[5]?32u:0u)|((pw->PmicCount?(pw->Pmic[0].Status&0xFFu):0u)<<8)|((pw->PmicCount?(pw->Pmic[0].Code&0xFFFFu):0u)<<16);}
 }
 VOID G98HIDFeature(PVOID context,VHFOPERATIONHANDLE operation,PVOID operationContext,PHID_XFER_PACKET packet)
 {
@@ -199,7 +206,7 @@ static void SaveFirstFault(G98HID_CONTEXT*c)
 static int RecoveryWait(G98HID_CONTEXT*c)
 {
  LARGE_INTEGER wait;unsigned i;wait.QuadPart=-1000000;
- for(i=0;i<5;i++){if(StopRequested(c)||!Available(c))return 0;KeDelayExecutionThread(KernelMode,FALSE,&wait);}return !StopRequested(c)&&Available(c);
+ for(i=0;i<10;i++){if(StopRequested(c)||!Available(c))return 0;KeDelayExecutionThread(KernelMode,FALSE,&wait);}return !StopRequested(c)&&Available(c);
 }
 static VOID Worker(PVOID context)
 {

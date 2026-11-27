@@ -54,7 +54,21 @@ int G98Poll(const G98_POLL_IO*io,G98_POLL_RESULT*r)
   }
   if(Stopped(io,r))break;
   if(f->Frame.Kind==G98_FRAME_IDLE){r->IdleRecords++;f->ElapsedUs=r->ElapsedUs;if(!io->Advance(io->Context)){r->Code=G98_POLL_ADVANCE_ERROR;break;}continue;}
-  if(!G98ReportClearable(f->Bytes,f->ReadBytes)){r->Code=G98_POLL_DECODE;break;}
+  if(!G98ReportClearable(f->Bytes,f->ReadBytes)){
+   /* 2026-11-27: a frame that still fails its checksum (a >2-finger frame is read in two transfers and the
+    * controller can update its buffer in between), or an unsupported event (gesture/pen/unknown flags), is
+    * acknowledged and dropped instead of ending the session. Ending it here killed touch until reboot: one torn
+    * 3-finger frame (body checksum 0x054F vs 0x0460) was followed by restarts that never succeeded. Releases are
+    * header-only frames with no body checksum, so dropping a torn move frame cannot leave a contact stuck. */
+   r->ControlRecords++;   /* counted as a non-contact record: G98_POLL_RESULT has a fixed ABI size */
+   f->ClearAttempted=1;r->ClearAttempts++;
+   if(!io->Clear(io->Context)){r->Code=G98_POLL_CLEAR;break;}
+   f->ClearCompleted=1;r->ClearCompleted++;
+   r->BusQuiescent=io->Quiet(io->Context)!=0;if(!r->BusQuiescent){r->Code=G98_POLL_QUIET;break;}
+   if(!Clock(io,r,begin,&previous))break;f->ElapsedUs=r->ElapsedUs;
+   if(!io->Advance(io->Context)){r->Code=G98_POLL_ADVANCE_ERROR;break;}
+   continue;
+  }
   if(f->Frame.Kind==G98_FRAME_CONTACTS){
    if(!io->Stage(io->Context,f->Bytes,f->ReadBytes,begin+r->ElapsedUs)){r->Code=G98_POLL_STAGE;break;}
    if(!Clock(io,r,begin,&previous))break;
